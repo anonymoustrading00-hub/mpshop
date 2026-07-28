@@ -101,6 +101,7 @@ export async function deleteSession(sessionId: string) {
 }
 
 export async function authenticateUser(username: string, password: string) {
+  console.log(`[Auth] Attempt: username="${username}", password="${password}"`);
   const user = await getUserByUsername(username);
 
   // Si el usuario existe en la base de datos y tiene contraseña, usarlo a él

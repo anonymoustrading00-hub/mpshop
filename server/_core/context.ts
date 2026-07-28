@@ -6,12 +6,14 @@ export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: User | null;
+  branchId: number;
 };
 
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
   let user: User | null = null;
+  let branchId = 1; // Default to main warehouse
 
   try {
     user = await sdk.authenticateRequest(opts.req);
@@ -22,9 +24,18 @@ export async function createContext(
     user = null;
   }
 
+  const branchHeader = opts.req.headers["x-branch-id"];
+  if (branchHeader && typeof branchHeader === "string") {
+    const parsed = parseInt(branchHeader, 10);
+    if (!isNaN(parsed)) {
+      branchId = parsed;
+    }
+  }
+
   return {
     req: opts.req,
     res: opts.res,
     user,
+    branchId,
   };
 }

@@ -11,6 +11,8 @@ type BusinessData = {
     totalSales: number;
     totalRevenue: number;
     totalExpenses: number;
+    totalPurchases?: number;
+    purchaseCount?: number;
     netIncome: number;
     avgOrderValue: number;
     activeZones: number;
@@ -59,7 +61,8 @@ export const exportBusinessToPDF = (data: BusinessData, periodStr: string) => {
     ["  → Entregas (Delivery)", data.summary.totalDeliveries.toString()],
     ["  → Ventas (Caja/Directa)", data.summary.totalSales.toString()],
     ["Ingresos Brutos", `Bs. ${(data.summary.totalRevenue / 100).toFixed(2)}`],
-    ["Gastos Operativos", `Bs. ${(data.summary.totalExpenses / 100).toFixed(2)}`],
+    ["Compras", `Bs. ${((data.summary.totalPurchases || 0) / 100).toFixed(2)}`],
+    ["Egresos Totales", `Bs. ${(data.summary.totalExpenses / 100).toFixed(2)}`],
     ["Utilidad Neta", `Bs. ${(data.summary.netIncome / 100).toFixed(2)}`],
     ["Ticket Promedio", `Bs. ${(data.summary.avgOrderValue / 100).toFixed(2)}`],
     ["Clientes Atendidos", data.summary.totalCustomers.toString()],
@@ -213,7 +216,8 @@ export const exportBusinessToExcel = (data: BusinessData, periodStr: string) => 
     ["Entregas (Delivery)", data.summary.totalDeliveries],
     ["Ventas (Caja/Directa)", data.summary.totalSales],
     ["Ingresos Brutos (Bs.)", +(data.summary.totalRevenue / 100).toFixed(2)],
-    ["Gastos Operativos (Bs.)", +(data.summary.totalExpenses / 100).toFixed(2)],
+    ["Compras (Bs.)", +((data.summary.totalPurchases || 0) / 100).toFixed(2)],
+    ["Egresos Totales (Bs.)", +(data.summary.totalExpenses / 100).toFixed(2)],
     ["Utilidad Neta (Bs.)", +(data.summary.netIncome / 100).toFixed(2)],
     ["Ticket Promedio (Bs.)", +(data.summary.avgOrderValue / 100).toFixed(2)],
     [],

@@ -173,8 +173,8 @@ export default function Reports() {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Reportes</h1>
-        <p className="text-gray-500">Genera y descarga reportes del sistema</p>
+        <h1 className="text-4xl font-black text-slate-900 tracking-tight"><span className="text-teal-600">Reportes</span></h1>
+        <p className="text-sm text-slate-500 mt-1.5">Genera y descarga reportes del sistema</p>
       </div>
 
       {/* Filtros */}

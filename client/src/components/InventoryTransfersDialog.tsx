@@ -16,7 +16,7 @@ export function InventoryTransfersDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2 bg-white/80">
+        <Button variant="outline" className="gap-2 bg-white/80 border-2 border-transparent hover:border-blue-500 transition-all duration-200">
           <History className="h-4 w-4 text-blue-600" />
           Historial de Traspasos
         </Button>

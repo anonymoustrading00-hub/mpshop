@@ -33,6 +33,31 @@ export const financeRouter = router({
     return await getFinancialTransactions(userId);
   }),
 
+  getGlobalBalances: protectedProcedure.query(async () => {
+    const transactions = await getFinancialTransactions(undefined);
+    const openings = await getAllCashOpenings();
+
+    const calc = (method: "cash" | "qr" | "transfer") => {
+      const income = (transactions as any[])
+        .filter((t: any) => t.type === "income" && (t.paymentMethod === method || (method === "cash" && !t.paymentMethod)))
+        .reduce((s: number, t: any) => s + (t.amount || 0), 0);
+      const expense = (transactions as any[])
+        .filter((t: any) => t.type === "expense" && (t.paymentMethod === method || (method === "cash" && !t.paymentMethod)))
+        .reduce((s: number, t: any) => s + (t.amount || 0), 0);
+      const openingTotal = (openings as any[])
+        .filter((o: any) => o.paymentMethod === method || (method === "cash" && !o.paymentMethod))
+        .reduce((s: number, o: any) => s + (o.openingAmount || 0), 0);
+      return income - expense + openingTotal;
+    };
+
+    return {
+      cash: calc("cash"),
+      qr: calc("qr"),
+      transfer: calc("transfer"),
+    };
+  }),
+
+
   getCashOpenings: protectedProcedure.query(async ({ ctx }) => {
     if (ctx.user?.role !== "admin") {
       throw new TRPCError({ code: "FORBIDDEN" });

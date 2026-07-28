@@ -23,6 +23,8 @@ import {
   Receipt,
   Factory,
   LineChart,
+  CreditCard,
+  Landmark,
 } from "lucide-react";
 
 const adminModules = [
@@ -35,6 +37,8 @@ const adminModules = [
   { href: "/sales", title: "Ventas", description: "Ventas rapidas y cobros.", icon: ShoppingBag },
   { href: "/customers", title: "Clientes", description: "Frecuencia, deuda y zonas.", icon: Users },
   { href: "/finance", title: "Finanzas", description: "Caja, ingresos y egresos.", icon: DollarSign },
+  { href: "/accounts-receivable", title: "Cuentas por Cobrar", description: "Créditos, cobranzas y pagarés.", icon: CreditCard },
+  { href: "/accounts-payable", title: "Cuentas por Pagar", description: "Deudas y obligaciones a proveedores.", icon: Landmark },
   { href: "/analysis", title: "Análisis", description: "Reportes, rentabilidad y KPIs.", icon: LineChart },
   { href: "/products", title: "Catalogo", description: "Precios, imagenes y categorias.", icon: LayoutGrid },
   { href: "/delivery-persons", title: "Repartidores", description: "Equipo, asignaciones y control.", icon: Truck },

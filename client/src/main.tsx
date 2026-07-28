@@ -22,6 +22,9 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
   if (window.location.pathname.startsWith("/preview/kefir-control")) return;
+  
+  // Prevent infinite redirect loops if we are already on the login or register page
+  if (window.location.pathname === "/login" || window.location.pathname === "/register") return;
 
   const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
 
@@ -52,8 +55,14 @@ const trpcClient = trpc.createClient({
       url: "/api/trpc",
       transformer: superjson,
       fetch(input, init) {
+        const branchId = localStorage.getItem("x-branch-id");
+        const headers = new Headers(init?.headers);
+        if (branchId) {
+          headers.set("x-branch-id", branchId);
+        }
         return globalThis.fetch(input, {
           ...(init ?? {}),
+          headers,
           credentials: "include",
         });
       },

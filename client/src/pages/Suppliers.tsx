@@ -47,8 +47,8 @@ export default function Suppliers() {
     <div className="p-4 space-y-6 max-w-5xl mx-auto mb-20 md:mb-0">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Proveedores</h1>
-          <p className="text-muted-foreground">Gestiona tus contactos comerciales y de suministros.</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight"><span className="text-indigo-600">Proveedores</span></h1>
+          <p className="text-sm text-slate-500 mt-1.5">Gestiona tus contactos comerciales y de suministros.</p>
         </div>
         
         <Dialog open={open} onOpenChange={setOpen}>

@@ -43,39 +43,39 @@
 }
 
 :root {
-  --primary: oklch(0.34 0.05 257);
-  --primary-foreground: oklch(0.985 0.003 255);
-  --sidebar-primary: oklch(0.38 0.05 255);
-  --sidebar-primary-foreground: oklch(0.985 0.003 255);
-  --chart-1: oklch(0.68 0.05 247);
-  --chart-2: oklch(0.58 0.05 235);
-  --chart-3: oklch(0.48 0.04 220);
-  --chart-4: oklch(0.55 0.03 198);
-  --chart-5: oklch(0.73 0.02 255);
+  --primary: #173DED;
+  --primary-foreground: #ffffff;
+  --sidebar-primary: #173DED;
+  --sidebar-primary-foreground: #ffffff;
+  --chart-1: #173DED;
+  --chart-2: #637FFF;
+  --chart-3: #091126;
+  --chart-4: #E4E6ED;
+  --chart-5: #EDF0F7;
   --radius: 1rem;
-  --background: oklch(0.978 0.003 255);
-  --foreground: oklch(0.23 0.018 255);
-  --card: oklch(0.995 0.002 255);
-  --card-foreground: oklch(0.23 0.018 255);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.23 0.018 255);
-  --secondary: oklch(0.95 0.006 252);
-  --secondary-foreground: oklch(0.31 0.02 248);
-  --muted: oklch(0.958 0.003 252);
-  --muted-foreground: oklch(0.5 0.013 252);
-  --accent: oklch(0.936 0.01 248);
-  --accent-foreground: oklch(0.28 0.02 248);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.89 0.006 248 / 72%);
-  --input: oklch(0.89 0.006 248 / 92%);
-  --ring: oklch(0.43 0.05 255);
-  --sidebar: oklch(0.985 0.002 255 / 95%);
-  --sidebar-foreground: oklch(0.23 0.018 255);
-  --sidebar-accent: oklch(0.94 0.009 248);
-  --sidebar-accent-foreground: oklch(0.28 0.02 248);
-  --sidebar-border: oklch(0.89 0.006 248 / 68%);
-  --sidebar-ring: oklch(0.43 0.05 255);
+  --background: #F7FAFF;
+  --foreground: #091126;
+  --card: #ffffff;
+  --card-foreground: #091126;
+  --popover: #ffffff;
+  --popover-foreground: #091126;
+  --secondary: #EDF0F7;
+  --secondary-foreground: #091126;
+  --muted: #E4E6ED;
+  --muted-foreground: #5a647e;
+  --accent: #E4E6ED;
+  --accent-foreground: #091126;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #E4E6ED;
+  --input: #E4E6ED;
+  --ring: #173DED;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #091126;
+  --sidebar-accent: #EDF0F7;
+  --sidebar-accent-foreground: #091126;
+  --sidebar-border: #E4E6ED;
+  --sidebar-ring: #173DED;
 }
 
 .dark {
@@ -115,7 +115,7 @@
 
 @layer base {
   html {
-    font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Poppins", ui-sans-serif, system-ui, sans-serif;
     color-scheme: light;
   }
 
@@ -125,8 +125,9 @@
   h4,
   h5,
   h6 {
-    font-family: "Sora", "Manrope", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Poppins", ui-sans-serif, system-ui, sans-serif;
     letter-spacing: -0.03em;
+    font-weight: 700;
   }
 
   * {
@@ -136,11 +137,24 @@
     @apply bg-background text-foreground antialiased;
     min-height: 100vh;
     overflow-y: auto;
-    background-image:
-      radial-gradient(circle at top left, rgba(51, 65, 85, 0.14), transparent 28%),
-      radial-gradient(circle at top right, rgba(71, 85, 105, 0.12), transparent 24%),
-      linear-gradient(180deg, rgba(248,250,252,0.96) 0%, rgba(242,246,251,0.98) 55%, rgba(237,242,248,1) 100%);
+    background-image: linear-gradient(135deg, #F0F4FF 0%, #EDF0F7 50%, #F7F3FF 100%);
     background-attachment: fixed;
+  }
+
+  /* ✨ Premium custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.3);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.55);
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -163,6 +177,61 @@
   textarea,
   select {
     font-size: 16px;
+  }
+
+  /* 🌟 MAX COLOR UX/UI HOVER & FOCUS STATES 🌟 */
+  /* Filas de tablas con color fuerte y barra lateral indicadora */
+  tr {
+    @apply transition-all duration-200;
+  }
+  tr:hover:not(.border-0) {
+    background-color: color-mix(in srgb, var(--color-primary) 14%, transparent) !important;
+    box-shadow: inset 4px 0 0 0 var(--color-primary);
+  }
+
+  /* Inputs muy coloridos al interactuar */
+  input:not([type="checkbox"]):not([type="radio"]), 
+  textarea, 
+  select {
+    @apply transition-all duration-200;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):hover, 
+  textarea:hover, 
+  select:hover {
+    border-color: var(--color-primary) !important;
+    background-color: color-mix(in srgb, var(--color-primary) 4%, white) !important;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):focus, 
+  textarea:focus, 
+  select:focus {
+    border-color: var(--color-primary) !important;
+    background-color: #fff !important;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 35%, transparent) !important;
+  }
+
+  /* Animación súper táctil y brillo para botones */
+  button:not(:disabled), 
+  [role="button"]:not([aria-disabled="true"]),
+  a {
+    @apply transition-all duration-300;
+  }
+  button:not(:disabled):active, 
+  [role="button"]:not([aria-disabled="true"]):active,
+  a:active {
+    transform: scale(0.95);
+  }
+  button:not(:disabled):hover, 
+  [role="button"]:not([aria-disabled="true"]):hover {
+    filter: brightness(1.15) saturate(1.2);
+  }
+
+  /* Efecto de resplandor (Glow) al pasar sobre Tarjetas (Cards) */
+  .rounded-xl, .rounded-lg, .card {
+    @apply transition-all duration-300;
+  }
+  .rounded-xl:hover:not(button):not(input), .card:hover {
+    box-shadow: 0 12px 30px -10px color-mix(in srgb, var(--color-primary) 35%, transparent) !important;
+    border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
   }
 }
 
@@ -207,9 +276,9 @@
     inset: 0;
     pointer-events: none;
     background:
-      radial-gradient(circle at 20% 15%, rgba(71, 85, 105, 0.08), transparent 22%),
-      radial-gradient(circle at 85% 8%, rgba(30, 41, 59, 0.08), transparent 20%),
-      radial-gradient(circle at 50% 100%, rgba(148, 163, 184, 0.1), transparent 28%);
+      radial-gradient(circle at 15% 10%, rgba(23, 61, 237, 0.07), transparent 30%),
+      radial-gradient(circle at 90% 5%, rgba(99, 102, 241, 0.06), transparent 25%),
+      radial-gradient(circle at 50% 95%, rgba(167, 139, 250, 0.08), transparent 30%);
     z-index: -1;
   }
 
@@ -249,7 +318,15 @@
   }
 
   .pill-nav {
-    @apply inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 p-1 shadow-[0_14px_30px_-18px_rgba(15,23,42,0.3)] backdrop-blur-xl;
+    @apply inline-flex items-center gap-0.5 rounded-full border border-white/70 bg-white/85 p-1 shadow-[0_14px_30px_-18px_rgba(15,23,42,0.3)] backdrop-blur-xl;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    flex-wrap: nowrap;
+  }
+
+  .pill-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .status-chip {
@@ -282,27 +359,27 @@
   }
 
   .production-shell {
-    --kefir-primary: #36469a;
-    --kefir-primary-dark: #253170;
-    --kefir-primary-light: #36469a14;
-    --kefir-primary-glow: #36469a33;
-    --kefir-secondary: #3dcdff;
-    --kefir-gradient: linear-gradient(135deg, #36469a 0%, #3dcdff 100%);
+    --kefir-primary: #173DED;
+    --kefir-primary-dark: #091126;
+    --kefir-primary-light: #637FFF;
+    --kefir-primary-glow: rgba(23, 61, 237, 0.2);
+    --kefir-secondary: #637FFF;
+    --kefir-gradient: linear-gradient(135deg, #173DED 0%, #637FFF 100%);
     --kefir-warning: #ff9f43;
     --kefir-danger: #ff6854;
     --kefir-success: #00d655;
-    --kefir-gray-500: #616569;
-    --kefir-gray-400: #92979d;
-    --kefir-gray-300: #c2c9d1;
-    --kefir-gray-200: #e1e4e8;
-    --kefir-gray-100: #f0f2f3;
-    --kefir-dark: #313131;
-    --kefir-bg: #f5f7fb;
+    --kefir-gray-500: #5a647e;
+    --kefir-gray-400: #8c97ad;
+    --kefir-gray-300: #E4E6ED;
+    --kefir-gray-200: #EDF0F7;
+    --kefir-gray-100: #F7FAFF;
+    --kefir-dark: #091126;
+    --kefir-bg: #F7FAFF;
     --kefir-surface: #ffffff;
-    --kefir-shadow-md: 0 6px 16px #36469a0d, 0 1px 3px #31313105;
-    --kefir-shadow-lg: 0 16px 40px #36469a1a, 0 4px 8px #36469a0a;
-    --kefir-shadow-glow: 0 0 20px #36469a26;
-    font-family: "Outfit", -apple-system, BlinkMacSystemFont, sans-serif;
+    --kefir-shadow-md: 0 6px 16px rgba(23, 61, 237, 0.05), 0 1px 3px rgba(9, 17, 38, 0.05);
+    --kefir-shadow-lg: 0 16px 40px rgba(23, 61, 237, 0.1), 0 4px 8px rgba(23, 61, 237, 0.05);
+    --kefir-shadow-glow: 0 0 20px rgba(23, 61, 237, 0.15);
+    font-family: "Poppins", -apple-system, BlinkMacSystemFont, sans-serif;
     background: var(--kefir-bg);
     color: var(--kefir-dark);
     line-height: 1.6;
@@ -314,9 +391,10 @@
   .production-shell h4,
   .production-shell h5,
   .production-shell h6 {
-    font-family: "Outfit", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: "Poppins", ui-sans-serif, system-ui, sans-serif;
     color: var(--kefir-dark);
     letter-spacing: -0.03em;
+    font-weight: 700;
   }
 
   .production-content {

@@ -30,7 +30,7 @@ export function ArqueoDialog({
   const [reportedTransfer, setReportedTransfer] = useState<number>(0);
 
   const utils = trpc.useContext();
-  const { data: user } = trpc.auth.getUser.useQuery();
+  const { data: user } = trpc.auth.me.useQuery();
 
   const getLocalDateInputValue = () => {
     const now = new Date();

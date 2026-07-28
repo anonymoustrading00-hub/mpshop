@@ -33,6 +33,7 @@ export const purchasesRouter = router({
       paymentStatus: z.enum(["pending", "paid"]).default("pending"),
       paymentMethod: z.enum(["cash", "qr", "transfer"]).optional(),
       isCredit: z.number().default(0),
+      dueDate: z.string().optional(),
       items: z.array(z.object({
         productId: z.number(),
         quantity: z.number(),
@@ -59,6 +60,7 @@ export const purchasesRouter = router({
       paymentStatus: z.enum(["pending", "paid"]).default("pending"),
       paymentMethod: z.enum(["cash", "qr", "transfer"]).optional(),
       isCredit: z.number().default(0),
+      dueDate: z.string().optional(),
       items: z.array(z.object({
         productId: z.number(),
         quantity: z.number(),

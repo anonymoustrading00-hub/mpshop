@@ -49,11 +49,13 @@ import {
   QrCode,
   ArrowLeftRight,
   ChevronDown,
-  Filter
+  Filter,
+  CreditCard,
+  AlertTriangle
 } from "lucide-react";
 
 type DiscountType = "none" | "percentage" | "fixed";
-type PaymentMethod = "cash" | "qr" | "transfer";
+type PaymentMethod = "cash" | "qr" | "transfer" | "credit";
 type PaymentStatus = "pending" | "completed";
 
 type CartItem = {
@@ -109,6 +111,7 @@ function getGlobalDiscountAmount(subtotal: number, discountType: DiscountType, d
 function paymentMethodLabel(method: PaymentMethod) {
   if (method === "cash") return "Efectivo";
   if (method === "qr") return "QR";
+  if (method === "credit") return "Crédito";
   return "Transferencia";
 }
 
@@ -121,7 +124,10 @@ function paymentStatusLabel(status: PaymentStatus | string) {
 }
 
 function printSaleTicket(detail: any) {
-  if (!detail) return;
+  if (!detail?.sale) {
+    toast.error("Abre el detalle de la venta antes de imprimir");
+    return;
+  }
 
   const itemsRows = (detail.items || [])
     .map((item: any) => `
@@ -225,6 +231,8 @@ export default function Sales() {
   const [notes, setNotes] = useState("");
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [anonymousCustomerPhone, setAnonymousCustomerPhone] = useState("");
+  const [anonymousCustomerTaxId, setAnonymousCustomerTaxId] = useState("");
+  const [creditDays, setCreditDays] = useState(30);
   const [innerProductSearch, setInnerProductSearch] = useState("");
 
   const { data: openingStatus } = trpc.finance.hasActiveOpening.useQuery({ paymentMethod });
@@ -252,6 +260,7 @@ export default function Sales() {
         utils.inventory.getProductsWithStock.invalidate(),
         utils.inventory.listInventory.invalidate(),
         utils.finance.getTransactions.invalidate(),
+        utils.credit.listReceivable.invalidate(),
       ]);
       setTimeout(() => {
         setShowSuccess(false);
@@ -345,6 +354,8 @@ export default function Sales() {
     setNotes("");
     setCartItems([]);
     setAnonymousCustomerPhone("");
+    setAnonymousCustomerTaxId("");
+    setCreditDays(30);
     setSelectedCustomerType("retail");
   };
 
@@ -483,20 +494,45 @@ export default function Sales() {
     setIsDetailOpen(true);
   };
 
+  const openSaleForm = (saleId: number) => {
+    openDetail(saleId);
+  };
+
+  // Validación de crédito: todos los campos del cliente son requeridos
+  const _selectedCustForValidation = selectedCustomerId
+    ? (customers as any[] | undefined)?.find((c: any) => c.id === selectedCustomerId)
+    : null;
+
+  const creditDataComplete = paymentMethod !== "credit" || (
+    _selectedCustForValidation
+      ? Boolean(_selectedCustForValidation.phone?.trim() && _selectedCustForValidation.taxId?.trim())
+      : Boolean(anonymousCustomerName.trim() && anonymousCustomerPhone.trim() && anonymousCustomerTaxId.trim())
+  );
+
   const submitSale = () => {
     const isAdmin = user?.role === "admin";
-    if (!openingStatus?.hasActive && !isAdmin) {
+    if (paymentMethod !== "credit" && !openingStatus?.hasActive && !isAdmin) {
       toast.error(`Caja cerrada: Para registrar ventas en ${paymentMethodLabel(paymentMethod)}, primero debes realizar la apertura de caja.`);
       return;
     }
 
+    if (paymentMethod === "credit" && !creditDataComplete) {
+      toast.error("Para ventas a crédito DEBES ingresar Nombre, Teléfono y NIT/CI del cliente obligatoriamente.");
+      return;
+    }
+
+    // Para crédito, siempre paymentStatus = pending
+    const resolvedPaymentStatus = paymentMethod === "credit" ? "pending" : paymentStatus;
+
     createSaleMutation.mutate({
       customerId: selectedCustomerId || undefined,
-      customerName: selectedCustomerId ? undefined : anonymousCustomerName.trim() || "Cliente anónimo",
+      customerName: selectedCustomerId ? undefined : anonymousCustomerName.trim() || undefined,
       customerPhone: selectedCustomerId ? undefined : anonymousCustomerPhone.trim() || undefined,
+      customerTaxId: selectedCustomerId ? undefined : anonymousCustomerTaxId.trim() || undefined,
+      creditDays,
       saleChannel,
       paymentMethod,
-      paymentStatus,
+      paymentStatus: resolvedPaymentStatus,
       discountType: globalDiscountType,
       discountValue: globalDiscountValue,
       notes,
@@ -554,22 +590,10 @@ export default function Sales() {
         </div>
         <TabsContent value="sales" className="mt-0">
           <div className="page-container space-y-6">
-            <div className="hero-panel overflow-hidden relative flex flex-col gap-4 p-8 sm:p-10 md:flex-row md:items-center md:justify-between bg-slate-900 text-white rounded-[2.5rem] shadow-2xl">
-               {/* Decorative background elements */}
-               <div className="absolute top-[-20%] right-[-5%] h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl" />
-               <div className="absolute bottom-[-20%] left-[-5%] h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
+            <div className="flex flex-col gap-4 p-0 sm:p-2 md:p-4 md:flex-row md:items-center md:justify-between">
                
                <div className="relative z-10">
-                 <div className="flex items-center gap-3 mb-3">
-                   <div className="h-10 w-10 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                     <ShoppingBag className="h-5 w-5 text-white" />
-                   </div>
-                   <Badge className="bg-emerald-500/20 text-emerald-400 border-none font-bold uppercase tracking-widest text-[10px]">Módulo de Ventas</Badge>
-                 </div>
-                 <h1 className="text-4xl font-black tracking-tight text-white">Gestión de Ventas</h1>
-                 <p className="mt-2 text-slate-400 font-medium max-w-xl">
-                   Punto de venta optimizado con control de stock en tiempo real, descuentos inteligentes y facturación rápida.
-                 </p>
+                 <h1 className="text-4xl font-black tracking-tight text-slate-900">Gestión de <span className="text-emerald-500">Ventas</span></h1>
                </div>
                <div className="relative z-10 flex flex-col sm:flex-row gap-3">
                  <Button onClick={() => setIsCreateOpen(true)} className="h-14 px-8 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg gap-3 shadow-xl shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95">
@@ -706,8 +730,17 @@ export default function Sales() {
                         <div className="text-right">
                           <p className="text-lg font-black text-slate-900">{formatCurrency(sale.total)}</p>
                           <div className="mt-1 flex flex-col items-end gap-1">
-                            <Badge variant={sale.paymentStatus === "completed" ? "outline" : "secondary"} className="rounded-full text-[9px] font-black uppercase tracking-widest px-2">
-                              {paymentStatusLabel(sale.paymentStatus)}
+                            <Badge 
+                              variant="outline"
+                              className={`rounded-full text-[9px] font-black uppercase tracking-wider px-2 ${
+                                sale.paymentMethod === "credit"
+                                  ? "bg-amber-100 text-amber-800 border-amber-200"
+                                  : sale.paymentStatus === "completed" 
+                                  ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                                  : "bg-slate-100 text-slate-600 border-slate-200"
+                              }`}
+                            >
+                              {sale.paymentMethod === "credit" ? "Por Cobrar" : paymentStatusLabel(sale.paymentStatus)}
                             </Badge>
                             <span className="text-[10px] font-bold text-slate-400">{paymentMethodLabel(sale.paymentMethod)}</span>
                           </div>
@@ -718,7 +751,13 @@ export default function Sales() {
                           <Eye className="h-4 w-4" />
                           VER DETALLE
                         </Button>
-                        <Button variant="outline" size="icon" className="h-11 w-11 rounded-2xl border-slate-200" onClick={() => printSaleTicket(sale)}>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-11 w-11 rounded-2xl border-slate-200"
+                          onClick={() => openSaleForm(sale.id)}
+                          title="Ver formulario de venta"
+                        >
                           <Printer className="h-4 w-4 text-slate-400" />
                         </Button>
                       </div>
@@ -784,20 +823,24 @@ export default function Sales() {
                               <Banknote className="h-3.5 w-3.5 text-emerald-500" />
                             ) : sale.paymentMethod === "qr" ? (
                               <QrCode className="h-3.5 w-3.5 text-violet-500" />
+                            ) : sale.paymentMethod === "credit" ? (
+                              <CreditCard className="h-3.5 w-3.5 text-amber-500" />
                             ) : (
                               <ArrowLeftRight className="h-3.5 w-3.5 text-blue-500" />
                             )}
                             <span className="tracking-tight">{paymentMethodLabel(sale.paymentMethod)}</span>
                           </div>
                           <Badge 
-                            variant={sale.paymentStatus === "completed" ? "outline" : "secondary"} 
+                            variant="outline" 
                             className={`rounded-full text-[9px] font-black uppercase tracking-wider w-fit px-2 py-0 ${
-                              sale.paymentStatus === "completed" 
+                              sale.paymentMethod === "credit"
+                                ? "bg-amber-100 text-amber-800 border-amber-200"
+                                : sale.paymentStatus === "completed" 
                                 ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
-                                : "bg-amber-50 text-amber-600 border-amber-100"
+                                : "bg-slate-100 text-slate-600 border-slate-200"
                             }`}
                           >
-                            {paymentStatusLabel(sale.paymentStatus)}
+                            {sale.paymentMethod === "credit" ? "Por Cobrar" : paymentStatusLabel(sale.paymentStatus)}
                           </Badge>
                         </div>
                       </TableCell>
@@ -822,8 +865,8 @@ export default function Sales() {
                             variant="outline" 
                             size="sm" 
                             className="h-9 w-9 rounded-xl border-slate-200" 
-                            onClick={() => printSaleTicket(sale)}
-                            title="Imprimir"
+                            onClick={() => openSaleForm(sale.id)}
+                            title="Ver formulario de venta"
                           >
                             <Printer className="h-4 w-4 text-slate-400" />
                           </Button>
@@ -895,12 +938,13 @@ export default function Sales() {
                     <div className="relative">
                       <UserRound className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
+                        autoFocus
                         value={customerSearch}
                         onChange={(event) => {
                           setCustomerSearch(event.target.value);
                           setSelectedCustomerId(null);
                         }}
-                        placeholder="Buscar cliente registrado"
+                        placeholder="Buscar cliente registrado..."
                         className="pl-9"
                       />
                     </div>
@@ -957,6 +1001,11 @@ export default function Sales() {
                           onChange={(event) => setAnonymousCustomerPhone(event.target.value)}
                           placeholder="Teléfono / Celular"
                         />
+                        <Input
+                          value={anonymousCustomerTaxId}
+                          onChange={(event) => setAnonymousCustomerTaxId(event.target.value)}
+                          placeholder="NIT / CI (Requerido para crédito)"
+                        />
                         <p className="text-[10px] text-muted-foreground italic">
                           * Si ingresas datos, se guardará automáticamente como cliente nuevo.
                         </p>
@@ -992,18 +1041,28 @@ export default function Sales() {
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label>Estado de pago</Label>
-                      <Select value={paymentStatus} onValueChange={(value: PaymentStatus) => setPaymentStatus(value)}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="completed">Pagada</SelectItem>
-                          <SelectItem value="pending">Pendiente</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {paymentMethod !== "credit" && (
+                      <div className="space-y-2">
+                        <Label>Estado de pago</Label>
+                        <Select value={paymentStatus} onValueChange={(value: PaymentStatus) => setPaymentStatus(value)}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="completed">Pagada</SelectItem>
+                            <SelectItem value="pending">Pendiente</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    {paymentMethod === "credit" && (
+                      <div className="space-y-1">
+                        <Label className="text-xs text-amber-700 font-bold uppercase tracking-wider">Estado de pago</Label>
+                        <div className="h-10 flex items-center px-3 rounded-md border border-amber-200 bg-amber-50 text-amber-800 text-sm font-bold">
+                          ⏳ Pendiente (Crédito)
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1374,24 +1433,29 @@ export default function Sales() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(["cash", "qr", "transfer"] as PaymentMethod[]).map((method) => {
+                    <div className="grid grid-cols-4 gap-2">
+                      {(["cash", "qr", "transfer", "credit"] as PaymentMethod[]).map((method) => {
                         const isActive = paymentMethod === method;
-                        const icon = method === "cash" ? <Banknote className="h-5 w-5" /> : method === "qr" ? <QrCode className="h-5 w-5" /> : <ArrowLeftRight className="h-5 w-5" />;
+                        const icon = method === "cash" ? <Banknote className="h-5 w-5" /> : method === "qr" ? <QrCode className="h-5 w-5" /> : method === "credit" ? <CreditCard className="h-5 w-5" /> : <ArrowLeftRight className="h-5 w-5" />;
                         const colors = method === "cash"
                           ? isActive ? "border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/25" : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:bg-emerald-50/50"
                           : method === "qr"
                           ? isActive ? "border-violet-500 bg-violet-500 text-white shadow-lg shadow-violet-500/25" : "border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:bg-violet-50/50"
+                          : method === "credit"
+                          ? isActive ? "border-amber-500 bg-amber-500 text-white shadow-lg shadow-amber-500/25" : "border-slate-200 bg-white text-slate-600 hover:border-amber-300 hover:bg-amber-50/50"
                           : isActive ? "border-blue-500 bg-blue-500 text-white shadow-lg shadow-blue-500/25" : "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50/50";
                         return (
                           <button
                             key={method}
                             type="button"
-                            onClick={() => setPaymentMethod(method)}
-                            className={`flex flex-col items-center gap-1.5 rounded-2xl border-2 px-3 py-4 text-center text-xs font-bold transition-all duration-200 ${colors}`}
+                            onClick={() => {
+                              setPaymentMethod(method);
+                              if (method === "credit") setPaymentStatus("pending");
+                            }}
+                            className={`flex flex-col items-center gap-1.5 rounded-2xl border-2 px-2 py-3 text-center text-xs font-bold transition-all duration-200 ${colors}`}
                           >
                             {icon}
-                            {method === "cash" ? "Efectivo" : method === "qr" ? "QR" : "Transfer."}
+                            {method === "cash" ? "Efectivo" : method === "qr" ? "QR" : method === "credit" ? "Crédito" : "Transfer."}
                           </button>
                         );
                       })}
@@ -1410,6 +1474,57 @@ export default function Sales() {
                       <p className="mt-3 text-[11px] text-center text-slate-400 font-medium">
                         Pago por transferencia bancaria
                       </p>
+                    )}
+                    {paymentMethod === "credit" && (
+                      <div className="mt-3 p-3 rounded-2xl bg-amber-50/90 border border-amber-200 space-y-3">
+                        <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                          <CreditCard className="h-4 w-4 text-amber-600 shrink-0" />
+                          <span>Configuración de Venta a Crédito</span>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
+                            Plazo de Pago (Días)
+                          </Label>
+                          <Select value={String(creditDays)} onValueChange={(val) => setCreditDays(Number(val))}>
+                            <SelectTrigger className="bg-white rounded-xl h-9 text-xs border-amber-300 font-semibold">
+                              <SelectValue placeholder="Seleccionar plazo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="7">7 Días (1 Semana)</SelectItem>
+                              <SelectItem value="15">15 Días (Quincenal)</SelectItem>
+                              <SelectItem value="30">30 Días (1 Mes - Estándar)</SelectItem>
+                              <SelectItem value="45">45 Días</SelectItem>
+                              <SelectItem value="60">60 Días (2 Meses)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="p-2 bg-white/90 rounded-xl border border-amber-200 text-xs flex justify-between items-center">
+                          <span className="text-slate-500 font-medium">Fecha Límite:</span>
+                          <span className="font-black text-amber-700 font-mono">
+                            {(() => {
+                              const d = new Date();
+                              d.setDate(d.getDate() + creditDays);
+                              return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+                            })()}
+                          </span>
+                        </div>
+
+                        {!creditDataComplete && (
+                          <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold flex items-start gap-2">
+                            <AlertTriangle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
+                            <div>
+                              <p className="font-extrabold text-red-800">Faltan datos del cliente</p>
+                              <p className="text-[11px] text-red-600 font-medium">Debes completar Nombre, Teléfono y NIT/CI para habilitar la venta a crédito.</p>
+                            </div>
+                          </div>
+                        )}
+
+                        <p className="text-[10px] text-amber-700 italic">
+                          * Se registrará una Cuenta por Cobrar (CXC) a nombre del cliente.
+                        </p>
+                      </div>
                     )}
                     {(!openingStatus?.hasActive && user?.role !== "admin") && (
                       <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-bold flex items-center gap-2">
@@ -1456,15 +1571,24 @@ export default function Sales() {
             </Button>
             <Button
               onClick={submitSale}
-              disabled={createSaleMutation.isPending || computedCart.items.length === 0 || (!openingStatus?.hasActive && user?.role !== "admin")}
-              className={`${isMobile ? "gap-2 flex-1" : "min-w-72 gap-2.5 h-12 rounded-xl text-base"} bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-lg shadow-emerald-600/20 transition-all hover:shadow-xl hover:shadow-emerald-600/30`}
+              disabled={
+                createSaleMutation.isPending || 
+                computedCart.items.length === 0 || 
+                (paymentMethod !== "credit" && !openingStatus?.hasActive && user?.role !== "admin") ||
+                !creditDataComplete
+              }
+              className={`${isMobile ? "gap-2 flex-1" : "min-w-72 gap-2.5 h-12 rounded-xl text-base"} ${
+                paymentMethod === "credit" && !creditDataComplete 
+                  ? "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none hover:bg-slate-300" 
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-lg shadow-emerald-600/20 transition-all hover:shadow-xl hover:shadow-emerald-600/30"
+              }`}
             >
               {createSaleMutation.isPending ? (
                 "Registrando..."
               ) : (
                 <>
                   <CheckCircle2 className="h-5 w-5" />
-                  Registrar Venta · {formatCurrency(computedCart.total)}
+                  {paymentMethod === "credit" ? "Registrar Crédito · " : "Registrar Venta · "}{formatCurrency(computedCart.total)}
                 </>
               )}
             </Button>
@@ -1475,9 +1599,9 @@ export default function Sales() {
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
         <DialogContent className="max-h-[92vh] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-[1.6rem] border-white/70 bg-white/95 p-4 sm:max-w-[min(960px,94vw)] sm:p-6">
           <DialogHeader>
-            <DialogTitle>Detalle de venta</DialogTitle>
+            <DialogTitle>Formulario de venta</DialogTitle>
             <DialogDescription>
-              Revisa productos, ticket, estado de pago y acciones administrativas.
+              Comprobante generado al momento de registrar la venta.
             </DialogDescription>
           </DialogHeader>
 

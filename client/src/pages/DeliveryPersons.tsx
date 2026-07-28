@@ -216,7 +216,7 @@ export default function DeliveryPersons() {
   return (
     <div className="container mx-auto p-4 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Gestión de Repartidores</h1>
+        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Gestión de <span className="text-violet-600">Repartidores</span></h1>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">

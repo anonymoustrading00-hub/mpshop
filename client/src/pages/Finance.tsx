@@ -157,12 +157,12 @@ export default function Finance() {
 
   return (
     <div className="p-4 space-y-6 max-w-5xl mx-auto mb-20 md:mb-10 min-h-full">
-      <div className="flex justify-between items-center no-print">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 no-print">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Finanzas</h1>
-          <p className="text-muted-foreground">Resumen de ingresos, egresos y rentabilidad.</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight"><span className="text-green-600">Finanzas</span></h1>
+          <p className="text-sm text-slate-500 mt-1.5">Resumen de ingresos, egresos y rentabilidad.</p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-wrap gap-2">
           <ArqueoDialog 
             expectedCash={cashBalance} 
             expectedQr={qrBalance} 

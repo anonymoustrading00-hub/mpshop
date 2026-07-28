@@ -97,6 +97,9 @@ export const MOCK_PRODUCTION_INPUTS: any[] = [];
 export const MOCK_PRODUCTION_INVENTORY: any[] = [];
 export const MOCK_INVENTORY_TRANSFERS: any[] = [];
 export const MOCK_INVENTORY_TRANSFER_ITEMS: any[] = [];
+export const MOCK_ACCOUNTS_RECEIVABLE: any[] = [];
+export const MOCK_CREDIT_PAYMENTS: any[] = [];
+export const MOCK_BRANCHES: any[] = [];
 
 export function syncMocksToDisk() {
   if (process.env.DATABASE_URL) return;
@@ -129,6 +132,9 @@ export function syncMocksToDisk() {
     MOCK_PRODUCTION_INVENTORY,
     MOCK_INVENTORY_TRANSFERS,
     MOCK_INVENTORY_TRANSFER_ITEMS,
+    MOCK_ACCOUNTS_RECEIVABLE,
+    MOCK_CREDIT_PAYMENTS,
+    MOCK_BRANCHES,
   };
   try {
     fs.writeFileSync(MOCK_DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
@@ -153,7 +159,8 @@ function loadMocks() {
       MOCK_DELIVERY_EXTRA_LOAD,
       MOCK_PRODUCTION_BATCHES, MOCK_PRODUCTION_OUTPUTS,
       MOCK_PRODUCTION_INPUTS, MOCK_PRODUCTION_INVENTORY,
-      MOCK_INVENTORY_TRANSFERS, MOCK_INVENTORY_TRANSFER_ITEMS
+      MOCK_INVENTORY_TRANSFERS, MOCK_INVENTORY_TRANSFER_ITEMS,
+      MOCK_ACCOUNTS_RECEIVABLE, MOCK_CREDIT_PAYMENTS, MOCK_BRANCHES
     };
     for (const [key, arr] of Object.entries(arrays)) {
       if (data[key] && Array.isArray(data[key])) {
@@ -1549,6 +1556,33 @@ export async function createPurchase(purchaseData: any, items: any[], userId?: n
       });
     }
 
+    // Si es a crédito, crear cuenta por pagar automáticamente
+    if (newPurchase.isCredit === 1) {
+      let dueDateObj: Date;
+      if (purchaseData.dueDate) {
+        dueDateObj = new Date(purchaseData.dueDate + "T00:00:00");
+      } else {
+        dueDateObj = new Date();
+        dueDateObj.setDate(dueDateObj.getDate() + 30);
+      }
+      const supplier = MOCK_SUPPLIERS.find((s: any) => s.id === newPurchase.supplierId);
+      MOCK_ACCOUNTS_PAYABLE.push({
+        id: MOCK_ACCOUNTS_PAYABLE.length + 1,
+        purchaseId,
+        supplierId: newPurchase.supplierId || null,
+        supplierName: supplier?.name || "Sin Proveedor",
+        purchaseNumber: newPurchase.purchaseNumber,
+        totalAmount: newPurchase.totalAmount,
+        paidAmount: 0,
+        balance: newPurchase.totalAmount,
+        dueDate: dueDateObj.toISOString(),
+        status: "unpaid",
+        notes: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+
     // Si se recibe inmediatamente, procesar stock
     if (newPurchase.status === "received") {
       await processPurchaseImpact(purchaseId, items, newPurchase);
@@ -1556,6 +1590,7 @@ export async function createPurchase(purchaseData: any, items: any[], userId?: n
     syncMocksToDisk();
     return { insertId: purchaseId };
   }
+
 
   // Real DB logic
   return await db.transaction(async (tx: any) => {
@@ -1798,10 +1833,15 @@ async function processPurchaseImpact(purchaseId: number, items: any[], purchase:
     MOCK_ACCOUNTS_PAYABLE.push({
       id: MOCK_ACCOUNTS_PAYABLE.length + 1,
       purchaseId,
-      amount: purchase.totalAmount,
+      supplierId: purchase.supplierId || null,
+      purchaseNumber: purchase.purchaseNumber || `CMP-${purchaseId}`,
+      totalAmount: purchase.totalAmount,
+      paidAmount: 0,
+      balance: purchase.totalAmount,
       status: "unpaid",
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días default
-      createdAt: new Date()
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
   }
   syncMocksToDisk();
@@ -2726,10 +2766,15 @@ type SaleCreatePayload = {
   discountValue: number;
   discountAmount: number;
   total: number;
-  paymentMethod: "cash" | "qr" | "transfer";
+  paymentMethod: "cash" | "qr" | "transfer" | "credit";
   paymentStatus: SalePaymentStatus;
+  creditDays?: number;
+  dueDate?: string;
   notes?: string;
   items: SaleItemCreateInput[];
+  branchId?: number;
+  adminOverrideUserId?: number;
+  adminOverrideReason?: string;
 };
 
 function getSaleFinanceNote(saleNumber: string) {
@@ -2910,7 +2955,30 @@ export async function createSaleWithItems(payload: SaleCreatePayload) {
       }
     }
 
-    if (payload.paymentStatus === "completed") {
+    // Si es venta a crédito, crear cuenta por cobrar automáticamente
+    if (payload.paymentMethod === "credit") {
+      const creditDays = payload.creditDays || 30;
+      const dueDateObj = new Date();
+      dueDateObj.setDate(dueDateObj.getDate() + creditDays);
+      const dueDateStr = dueDateObj.toISOString().split("T")[0];
+      const customer = payload.customerId ? MOCK_CUSTOMERS.find((c: any) => c.id === payload.customerId) : null;
+      MOCK_ACCOUNTS_RECEIVABLE.push({
+        id: MOCK_ACCOUNTS_RECEIVABLE.length + 1,
+        saleId: newSaleId,
+        customerId: payload.customerId || null,
+        customerName: customer?.name || payload.customerName || "Anónimo",
+        saleNumber: payload.saleNumber,
+        totalAmount: payload.total,
+        paidAmount: 0,
+        balance: payload.total,
+        dueDate: dueDateStr,
+        status: "unpaid",
+        notes: payload.notes || null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    } else if (payload.paymentStatus === "completed") {
+      // Venta normal (no a crédito): registrar en caja
       await createFinancialTransaction({
         type: "income",
         category: payload.saleChannel === "delivery" ? "sale_delivery" : "sale_local",
@@ -3704,3 +3772,256 @@ export async function getSmartInventoryAlerts() {
 
   return alerts;
 }
+
+// Branches
+export async function getAllBranches() {
+  const db = await getDb();
+  if (!db) {
+    return MOCK_BRANCHES;
+  }
+  return await db.select().from(branches);
+}
+
+export async function createBranch(data: any) {
+  const db = await getDb();
+  if (!db) {
+    const newId = MOCK_BRANCHES.length + 1;
+    const newBranch = { ...data, id: newId, createdAt: new Date(), updatedAt: new Date() };
+    MOCK_BRANCHES.push(newBranch);
+    syncMocksToDisk();
+    return { insertId: newId };
+  }
+  return await db.insert(branches).values(data);
+}
+
+export async function updateBranch(id: number, data: any) {
+  const db = await getDb();
+  if (!db) {
+    const index = MOCK_BRANCHES.findIndex((b) => b.id === id);
+    if (index !== -1) {
+      MOCK_BRANCHES[index] = { ...MOCK_BRANCHES[index], ...data, updatedAt: new Date() };
+      syncMocksToDisk();
+      return { success: true };
+    }
+    return { success: false };
+  }
+  return await db.update(branches).set(data).where(eq(branches.id, id));
+}
+
+export async function getBranchById(id: number) {
+  const db = await getDb();
+  if (!db) {
+    return MOCK_BRANCHES.find((b) => b.id === id);
+  }
+  const result = await db.select().from(branches).where(eq(branches.id, id)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function deleteBranch(id: number) {
+  const db = await getDb();
+  if (!db) {
+    const index = MOCK_BRANCHES.findIndex((b) => b.id === id);
+    if (index !== -1) {
+      MOCK_BRANCHES.splice(index, 1);
+      syncMocksToDisk();
+      return { success: true };
+    }
+    return { success: false };
+  }
+  return await db.delete(branches).where(eq(branches.id, id));
+}
+
+// ----------------------------------------------------
+// CUENTAS POR COBRAR (CXC) & CUENTAS POR PAGAR (CXP)
+// ----------------------------------------------------
+
+export async function getCustomerCreditStatus(customerId: number) {
+  const customer = MOCK_CUSTOMERS.find((c: any) => c.id === customerId);
+  if (!customer) return null;
+
+  const customerARs = MOCK_ACCOUNTS_RECEIVABLE.filter((ar: any) => ar.customerId === customerId && ar.status !== "paid");
+  const currentDebt = customerARs.reduce((sum: number, ar: any) => sum + (ar.balance || 0), 0);
+  
+  const todayStr = getLocalDateKey(new Date()) || new Date().toISOString().split("T")[0];
+  const overdueARs = customerARs.filter((ar: any) => ar.dueDate && ar.dueDate < todayStr);
+  const overdueAmount = overdueARs.reduce((sum: number, ar: any) => sum + (ar.balance || 0), 0);
+
+  const creditLimit = customer.creditLimit || 0;
+  const availableCredit = Math.max(0, creditLimit - currentDebt);
+  const hasOverdue = overdueAmount > 0;
+  const allowCredit = customer.allowCredit !== 0;
+
+  return {
+    customer,
+    creditLimit,
+    creditDays: customer.creditDays || 30,
+    currentDebt,
+    availableCredit,
+    overdueAmount,
+    hasOverdue,
+    allowCredit,
+  };
+}
+
+export async function getAllAccountsReceivable() {
+  const todayStr = getLocalDateKey(new Date()) || new Date().toISOString().split("T")[0];
+  
+  return MOCK_ACCOUNTS_RECEIVABLE.map((ar: any) => {
+    const customer = MOCK_CUSTOMERS.find((c: any) => c.id === ar.customerId);
+    const sale = MOCK_SALES.find((s: any) => s.id === ar.saleId);
+    
+    let status = ar.status;
+    if (status !== "paid" && ar.dueDate && ar.dueDate < todayStr) {
+      status = "overdue";
+    }
+
+    return {
+      ...ar,
+      status,
+      customerName: customer?.name || sale?.customerName || "Anónimo",
+      customerPhone: customer?.phone || null,
+      customerTaxId: customer?.taxId || null,
+      saleNumber: sale?.saleNumber || `VTA-${ar.saleId}`,
+    };
+  });
+}
+
+export async function getAllAccountsPayable() {
+  const todayStr = getLocalDateKey(new Date()) || new Date().toISOString().split("T")[0];
+
+  return MOCK_ACCOUNTS_PAYABLE.map((ap: any) => {
+    const supplier = MOCK_SUPPLIERS.find((s: any) => s.id === ap.supplierId);
+    const purchase = MOCK_PURCHASES.find((p: any) => p.id === ap.purchaseId);
+
+    const totalAmount = ap.totalAmount !== undefined ? ap.totalAmount : (ap.amount || 0);
+    const paidAmount = ap.paidAmount !== undefined ? ap.paidAmount : 0;
+    const balance = ap.balance !== undefined ? ap.balance : (totalAmount - paidAmount);
+
+    let status = ap.status;
+    if (status !== "paid" && ap.dueDate && ap.dueDate < todayStr) {
+      status = "overdue";
+    }
+
+    return {
+      ...ap,
+      totalAmount,
+      paidAmount,
+      balance,
+      status,
+      supplierName: supplier?.name || "Proveedor Sistema",
+      supplierPhone: supplier?.phone || null,
+      purchaseNumber: purchase?.purchaseNumber || ap.purchaseNumber || `CMP-${ap.purchaseId}`,
+    };
+  });
+}
+
+export async function createCreditPayment(data: {
+  type: "receivable" | "payable";
+  accountsReceivableId?: number;
+  accountsPayableId?: number;
+  amount: number;
+  paymentMethod: "cash" | "qr" | "transfer";
+  notes?: string;
+  userId: number;
+}) {
+  const receiptNumber = `REC-${String(MOCK_CREDIT_PAYMENTS.length + 1).padStart(4, "0")}`;
+  
+  if (data.type === "receivable") {
+    const ar = MOCK_ACCOUNTS_RECEIVABLE.find((item: any) => item.id === data.accountsReceivableId);
+    if (!ar) throw new Error("Cuenta por cobrar no encontrada");
+    if (ar.balance <= 0) throw new Error("Esta cuenta por cobrar ya se encuentra totalmente saldada");
+
+    const paymentAmount = Math.min(data.amount, ar.balance);
+    ar.paidAmount += paymentAmount;
+    ar.balance -= paymentAmount;
+    ar.status = ar.balance <= 0 ? "paid" : "partially_paid";
+    ar.updatedAt = new Date();
+
+    const paymentId = MOCK_CREDIT_PAYMENTS.length + 1;
+    const payment = {
+      id: paymentId,
+      type: "receivable",
+      accountsReceivableId: ar.id,
+      customerId: ar.customerId,
+      amount: paymentAmount,
+      paymentMethod: data.paymentMethod,
+      notes: data.notes || null,
+      userId: data.userId,
+      receiptNumber,
+      createdAt: new Date(),
+    };
+    MOCK_CREDIT_PAYMENTS.push(payment);
+
+    await createFinancialTransaction({
+      type: "income",
+      category: "ar_payment",
+      amount: paymentAmount,
+      referenceId: ar.id,
+      notes: `Cobro de CXC (${receiptNumber}) - Venta #${ar.saleId}`,
+      paymentMethod: data.paymentMethod,
+      userId: data.userId,
+    });
+
+    syncMocksToDisk();
+    return payment;
+  } else {
+    const ap = MOCK_ACCOUNTS_PAYABLE.find((item: any) => item.id === data.accountsPayableId);
+    if (!ap) throw new Error("Cuenta por pagar no encontrada");
+
+    // Normalizar campos si el registro es antiguo
+    if (ap.totalAmount === undefined) ap.totalAmount = ap.amount || 0;
+    if (ap.paidAmount === undefined) ap.paidAmount = 0;
+    if (ap.balance === undefined) ap.balance = ap.totalAmount - ap.paidAmount;
+
+    if (ap.balance <= 0) throw new Error("Esta cuenta por pagar ya se encuentra totalmente saldada");
+
+    const paymentAmount = Math.min(data.amount, ap.balance);
+    ap.paidAmount += paymentAmount;
+    ap.balance -= paymentAmount;
+    ap.status = ap.balance <= 0 ? "paid" : "partially_paid";
+    ap.updatedAt = new Date();
+
+    const paymentId = MOCK_CREDIT_PAYMENTS.length + 1;
+    const payment = {
+      id: paymentId,
+      type: "payable",
+      accountsPayableId: ap.id,
+      supplierId: ap.supplierId,
+      amount: paymentAmount,
+      paymentMethod: data.paymentMethod,
+      notes: data.notes || null,
+      userId: data.userId,
+      receiptNumber,
+      createdAt: new Date(),
+    };
+    MOCK_CREDIT_PAYMENTS.push(payment);
+
+    await createFinancialTransaction({
+      type: "expense",
+      category: "ap_payment",
+      amount: paymentAmount,
+      referenceId: ap.id,
+      notes: `Pago de CXP (${receiptNumber}) - Compra #${ap.purchaseId}`,
+      paymentMethod: data.paymentMethod,
+      userId: data.userId,
+    });
+
+    syncMocksToDisk();
+    return payment;
+  }
+}
+
+export async function getAllCreditPayments() {
+  return MOCK_CREDIT_PAYMENTS.map((p: any) => {
+    const user = MOCK_USERS.find((u: any) => u.id === p.userId);
+    const customer = p.customerId ? MOCK_CUSTOMERS.find((c: any) => c.id === p.customerId) : null;
+    const supplier = p.supplierId ? MOCK_SUPPLIERS.find((s: any) => s.id === p.supplierId) : null;
+    return {
+      ...p,
+      userName: user?.name || "Desconocido",
+      entityName: customer?.name || supplier?.name || "N/A",
+    };
+  });
+}
+
+

@@ -109,9 +109,13 @@ async function seedDefaultAdmin() {
 
 async function startServer() {
   await runDatabaseMigrations();
-  await ensureTables().catch(err =>
-    console.error("[StartServer] ensureTables failed:", err)
-  );
+  if (process.env.DATABASE_URL) {
+    await ensureTables().catch(err =>
+      console.error("[StartServer] ensureTables failed:", err)
+    );
+  } else {
+    console.log("[StartServer] Skipping ensureTables (no DATABASE_URL, running in demo mode)");
+  }
   await seedDefaultAdmin();
 
   const app = express();

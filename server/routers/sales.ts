@@ -13,7 +13,7 @@ import {
 import { ensureCustomerRecord } from "./customer_utils";
 
 const discountTypeSchema = z.enum(["none", "percentage", "fixed"]);
-const paymentMethodSchema = z.enum(["cash", "qr", "transfer"]);
+const paymentMethodSchema = z.enum(["cash", "qr", "transfer", "credit"]);
 const paymentStatusSchema = z.enum(["pending", "completed"]);
 
 function getLinePricing(basePrice: number, quantity: number, discountType: "none" | "percentage" | "fixed", discountValue: number) {
@@ -66,7 +66,7 @@ export const salesRouter = router({
   }),
 
   list: protectedProcedure.query(async ({ ctx }) => {
-    const allSales = await getAllSales();
+    const allSales = await getAllSales(ctx.branchId);
     if (ctx.user?.role === "admin") {
       return allSales;
     }
@@ -96,6 +96,8 @@ export const salesRouter = router({
         customerId: z.number().optional(),
         customerName: z.string().optional(),
         customerPhone: z.string().optional(),
+        customerTaxId: z.string().optional(),
+        creditDays: z.number().default(30),
         saleChannel: z.enum(["local", "delivery"]).default("local"),
         orderId: z.number().optional(),
         paymentMethod: paymentMethodSchema,
@@ -103,6 +105,8 @@ export const salesRouter = router({
         discountType: discountTypeSchema.default("none"),
         discountValue: z.number().default(0),
         notes: z.string().optional(),
+        adminOverrideUserId: z.number().optional(),
+        adminOverrideReason: z.string().optional(),
         items: z.array(
           z.object({
             productId: z.number(),
@@ -145,6 +149,8 @@ export const salesRouter = router({
         const customer = await ensureCustomerRecord({
           clientNumber: input.customerPhone,
           clientName: input.customerName,
+          phone: input.customerPhone,
+          taxId: input.customerTaxId,
           zone: "Venta Directa",
           sourceChannel: "other",
           customerType: input.customerType
@@ -157,6 +163,7 @@ export const salesRouter = router({
       try {
         const result = await createSaleWithItems({
           saleNumber,
+          branchId: ctx.branchId,
           customerId,
           customerName: customerId ? undefined : input.customerName,
           saleChannel: input.saleChannel,
@@ -168,7 +175,10 @@ export const salesRouter = router({
           discountAmount,
           total,
           paymentMethod: input.paymentMethod,
-          paymentStatus: input.paymentStatus,
+          paymentStatus: input.paymentMethod === "credit" ? "pending" : input.paymentStatus,
+          creditDays: input.creditDays,
+          adminOverrideUserId: input.adminOverrideUserId,
+          adminOverrideReason: input.adminOverrideReason,
           notes: input.notes,
           items: normalizedItems as any,
         });

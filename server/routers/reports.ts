@@ -1,6 +1,16 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc.js";
-import { getDb } from "../db.js";
+import {
+  getDb,
+  MOCK_CUSTOMERS,
+  MOCK_OPERATIONAL_EXPENSES,
+  MOCK_ORDERS,
+  MOCK_ORDER_ITEMS,
+  MOCK_PRODUCTS,
+  MOCK_PURCHASES,
+  MOCK_SALES,
+  MOCK_SALE_ITEMS,
+} from "../db.js";
 import {
   orders,
   customers,
@@ -12,6 +22,7 @@ import {
   cashClosures,
   users,
   operationalExpenses,
+  purchases,
   orderItems,
   saleItems,
 } from "../../drizzle/schema";
@@ -346,10 +357,10 @@ export const reportsRouter = router({
     )
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return null;
 
       let dateFilterOrders = undefined;
       let dateFilterSales = undefined;
+      let dateFilterPurchases = undefined;
       
       let start: Date;
       let end: Date;
@@ -366,6 +377,7 @@ export const reportsRouter = router({
 
       dateFilterOrders = and(gte(orders.createdAt, start), lte(orders.createdAt, end));
       dateFilterSales = and(gte(sales.createdAt, start), lte(sales.createdAt, end));
+      dateFilterPurchases = and(gte(purchases.orderDate, start), lte(purchases.orderDate, end));
 
       // 0. Calcular periodo previo para tendencias
       const duration = end.getTime() - start.getTime();
@@ -375,27 +387,95 @@ export const reportsRouter = router({
       const prevDateFilterOrders = and(gte(orders.createdAt, prevStart), lte(orders.createdAt, prevEnd));
       const prevDateFilterSales = and(gte(sales.createdAt, prevStart), lte(sales.createdAt, prevEnd));
 
-      // 1. Obtener datos del periodo actual
-      const deliveredOrders = await db.query.orders.findMany({
-        where: and(eq(orders.status, "delivered"), dateFilterOrders),
-        with: { items: { with: { product: true } }, customer: true }
+      const inRange = (value: any, from: Date, to: Date) => {
+        const date = new Date(value);
+        return !Number.isNaN(date.getTime()) && date >= from && date <= to;
+      };
+
+      const attachOrderRelations = (order: any) => ({
+        ...order,
+        customer: MOCK_CUSTOMERS.find((customer: any) => customer.id === order.customerId) || null,
+        items: MOCK_ORDER_ITEMS
+          .filter((item: any) => item.orderId === order.id)
+          .map((item: any) => ({
+            ...item,
+            product: MOCK_PRODUCTS.find((product: any) => product.id === item.productId) || { id: item.productId, name: "Producto sin ficha", price: 0 },
+          })),
       });
 
-      const completedSales = await db.query.sales.findMany({
-        where: and(eq(sales.status, "completed"), dateFilterSales),
-        with: { items: { with: { product: true } }, customer: true }
+      const attachSaleRelations = (sale: any) => ({
+        ...sale,
+        customer: MOCK_CUSTOMERS.find((customer: any) => customer.id === sale.customerId) || null,
+        items: MOCK_SALE_ITEMS
+          .filter((item: any) => item.saleId === sale.id)
+          .map((item: any) => ({
+            ...item,
+            product: MOCK_PRODUCTS.find((product: any) => product.id === item.productId) || { id: item.productId, name: "Producto sin ficha", price: 0 },
+          })),
       });
 
-      // 2. Obtener datos del periodo previo para tendencias
-      const prevDeliveredOrders = await db.query.orders.findMany({
-        where: and(eq(orders.status, "delivered"), prevDateFilterOrders),
-        with: { items: { with: { product: true } } }
-      });
+      let deliveredOrders: any[] = [];
+      let completedSales: any[] = [];
+      let purchasesData: any[] = [];
+      let prevDeliveredOrders: any[] = [];
+      let prevCompletedSales: any[] = [];
+      let expensesData: any[] = [];
 
-      const prevCompletedSales = await db.query.sales.findMany({
-        where: and(eq(sales.status, "completed"), prevDateFilterSales),
-        with: { items: { with: { product: true } } }
-      });
+      if (db) {
+        // 1. Obtener datos del periodo actual
+        deliveredOrders = await db.query.orders.findMany({
+          where: and(eq(orders.status, "delivered"), dateFilterOrders),
+          with: { items: { with: { product: true } }, customer: true }
+        });
+
+        completedSales = await db.query.sales.findMany({
+          where: and(eq(sales.status, "completed"), dateFilterSales),
+          with: { items: { with: { product: true } }, customer: true }
+        });
+
+        purchasesData = await db
+          .select()
+          .from(purchases)
+          .where(and(ne(purchases.status, "cancelled"), dateFilterPurchases));
+
+        // 2. Obtener datos del periodo previo para tendencias
+        prevDeliveredOrders = await db.query.orders.findMany({
+          where: and(eq(orders.status, "delivered"), prevDateFilterOrders),
+          with: { items: { with: { product: true } } }
+        });
+
+        prevCompletedSales = await db.query.sales.findMany({
+          where: and(eq(sales.status, "completed"), prevDateFilterSales),
+          with: { items: { with: { product: true } } }
+        });
+
+        const dateFilterExpenses = and(gte(operationalExpenses.expenseDate, start), lte(operationalExpenses.expenseDate, end));
+        expensesData = await db.query.operationalExpenses.findMany({
+          where: and(eq(operationalExpenses.status, "paid"), dateFilterExpenses)
+        });
+      } else {
+        deliveredOrders = MOCK_ORDERS
+          .filter((order: any) => order.status === "delivered" && inRange(order.createdAt, start, end))
+          .map(attachOrderRelations);
+
+        completedSales = MOCK_SALES
+          .filter((sale: any) => sale.status !== "cancelled" && inRange(sale.createdAt, start, end))
+          .map(attachSaleRelations);
+
+        purchasesData = MOCK_PURCHASES
+          .filter((purchase: any) => purchase.status !== "cancelled" && inRange(purchase.orderDate || purchase.createdAt, start, end));
+
+        prevDeliveredOrders = MOCK_ORDERS
+          .filter((order: any) => order.status === "delivered" && inRange(order.createdAt, prevStart, prevEnd))
+          .map(attachOrderRelations);
+
+        prevCompletedSales = MOCK_SALES
+          .filter((sale: any) => sale.status !== "cancelled" && inRange(sale.createdAt, prevStart, prevEnd))
+          .map(attachSaleRelations);
+
+        expensesData = MOCK_OPERATIONAL_EXPENSES
+          .filter((expense: any) => expense.status === "paid" && inRange(expense.expenseDate || expense.createdAt, start, end));
+      }
 
       // Evitar duplicados de IDs de órdenes procesadas en ventas
       const processedOrderIds = new Set(completedSales.map((s: any) => s.orderId).filter(Boolean));
@@ -432,18 +512,27 @@ export const reportsRouter = router({
       };
 
       let totalExpenses = 0;
+      let totalPurchases = 0;
+      let purchaseCount = 0;
       let totalRevenue = 0;
       let totalTransactions = 0;
 
       // Gastos
-      const dateFilterExpenses = and(gte(operationalExpenses.expenseDate, start), lte(operationalExpenses.expenseDate, end));
-      const expensesData = await db.query.operationalExpenses.findMany({
-        where: and(eq(operationalExpenses.status, "paid"), dateFilterExpenses)
-      });
       expensesData.forEach((exp: any) => {
         totalExpenses += exp.amount;
         expenseCounts[exp.category] = (expenseCounts[exp.category] || 0) + exp.amount;
       });
+
+      purchasesData.forEach((purchase: any) => {
+        const amount = Number(purchase.totalAmount || 0);
+        totalPurchases += amount;
+        totalExpenses += amount;
+        purchaseCount++;
+      });
+
+      if (totalPurchases > 0) {
+        expenseCounts.purchases = (expenseCounts.purchases || 0) + totalPurchases;
+      }
 
       // Función helper para procesar productos
       const processItems = (items: any[], isCurrent: boolean, segment?: string) => {
@@ -673,6 +762,8 @@ export const reportsRouter = router({
         deliveriesData,
         topFlavors,
         productRanking,
+        retailRanking,
+        wholesaleRanking,
         bcgMatrix,
         customerDemographics,
         channelsData,
@@ -689,8 +780,11 @@ export const reportsRouter = router({
           totalSales: completedSales.length,
           totalRevenue, 
           totalExpenses,
+          totalPurchases,
+          purchaseCount,
           netIncome: totalRevenue - totalExpenses,
           avgOrderValue: totalTransactions > 0 ? totalRevenue / totalTransactions : 0,
+          activeZones: zonesData.length,
           totalCustomers: customerIdsInPeriod.size,
           newCustomers,
           returningCustomers,
@@ -700,4 +794,4 @@ export const reportsRouter = router({
         }
       };
     }),
-});
+});

@@ -27,6 +27,7 @@ import { EditProductDialog } from "@/components/EditProductDialog";
 import { ProductHistoryDialog } from "@/components/ProductHistoryDialog";
 import { TransferToProductionDialog } from "@/components/TransferToProductionDialog";
 import { InventoryTransfersDialog } from "@/components/InventoryTransfersDialog";
+import { TransferToBranchDialog } from "@/components/TransferToBranchDialog";
 import { formatCurrency } from "@/lib/currency";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Package, AlertTriangle, Info, History as HistoryIcon, LayoutGrid, List, Calendar, TriangleAlert, FileDown, Filter, ChevronDown, CheckCircle2, XCircle } from "lucide-react";
@@ -322,6 +323,8 @@ export default function Inventory() {
   const [filterStock, setFilterStock] = useState<"all" | "low" | "out" | "sufficient">("all");
   const [filterExpiry, setFilterExpiry] = useState<"all" | "expired" | "soon">("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = viewMode === "list" ? 15 : 12;
 
   useEffect(() => {
     if (selectedItem) {
@@ -389,6 +392,9 @@ export default function Inventory() {
     [finishedProducts]
   );
   const lowStockRaw = useMemo(() => allRawItems.filter((item: any) => item.isLowStock) || [], [allRawItems]);
+
+  // Reset page when filters change
+  const resetPage = () => setCurrentPage(1);
 
   const displayItems = useMemo(() => {
     let baseItems = [];
@@ -570,27 +576,21 @@ export default function Inventory() {
   return (
     <div className="page-shell">
       <div className="page-container space-y-6 print:hidden">
-        <section className="hero-panel p-5 sm:p-7 md:p-8">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+        <section className="p-0 sm:p-2 md:p-4">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="max-w-3xl">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="status-chip">
-                  <Sparkles className="mr-1.5 h-3.5 w-3.5 text-primary" />
-                  Inventario con mejor lectura
-                </span>
-              </div>
-
-              <h1 className="mt-2 text-2xl font-extrabold text-slate-900">
+              <h1 className="mt-2 text-4xl font-black text-slate-900 tracking-tight">
                 Inventario
               </h1>
             </div>
 
-            {user?.role === "admin" && isMobile ? (
-              <div className="flex flex-wrap gap-2">
+            {user?.role === "admin" ? (
+              <div className="flex flex-wrap items-center gap-2">
                 <Button onClick={() => window.print()} variant="outline" className="gap-2 bg-white/80 no-print">
                   <Printer className="h-4 w-4" /> Imprimir Inventario
                 </Button>
                 <InventoryTransfersDialog />
+                <TransferToBranchDialog inventoryItems={inventory || []} onSuccess={() => refetch()} />
                 <TransferToProductionDialog inventoryItems={inventory || []} onSuccess={() => refetch()} />
                 <AddProductDialog onProductAdded={() => refetch()} />
               </div>
@@ -665,21 +665,21 @@ export default function Inventory() {
           <div className="flex flex-col gap-4">
             <Card className="border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[1.5rem] overflow-visible bg-white/95 p-3">
               <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center">
-                <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full xl:max-w-[620px] xl:flex-none">
+                <Tabs value={activeTab} onValueChange={(val: any) => { setActiveTab(val); setCurrentPage(1); }} className="w-full xl:max-w-[620px] xl:flex-none">
                   <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 sm:grid-cols-3 lg:grid-cols-5">
-                    <TabsTrigger value="all" className="min-w-0 rounded-xl h-10 px-3 text-center text-[11px] font-bold uppercase tracking-wide">
+                    <TabsTrigger value="all" className="min-w-0 rounded-xl h-10 px-3 text-center text-[11px] font-bold uppercase tracking-wide border-2 border-transparent hover:border-blue-500 transition-all duration-200">
                       Todos
                     </TabsTrigger>
-                    <TabsTrigger value="finished" className="min-w-0 rounded-xl h-10 px-3 text-center text-[11px] font-bold uppercase tracking-wide">
+                    <TabsTrigger value="finished" className="min-w-0 rounded-xl h-10 px-3 text-center text-[11px] font-bold uppercase tracking-wide border-2 border-transparent hover:border-blue-500 transition-all duration-200">
                       Terminados
                     </TabsTrigger>
-                    <TabsTrigger value="raw" className="min-w-0 rounded-xl h-10 px-3 text-center text-[11px] font-bold uppercase tracking-wide">
+                    <TabsTrigger value="raw" className="min-w-0 rounded-xl h-10 px-3 text-center text-[11px] font-bold uppercase tracking-wide border-2 border-transparent hover:border-blue-500 transition-all duration-200">
                       Materia Prima
                     </TabsTrigger>
-                    <TabsTrigger value="insumo" className="min-w-0 rounded-xl h-10 px-3 text-center text-[11px] font-bold uppercase tracking-wide">
+                    <TabsTrigger value="insumo" className="min-w-0 rounded-xl h-10 px-3 text-center text-[11px] font-bold uppercase tracking-wide border-2 border-transparent hover:border-blue-500 transition-all duration-200">
                       Insumos
                     </TabsTrigger>
-                    <TabsTrigger value="supplies" className="min-w-0 rounded-xl h-10 px-3 text-center text-[11px] font-bold uppercase tracking-wide">
+                    <TabsTrigger value="supplies" className="min-w-0 rounded-xl h-10 px-3 text-center text-[11px] font-bold uppercase tracking-wide border-2 border-transparent hover:border-blue-500 transition-all duration-200">
                       Suministros
                     </TabsTrigger>
                   </TabsList>
@@ -691,7 +691,7 @@ export default function Inventory() {
                     placeholder="Buscar por nombre o código de producto..." 
                     className="h-12 pl-12 rounded-2xl border-slate-100 bg-slate-50/50 shadow-sm focus:ring-2 focus:ring-primary/20 transition-all w-full"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   />
                 </div>
 
@@ -747,14 +747,6 @@ export default function Inventory() {
                     </Button>
                     </div>
                   </div>
-
-                  {user?.role === "admin" && (
-                    <div className="flex min-w-0 flex-wrap gap-2 sm:justify-end [&>*]:shrink-0">
-                      <InventoryTransfersDialog />
-                      <TransferToProductionDialog inventoryItems={inventory || []} onSuccess={() => refetch()} />
-                      <AddProductDialog onProductAdded={() => refetch()} />
-                    </div>
-                  )}
                 </div>
               </div>
             </Card>
@@ -849,20 +841,51 @@ export default function Inventory() {
 
         <SmartAlerts />
 
+        {/* Contador y paginación info */}
+        {displayItems.length > 0 && (
+          <div className="flex items-center justify-between px-1">
+            <p className="text-sm text-slate-500 font-medium">
+              <span className="font-black text-slate-800">{displayItems.length}</span> productos
+              {searchTerm && <> · "<span className="text-blue-600 font-bold">{searchTerm}</span>"</>}
+            </p>
+            {Math.ceil(displayItems.length / ITEMS_PER_PAGE) > 1 && (
+              <p className="text-xs text-slate-400 font-medium">
+                Página {currentPage} de {Math.ceil(displayItems.length / ITEMS_PER_PAGE)}
+              </p>
+            )}
+          </div>
+        )}
+
         {displayItems.length === 0 ? (
-          <div className="bg-white rounded-[2.5rem] p-12 text-center border-2 border-dashed border-slate-200">
-             <Package className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-             <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">No se encontraron productos</p>
-             <Button variant="link" className="mt-2 text-primary" onClick={() => setSearchTerm("")}>Limpiar búsqueda</Button>
+          <div className="flex flex-col items-center justify-center py-24 gap-5 bg-white rounded-[2.5rem] border-2 border-dashed border-slate-100">
+            <div className="relative">
+              <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center shadow-inner">
+                <Package className="h-10 w-10 text-slate-400" />
+              </div>
+            </div>
+            <div className="text-center">
+              <h3 className="text-xl font-black text-slate-800">Sin resultados</h3>
+              <p className="text-sm text-slate-500 mt-1 max-w-xs">
+                {searchTerm
+                  ? `No encontramos productos que coincidan con "${searchTerm}".`
+                  : "No hay productos en esta categoría con los filtros actuales."}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {searchTerm && (
+                <Button variant="outline" className="rounded-xl gap-2" onClick={() => setSearchTerm("")}>Limpiar búsqueda</Button>
+              )}
+            </div>
           </div>
         ) : (
-          viewMode === "grid" || isMobile ? (
+          <>
+          {viewMode === "grid" || isMobile ? (
           <motion.div 
             layout
             className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
           >
             <AnimatePresence mode="popLayout">
-              {displayItems.map((item: any) => (
+              {displayItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((item: any) => (
                 <motion.div
                   key={item.id}
                   layout
@@ -906,7 +929,7 @@ export default function Inventory() {
                 <div className="table-shell">
                   <div className="table-scroll">
                     <table className="min-w-[980px] w-full text-sm">
-                      <thead className="bg-slate-50/80 text-slate-700">
+                      <thead className="sticky top-0 z-10 bg-slate-50 text-slate-700 shadow-sm">
                         <tr className="border-b border-border/70">
                           <th className="w-16 px-6 py-5 text-left font-semibold uppercase text-[10px] tracking-widest">Imagen</th>
                           <th className="px-6 py-5 text-left font-semibold uppercase text-[10px] tracking-widest">Producto</th>
@@ -919,7 +942,7 @@ export default function Inventory() {
                         </tr>
                       </thead>
                       <tbody>
-                        {displayItems.map((item: any) => (
+                        {displayItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((item: any) => (
                           <InventoryRow 
                             key={item.id} 
                             item={item} 
@@ -953,7 +976,61 @@ export default function Inventory() {
                 </div>
               </CardContent>
             </Card>
-          )
+          )}
+
+          {/* Paginación */}
+          {Math.ceil(displayItems.length / ITEMS_PER_PAGE) > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-xl h-10 w-10 border-slate-200"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
+              </Button>
+
+              <div className="flex items-center gap-1.5">
+                {Array.from({ length: Math.ceil(displayItems.length / ITEMS_PER_PAGE) }, (_, i) => i + 1)
+                  .filter((page) => page === 1 || page === Math.ceil(displayItems.length / ITEMS_PER_PAGE) || Math.abs(page - currentPage) <= 2)
+                  .reduce((acc: (number | string)[], page, idx, arr) => {
+                    if (idx > 0 && (page as number) - (arr[idx - 1] as number) > 1) acc.push('...');
+                    acc.push(page);
+                    return acc;
+                  }, [])
+                  .map((item, idx) =>
+                    item === '...' ? (
+                      <span key={`ellipsis-${idx}`} className="w-8 text-center text-slate-400 text-sm">…</span>
+                    ) : (
+                      <button
+                        key={item}
+                        onClick={() => setCurrentPage(item as number)}
+                        className={`w-10 h-10 rounded-xl text-sm font-bold transition-all duration-200 ${
+                          currentPage === item
+                            ? "bg-slate-900 text-white shadow-md"
+                            : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  )
+                }
+              </div>
+
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-xl h-10 w-10 border-slate-200"
+                disabled={currentPage === Math.ceil(displayItems.length / ITEMS_PER_PAGE)}
+                onClick={() => setCurrentPage((p) => Math.min(Math.ceil(displayItems.length / ITEMS_PER_PAGE), p + 1))}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+              </Button>
+            </div>
+          )}
+          </>
         )}
       </div>
 
@@ -1187,7 +1264,7 @@ function PrintInventoryContent({ inventory }: { inventory: any[] }) {
 function InventoryCard({ 
   item, user, refetch, isDialogOpen, selectedItem, setSelectedItem, setIsDialogOpen, 
   quantity, setQuantity, reason, setReason, type, setType, price, setPrice, 
-  expiryDate, setExpiryDate, registerPurchase, setRegisterPurchase, paymentMethod, setPaymentMethod, 
+  expiryDate, setExpiryDate, batchNumber, setBatchNumber, registerPurchase, setRegisterPurchase, paymentMethod, setPaymentMethod, 
   handleUpdateInventory, updateInventoryMutation 
 }: any) {
   const margin = item.product?.price != null && item.product?.salePrice != null
@@ -1305,6 +1382,8 @@ function InventoryCard({
                 setPrice={setPrice}
                 expiryDate={expiryDate}
                 setExpiryDate={setExpiryDate}
+                batchNumber={batchNumber}
+                setBatchNumber={setBatchNumber}
                 registerPurchase={registerPurchase}
                 setRegisterPurchase={setRegisterPurchase}
                 paymentMethod={paymentMethod}
@@ -1323,7 +1402,7 @@ function InventoryCard({
 function InventoryRow({ 
   item, user, refetch, isDialogOpen, selectedItem, setSelectedItem, setIsDialogOpen, 
   quantity, setQuantity, reason, setReason, type, setType, price, setPrice, 
-  expiryDate, setExpiryDate, registerPurchase, setRegisterPurchase, paymentMethod, setPaymentMethod, 
+  expiryDate, setExpiryDate, batchNumber, setBatchNumber, registerPurchase, setRegisterPurchase, paymentMethod, setPaymentMethod, 
   handleUpdateInventory, updateInventoryMutation 
 }: any) {
   const margin = item.product?.price != null && item.product?.salePrice != null
@@ -1373,7 +1452,7 @@ function InventoryRow({
         </div>
       </td>
       <td className="px-6 py-4 text-right">
-        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center justify-end gap-2">
           <ProductHistoryDialog productId={item.productId} productName={item.product?.name || "Producto"} />
           {user?.role === "admin" && (
             <>
@@ -1395,6 +1474,8 @@ function InventoryRow({
                 setPrice={setPrice}
                 expiryDate={expiryDate}
                 setExpiryDate={setExpiryDate}
+                batchNumber={batchNumber}
+                setBatchNumber={setBatchNumber}
                 registerPurchase={registerPurchase}
                 setRegisterPurchase={setRegisterPurchase}
                 paymentMethod={paymentMethod}

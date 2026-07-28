@@ -13,7 +13,8 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock as ClockIcon, Calendar as CalendarIcon, CheckCircle, XCircle, MoreHorizontal } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Clock as ClockIcon, Calendar as CalendarIcon, CheckCircle, XCircle, MoreHorizontal, CheckSquare } from "lucide-react";
 
 export default function Orders() {
   const { user } = useAuth();
@@ -46,6 +47,21 @@ export default function Orders() {
   const [deliveredPage, setDeliveredPage] = useState(1);
   const [cancelledPage, setCancelledPage] = useState(1);
   const ORDERS_PER_PAGE = 10;
+
+  const [selectedOrderIds, setSelectedOrderIds] = useState<number[]>([]);
+
+  const toggleSelection = (id: number) => {
+    setSelectedOrderIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+  const selectAllRouteOrders = () => {
+    if (selectedOrderIds.length === paginatedRouteOrders.length) {
+      setSelectedOrderIds([]);
+    } else {
+      setSelectedOrderIds(paginatedRouteOrders.map((o: any) => o.id));
+    }
+  };
 
   const [dismissOrderId, setDismissOrderId] = useState<number | null>(null);
   const [cancelData, setCancelData] = useState<{ cancelledBy: "client" | "company" | "system"; reason: string }>({
@@ -141,6 +157,16 @@ export default function Orders() {
       toast.success("Solicitud rechazada");
       setRescheduleOrderId(null);
       utils.orders.list.invalidate();
+    },
+    onError: (err: any) => toast.error(`Error: ${err.message}`),
+  });
+
+  const bulkUpdateMutation = trpc.orders.bulkUpdateStatus.useMutation({
+    onSuccess: (data) => {
+      toast.success(`${data.updatedCount} pedidos actualizados correctamente`);
+      setSelectedOrderIds([]);
+      utils.orders.list.invalidate();
+      utils.orders.listForDelivery.invalidate();
     },
     onError: (err: any) => toast.error(`Error: ${err.message}`),
   });
@@ -453,7 +479,7 @@ export default function Orders() {
       <div className="max-w-7xl mx-auto p-4 md:p-0">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
           <div>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight">Gestión de Pedidos</h1>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight">Gestión de <span className="text-blue-600">Pedidos</span></h1>
             <p className="text-slate-500 font-medium mt-1">Administra y monitorea todas las entregas de Vitalia</p>
           </div>
           <div className="flex items-center gap-3">
@@ -678,7 +704,51 @@ export default function Orders() {
           </div>
 
           <TabsContent value="route" className="space-y-6">
-            <OrderGrid orders={paginatedRouteOrders} user={user} openWhatsApp={openWhatsApp} setRescheduleOrderId={setRescheduleOrderId} setRescheduleData={setRescheduleData} setDeliverOrderId={setDeliverOrderId} setCancellationRequestOrderId={setCancellationRequestOrderId} setDismissOrderId={setDismissOrderId} />
+            {selectedOrderIds.length > 0 && (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex items-center justify-between shadow-sm animate-in slide-in-from-top-4">
+                <div className="flex items-center gap-3">
+                  <Badge className="bg-indigo-600 text-white hover:bg-indigo-700">{selectedOrderIds.length} seleccionados</Badge>
+                  <span className="text-sm font-medium text-indigo-900">¿Qué deseas hacer con estos pedidos?</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="border-indigo-200 text-indigo-700 hover:bg-indigo-100"
+                    onClick={() => setSelectedOrderIds([])}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-sm"
+                    onClick={() => {
+                      bulkUpdateMutation.mutate({
+                        orderIds: selectedOrderIds,
+                        status: "delivered"
+                      });
+                    }}
+                    disabled={bulkUpdateMutation.isPending}
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    Marcar como Entregados
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex items-center gap-2 mb-4">
+              <Checkbox 
+                id="selectAll" 
+                checked={paginatedRouteOrders.length > 0 && selectedOrderIds.length === paginatedRouteOrders.length}
+                onCheckedChange={selectAllRouteOrders}
+              />
+              <label htmlFor="selectAll" className="text-sm font-medium cursor-pointer text-slate-600">
+                Seleccionar todos en esta página
+              </label>
+            </div>
+
+            <OrderGrid orders={paginatedRouteOrders} user={user} openWhatsApp={openWhatsApp} setRescheduleOrderId={setRescheduleOrderId} setRescheduleData={setRescheduleData} setDeliverOrderId={setDeliverOrderId} setCancellationRequestOrderId={setCancellationRequestOrderId} setDismissOrderId={setDismissOrderId} selectedOrderIds={selectedOrderIds} toggleSelection={toggleSelection} />
             {totalRoutePages > 1 && (
               <PaginationControls currentPage={currentPage} totalPages={totalRoutePages} onPageChange={setCurrentPage} />
             )}
@@ -1139,7 +1209,7 @@ export default function Orders() {
     </div>
   );
 }
-function OrderGrid({ orders, user, openWhatsApp, setRescheduleOrderId, setRescheduleData, setDeliverOrderId, setCancellationRequestOrderId, setDismissOrderId }: any) {
+function OrderGrid({ orders, user, openWhatsApp, setRescheduleOrderId, setRescheduleData, setDeliverOrderId, setCancellationRequestOrderId, setDismissOrderId, selectedOrderIds = [], toggleSelection = () => {} }: any) {
   if (orders.length === 0) {
     return (
       <div className="bg-white/40 rounded-3xl p-12 text-center border-2 border-dashed border-slate-200">
@@ -1152,10 +1222,17 @@ function OrderGrid({ orders, user, openWhatsApp, setRescheduleOrderId, setResche
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {orders.map((order: any) => (
-        <Card key={order.id} className="border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.08)] transition-all duration-300 rounded-[2.5rem] overflow-hidden bg-white group">
+        <Card key={order.id} className="border-2 border-transparent hover:border-blue-500 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.08)] transition-all duration-300 rounded-[2.5rem] overflow-hidden bg-white group">
           <CardContent className="p-0">
-            <div className="p-6 md:p-8 flex flex-col gap-6">
-              <div className="flex items-start justify-between">
+            <div className="p-6 md:p-8 flex flex-col gap-6 relative">
+              <div className="absolute top-6 left-6 z-10">
+                <Checkbox 
+                  checked={selectedOrderIds.includes(order.id)} 
+                  onCheckedChange={() => toggleSelection(order.id)}
+                  className="h-5 w-5 rounded data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600"
+                />
+              </div>
+              <div className="flex items-start justify-between pl-8">
                 <div className="space-y-1">
                   <div className="flex items-center gap-3">
                     <h3 className="text-2xl font-black text-slate-900 tracking-tight">#{order.orderNumber}</h3>

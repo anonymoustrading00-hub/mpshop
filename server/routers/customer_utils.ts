@@ -3,6 +3,8 @@ import { getCustomerByNumber, createCustomer, updateCustomer } from "../db";
 export async function ensureCustomerRecord(input: {
   clientNumber: string;
   clientName: string;
+  phone?: string;
+  taxId?: string;
   zone: string;
   sourceChannel?: "facebook" | "tiktok" | "marketplace" | "referral" | "other";
   customerType?: "retail" | "wholesale";
@@ -13,6 +15,8 @@ export async function ensureCustomerRecord(input: {
     await createCustomer({
       clientNumber: input.clientNumber,
       name: input.clientName,
+      phone: input.phone || input.clientNumber,
+      taxId: input.taxId || undefined,
       zone: input.zone,
       sourceChannel: input.sourceChannel || "other",
       customerType: input.customerType || "retail",
@@ -29,6 +33,14 @@ export async function ensureCustomerRecord(input: {
       updates.zone = input.zone;
     }
     
+    if (input.phone && input.phone !== customer.phone) {
+      updates.phone = input.phone;
+    }
+
+    if (input.taxId && input.taxId !== customer.taxId) {
+      updates.taxId = input.taxId;
+    }
+
     if (input.sourceChannel && (!customer.sourceChannel || customer.sourceChannel === "other")) {
       (updates as any).sourceChannel = input.sourceChannel;
     }

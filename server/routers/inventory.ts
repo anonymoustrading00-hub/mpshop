@@ -284,8 +284,8 @@ export const inventoryRouter = router({
     return await getAllProducts();
   }),
 
-  getProductsWithStock: protectedProcedure.query(async () => {
-    return await getProductsWithStock();
+  getProductsWithStock: protectedProcedure.query(async ({ ctx }) => {
+    return await getProductsWithStock(ctx.branchId);
   }),
 
   // Crear un nuevo producto
@@ -592,7 +592,7 @@ export const inventoryRouter = router({
   // Obtener inventario completo
   listInventory: protectedProcedure.query(async ({ ctx }) => {
     const [inventory, products, onOrder] = await Promise.all([
-      getAllInventory(),
+      getAllInventory(ctx.branchId),
       getAllProducts(),
       getOnOrderQuantities()
     ]);
@@ -648,7 +648,7 @@ export const inventoryRouter = router({
       console.log(`[SYNC TRACE] updateQuantity: productId=${input.productId}, inputQty=${input.quantity}, existingQty=${existingInv?.quantity || 0}, newQty=${newQuantity}`);
       
       const { updateInventory, createInventoryMovement, updateProductPrice, recordInventoryEntryAsPurchase } = await import("../db");
-      await updateInventory(input.productId, newQuantity, input.expiryDate, input.batchNumber);
+      await updateInventory(input.productId, newQuantity, input.expiryDate, input.batchNumber, ctx.branchId);
 
       const notes: string[] = [];
       if (input.price !== undefined && product && input.price !== product.price) {
@@ -703,7 +703,7 @@ export const inventoryRouter = router({
 
   // Obtener productos con stock bajo
   getLowStockProducts: protectedProcedure.query(async ({ ctx }) => {
-    const inventory = await getAllInventory();
+    const inventory = await getAllInventory(ctx.branchId);
     const products = await getAllProducts();
 
     return inventory
@@ -719,7 +719,7 @@ export const inventoryRouter = router({
 
   // Obtener alertas de vencimiento
   getExpiryAlerts: protectedProcedure.query(async ({ ctx }) => {
-    const inventory = await getAllInventory();
+    const inventory = await getAllInventory(ctx.branchId);
     const products = await getAllProducts();
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -754,7 +754,7 @@ export const inventoryRouter = router({
   getByProductId: protectedProcedure
     .input(z.object({ productId: z.number() }))
     .query(async ({ ctx, input }) => {
-      return await getInventoryByProductId(input.productId);
+      return await getInventoryByProductId(input.productId, ctx.branchId);
     }),
 
   getProductHistory: protectedProcedure
@@ -763,10 +763,10 @@ export const inventoryRouter = router({
       startDate: z.string().optional(),
       endDate: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const [product, stock, movements, purchases] = await Promise.all([
         getProductById(input.productId),
-        getInventoryByProductId(input.productId),
+        getInventoryByProductId(input.productId, ctx.branchId),
         getInventoryMovements(input.productId),
         getPurchasesByProductId(input.productId),
       ]);
@@ -1012,13 +1012,24 @@ export const inventoryRouter = router({
       CREATE TABLE IF NOT EXISTS inventory_transfers (
         id INT AUTO_INCREMENT PRIMARY KEY,
         transferNumber VARCHAR(50) NOT NULL UNIQUE,
-        direction ENUM('to_production', 'to_general') NOT NULL,
-        status ENUM('completed', 'cancelled') NOT NULL DEFAULT 'completed',
+        type ENUM('to_production', 'to_general', 'to_branch') NOT NULL,
+        status ENUM('pending', 'completed', 'cancelled') DEFAULT 'completed',
+        fromBranchId INT NULL,
+        toBranchId INT NULL,
         userId INT NOT NULL,
         notes TEXT,
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
+
+    // Intento de agregar las columnas si ya existe la tabla (ignoramos errores si ya existen)
+    try {
+      const pool = (db as any).session?.client || (global as any)._pool;
+      await pool.execute("ALTER TABLE inventory_transfers MODIFY COLUMN type ENUM('to_production', 'to_general', 'to_branch') NOT NULL");
+      await pool.execute("ALTER TABLE inventory_transfers ADD COLUMN fromBranchId INT NULL");
+      await pool.execute("ALTER TABLE inventory_transfers ADD COLUMN toBranchId INT NULL");
+    } catch(e) {}
 
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS inventory_transfer_items (
@@ -1048,7 +1059,7 @@ export const inventoryRouter = router({
       
       const db = await import("../db").then(m => m.getDb());
       const productsData = await getAllProducts();
-      const inventoryData = await getAllInventory();
+      const inventoryData = await getAllInventory(ctx.branchId);
       const transferDetails = [];
 
       if (!db) {
@@ -1169,7 +1180,7 @@ export const inventoryRouter = router({
         // 4. Update Inventory (General -> decrease)
         const currentInv = inventoryData.find((i: any) => i.productId === item.productId);
         const newQty = (currentInv?.quantity || 0) - item.quantity;
-        await updateInventory(item.productId, Math.max(0, newQty));
+        await updateInventory(item.productId, Math.max(0, newQty), undefined, undefined, ctx.branchId);
 
         // 4.1 Incrementar el almacén de planta para que la vista de producción
         // refleje inmediatamente el stock transferido desde inventario general.
@@ -1245,7 +1256,7 @@ export const inventoryRouter = router({
       
       const db = await import("../db").then(m => m.getDb());
       const productsData = await getAllProducts();
-      const inventoryData = await getAllInventory();
+      const inventoryData = await getAllInventory(ctx.branchId);
       const transferDetails = [];
 
       if (!db) {
@@ -1389,7 +1400,7 @@ export const inventoryRouter = router({
         // 4. Update Inventory (Production -> General, so general increases)
         const currentInv = inventoryData.find((i: any) => i.productId === product!.id);
         const newQty = (currentInv?.quantity || 0) + item.quantity;
-        await updateInventory(product!.id, newQty);
+        await updateInventory(product!.id, newQty, undefined, undefined, ctx.branchId);
 
         // 4.5 Deduct from production_inventory
         const { productionInventory } = await import("../../drizzle/schema");
@@ -1460,6 +1471,8 @@ export const inventoryRouter = router({
           direction: t.direction,
           status: t.status,
           userId: t.userId,
+          sourceBranchId: t.sourceBranchId || 1,
+          destinationBranchId: t.destinationBranchId || 1,
           notes: t.notes,
           createdAt: t.createdAt,
           username: user?.username || 'admin',
@@ -1476,6 +1489,8 @@ export const inventoryRouter = router({
       direction: inventoryTransfers.direction,
       status: inventoryTransfers.status,
       userId: inventoryTransfers.userId,
+      sourceBranchId: inventoryTransfers.sourceBranchId,
+      destinationBranchId: inventoryTransfers.destinationBranchId,
       notes: inventoryTransfers.notes,
       createdAt: inventoryTransfers.createdAt,
       username: users.username,
@@ -1503,4 +1518,243 @@ export const inventoryRouter = router({
       items: items.filter((i: any) => i.transferId === t.id)
     }));
   }),
+
+  // Traspasos entre Sucursales (Origen)
+  createBranchTransfer: protectedProcedure
+    .input(z.object({
+      destinationBranchId: z.number(),
+      items: z.array(z.object({
+        productId: z.number(),
+        quantity: z.number().min(1),
+        productName: z.string().optional()
+      })),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await import("../db").then(m => m.getDb());
+      const { getAllInventory, updateInventory, createInventoryMovement } = await import("../db");
+      
+      // MOCK MODE
+      if (!db) {
+        const { MOCK_INVENTORY_TRANSFERS, MOCK_INVENTORY_TRANSFER_ITEMS, MOCK_INVENTORY } = await import("../db");
+        
+        // En modo demo, obtenemos el inventario global (sin filtro de sucursal)
+        // ya que el mock no siempre tiene datos por branchId
+        const inventoryData = await getAllInventory(); // sin filtro = todos
+        
+        for (const item of input.items) {
+          const invItem = inventoryData.find((i: any) => i.productId === item.productId);
+          if (!invItem || (invItem.quantity || 0) < item.quantity) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: `Stock insuficiente para el producto "${item.productName || item.productId}"` });
+          }
+        }
+
+        const nextId = MOCK_INVENTORY_TRANSFERS.length + 1;
+        const transferNumber = `TRB-${new Date().getFullYear()}-${String(nextId).padStart(4, '0')}`;
+        
+        MOCK_INVENTORY_TRANSFERS.push({
+          id: nextId,
+          transferNumber,
+          direction: "branch_transfer",
+          sourceBranchId: ctx.branchId,
+          destinationBranchId: input.destinationBranchId,
+          status: "completed",
+          userId: ctx.user!.id,
+          notes: input.notes,
+          createdAt: new Date(),
+        });
+
+        const transferDetails = [];
+        for (const item of input.items) {
+          MOCK_INVENTORY_TRANSFER_ITEMS.push({
+            id: MOCK_INVENTORY_TRANSFER_ITEMS.length + 1,
+            transferId: nextId,
+            productId: item.productId,
+            quantity: item.quantity,
+            productName: item.productName || "Producto",
+            productUnit: "unidad"
+          });
+
+          // Deduct from origin (global mock)
+          const mockInvItem = MOCK_INVENTORY.find((i: any) => i.productId === item.productId);
+          if (mockInvItem) {
+            mockInvItem.quantity = Math.max(0, (mockInvItem.quantity || 0) - item.quantity);
+          }
+
+          // Add to destination in mock inventory
+          const destInvItem = MOCK_INVENTORY.find((i: any) => i.productId === item.productId && i.branchId === input.destinationBranchId);
+          if (destInvItem) {
+            destInvItem.quantity = (destInvItem.quantity || 0) + item.quantity;
+          } else {
+            // Create new entry for destination branch
+            MOCK_INVENTORY.push({
+              id: MOCK_INVENTORY.length + 1,
+              productId: item.productId,
+              branchId: input.destinationBranchId,
+              quantity: item.quantity,
+              minStock: 0,
+              lastUpdated: new Date(),
+            });
+          }
+
+          transferDetails.push({ ...item, productName: item.productName || "Producto" });
+        }
+
+        return { success: true, transferNumber, sourceBranchId: ctx.branchId, destinationBranchId: input.destinationBranchId, items: transferDetails, notes: input.notes };
+      }
+
+      // DB MODE
+      const { inventoryTransfers, inventoryTransferItems, products } = await import("../../drizzle/schema");
+      const { eq, count } = await import("drizzle-orm");
+
+      // Check stock
+      const inventoryData = await getAllInventory(ctx.branchId);
+      for (const item of input.items) {
+        const invItem = inventoryData.find((i: any) => i.productId === item.productId);
+        if (!invItem || (invItem.quantity || 0) < item.quantity) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Stock insuficiente para el producto ID ${item.productId} en sucursal origen` });
+        }
+      }
+
+      // 1. Generate transfer number
+      const countRes = await db.select({ value: count() }).from(inventoryTransfers);
+      const nextId = (countRes[0]?.value || 0) + 1;
+      const transferNumber = `TRB-${new Date().getFullYear()}-${String(nextId).padStart(4, '0')}`;
+
+      // 2. Create Transfer Record
+      const insertRes = await db.insert(inventoryTransfers).values({
+        transferNumber,
+        direction: "branch_transfer",
+        sourceBranchId: ctx.branchId,
+        destinationBranchId: input.destinationBranchId,
+        status: "in_transit",
+        userId: ctx.user!.id,
+        notes: input.notes,
+      });
+
+      const transferId = (insertRes[0] as any).insertId;
+      const transferDetails = [];
+
+      for (const item of input.items) {
+        const [product] = await db.select().from(products).where(eq(products.id, item.productId));
+
+        // 3. Create Transfer Item
+        await db.insert(inventoryTransferItems).values({
+          transferId,
+          productId: product.id,
+          quantity: item.quantity,
+          productName: product.name,
+          productUnit: product.unit || 'unidad'
+        });
+
+        // 4. Update Origin Inventory (reduce)
+        const currentInv = inventoryData.find((i: any) => i.productId === product.id);
+        const newQty = (currentInv?.quantity || 0) - item.quantity;
+        await updateInventory(product.id, newQty, undefined, undefined, ctx.branchId);
+
+        // 5. Kardex Exit
+        await createInventoryMovement({
+          productId: product.id,
+          type: "exit",
+          quantity: item.quantity,
+          reason: `Traspaso a Suc. #${input.destinationBranchId} ${transferNumber}`,
+          notes: input.notes,
+          userId: ctx.user!.id,
+          branchId: ctx.branchId
+        });
+
+        transferDetails.push({ ...item, productName: product.name });
+      }
+
+      return { success: true, transferNumber, sourceBranchId: ctx.branchId, destinationBranchId: input.destinationBranchId, items: transferDetails, notes: input.notes };
+    }),
+
+  // Aceptar Traspaso en Sucursal Destino
+  acceptBranchTransfer: protectedProcedure
+    .input(z.object({
+      transferId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await import("../db").then(m => m.getDb());
+      const { getAllInventory, updateInventory, createInventoryMovement } = await import("../db");
+
+      if (!db) {
+        const { MOCK_INVENTORY_TRANSFERS, MOCK_INVENTORY_TRANSFER_ITEMS } = await import("../db");
+        const transfer = MOCK_INVENTORY_TRANSFERS.find((t: any) => t.id === input.transferId);
+        
+        if (!transfer) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Transferencia no encontrada" });
+        }
+        if (transfer.status !== "in_transit") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "La transferencia no está en tránsito" });
+        }
+        if (transfer.destinationBranchId !== ctx.branchId && ctx.user?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Solo la sucursal destino o un administrador puede aceptar el traspaso" });
+        }
+
+        transfer.status = "completed";
+        const itemsRows = MOCK_INVENTORY_TRANSFER_ITEMS.filter((i: any) => i.transferId === transfer.id);
+        const destInventoryData = await getAllInventory(transfer.destinationBranchId);
+
+        for (const item of itemsRows) {
+          const currentInv = destInventoryData.find((i: any) => i.productId === item.productId);
+          const newQty = (currentInv?.quantity || 0) + item.quantity;
+          await updateInventory(item.productId, newQty, undefined, undefined, transfer.destinationBranchId);
+
+          await createInventoryMovement({
+            productId: item.productId,
+            type: "entry",
+            quantity: item.quantity,
+            reason: `Recepción Traspaso ${transfer.transferNumber}`,
+            notes: `Recibido desde sucursal #${transfer.sourceBranchId}`,
+            userId: ctx.user!.id,
+            branchId: transfer.destinationBranchId
+          });
+        }
+        return { success: true };
+      }
+
+      const { inventoryTransfers, inventoryTransferItems } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+
+      const [transfer] = await db.select().from(inventoryTransfers).where(eq(inventoryTransfers.id, input.transferId));
+      if (!transfer) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Transferencia no encontrada" });
+      }
+
+      if (transfer.status !== "in_transit") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "La transferencia no está en tránsito" });
+      }
+
+      if (transfer.destinationBranchId !== ctx.branchId && ctx.user?.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Solo la sucursal destino o un administrador puede aceptar el traspaso" });
+      }
+
+      // Update transfer status
+      await db.update(inventoryTransfers).set({ status: "completed" }).where(eq(inventoryTransfers.id, transfer.id));
+
+      const itemsRows = await db.select().from(inventoryTransferItems).where(eq(inventoryTransferItems.transferId, transfer.id));
+
+      const destInventoryData = await getAllInventory(transfer.destinationBranchId);
+
+      for (const item of itemsRows) {
+        // Update Destination Inventory (increase)
+        const currentInv = destInventoryData.find((i: any) => i.productId === item.productId);
+        const newQty = (currentInv?.quantity || 0) + item.quantity;
+        await updateInventory(item.productId, newQty, undefined, undefined, transfer.destinationBranchId);
+
+        // Kardex Entry
+        await createInventoryMovement({
+          productId: item.productId,
+          type: "entry",
+          quantity: item.quantity,
+          reason: `Recepción Traspaso ${transfer.transferNumber}`,
+          notes: `Recibido desde sucursal #${transfer.sourceBranchId}`,
+          userId: ctx.user!.id,
+          branchId: transfer.destinationBranchId
+        });
+      }
+
+      return { success: true };
+    }),
 });

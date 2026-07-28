@@ -8,6 +8,20 @@
       "when": 1779752384083,
       "tag": "0000_amazing_white_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1784172172449,
+      "tag": "0001_flat_red_ghost",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1784172266661,
+      "tag": "0002_greedy_hemingway",
+      "breakpoints": true
     }
   ]
 }

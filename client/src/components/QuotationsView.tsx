@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   Eye,
@@ -139,7 +141,7 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
       if (item.discountType === "percentage") {
         finalUnitPrice = Math.max(0, item.basePrice * (1 - item.discountValue / 100));
       } else if (item.discountType === "fixed") {
-        finalUnitPrice = Math.max(0, item.basePrice - item.discountValue);
+        finalUnitPrice = Math.max(0, item.basePrice - (item.discountValue * 100));
       }
       return { ...item, subtotal: finalUnitPrice * item.quantity };
     });
@@ -149,7 +151,7 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
     if (globalDiscountType === "percentage") {
       globalDiscountAmount = subtotal * (globalDiscountValue / 100);
     } else if (globalDiscountType === "fixed") {
-      globalDiscountAmount = globalDiscountValue;
+      globalDiscountAmount = globalDiscountValue * 100;
     }
     const total = Math.max(0, subtotal - globalDiscountAmount);
 
@@ -187,7 +189,19 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
   };
 
   const removeCartItem = (productId: number) => {
+    const itemToRemove = cartItems.find((item) => item.productId === productId);
     setCartItems((current) => current.filter((item) => item.productId !== productId));
+    
+    if (itemToRemove) {
+      toast("Producto eliminado", {
+        description: `${itemToRemove.productName} retirado de la cotización.`,
+        action: {
+          label: "Deshacer",
+          onClick: () => setCartItems((current) => [...current, itemToRemove]),
+        },
+        duration: 5000,
+      });
+    }
   };
 
   const submitQuotation = () => {
@@ -270,10 +284,9 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
 
   return (
     <div className="space-y-6">
-      <div className="hero-panel flex flex-col gap-4 p-5 sm:p-6 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 p-0 sm:p-2 md:p-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Cotizaciones</h1>
-          <p className="mt-2 text-muted-foreground">Crea y gestiona cotizaciones para tus clientes.</p>
         </div>
         <Button onClick={() => setIsCreateOpen(true)} className="h-11 gap-2">
           <FileText className="h-4 w-4" />
@@ -287,7 +300,16 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="py-10 text-center">Cargando...</div>
+            <div className="space-y-4 py-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex gap-4 animate-pulse items-center">
+                  <Skeleton className="h-10 w-24" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-32" />
+                  <Skeleton className="h-10 w-24 hidden md:block" />
+                </div>
+              ))}
+            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -325,7 +347,27 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
                   </TableRow>
                 ))}
                 {quotationsList?.length === 0 && (
-                  <TableRow><TableCell colSpan={7} className="text-center py-6">No hay cotizaciones</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-[300px]">
+                      <Empty className="border-0 bg-transparent">
+                        <EmptyHeader>
+                          <EmptyMedia className="bg-indigo-50">
+                            <FileText className="h-8 w-8 text-indigo-600" />
+                          </EmptyMedia>
+                          <EmptyTitle>No hay cotizaciones</EmptyTitle>
+                          <EmptyDescription>
+                            Aún no has creado ninguna cotización. Empieza ahora para enviarla a tus clientes.
+                          </EmptyDescription>
+                        </EmptyHeader>
+                        <EmptyContent>
+                          <Button onClick={() => setIsCreateOpen(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+                            <Plus className="h-4 w-4" />
+                            Crear tu primera cotización
+                          </Button>
+                        </EmptyContent>
+                      </Empty>
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
@@ -362,6 +404,7 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
                     <div className="relative">
                       <UserRound className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input 
+                        autoFocus
                         value={customerSearch} 
                         onChange={e => { setCustomerSearch(e.target.value); setSelectedCustomerId(null); }} 
                         className="pl-9 focus-visible:ring-indigo-500" 
@@ -540,27 +583,56 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
                           </Button>
                         </div>
                         
-                        <div className="flex items-center justify-between mt-1">
-                          <div className="flex h-8 items-center rounded-md border border-slate-200 bg-slate-50">
-                            <button
-                              type="button"
-                              className="flex h-full w-8 items-center justify-center text-slate-500 hover:text-indigo-600 disabled:opacity-50"
-                              onClick={() => updateCartItem(item.productId, { quantity: Math.max(1, item.quantity - 1) })}
-                              disabled={item.quantity <= 1}
+                        <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-indigo-50">
+                          <div className="flex items-center gap-2">
+                            <Select 
+                              value={item.discountType} 
+                              onValueChange={(value: DiscountType) => updateCartItem(item.productId, { discountType: value, discountValue: 0 })}
                             >
-                              <Minus className="h-3 w-3" />
-                            </button>
-                            <span className="flex-1 text-center text-sm font-medium min-w-[2rem]">{item.quantity}</span>
-                            <button
-                              type="button"
-                              className="flex h-full w-8 items-center justify-center text-slate-500 hover:text-indigo-600"
-                              onClick={() => updateCartItem(item.productId, { quantity: item.quantity + 1 })}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </button>
+                              <SelectTrigger className="h-8 text-xs focus:ring-indigo-500 w-[120px]">
+                                <SelectValue placeholder="Descuento" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Sin dto</SelectItem>
+                                <SelectItem value="percentage">% Dto</SelectItem>
+                                <SelectItem value="fixed">$ Fijo</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {item.discountType !== "none" && (
+                              <Input
+                                type="number"
+                                className="h-8 text-xs focus-visible:ring-indigo-500 w-[80px]"
+                                value={item.discountValue || ""}
+                                onChange={(e) => updateCartItem(item.productId, { discountValue: parseFloat(e.target.value) || 0 })}
+                                placeholder={item.discountType === "percentage" ? "%" : "$"}
+                              />
+                            )}
                           </div>
-                          <div className="text-right">
-                            <p className="font-bold text-indigo-950">{formatCurrency(item.subtotal)}</p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex h-8 items-center rounded-md border border-slate-200 bg-slate-50">
+                              <button
+                                type="button"
+                                className="flex h-full w-8 items-center justify-center text-slate-500 hover:text-indigo-600 disabled:opacity-50"
+                                onClick={() => updateCartItem(item.productId, { quantity: Math.max(1, item.quantity - 1) })}
+                                disabled={item.quantity <= 1}
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <span className="flex-1 text-center text-sm font-medium min-w-[2rem]">{item.quantity}</span>
+                              <button
+                                type="button"
+                                className="flex h-full w-8 items-center justify-center text-slate-500 hover:text-indigo-600"
+                                onClick={() => updateCartItem(item.productId, { quantity: item.quantity + 1 })}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                            <div className="text-right flex flex-col items-end">
+                              {item.discountType !== "none" && (
+                                <span className="text-[10px] text-red-500 line-through mb-0.5">{formatCurrency(item.basePrice * item.quantity)}</span>
+                              )}
+                              <p className="font-bold text-indigo-950">{formatCurrency(item.subtotal)}</p>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -605,10 +677,13 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
               {/* HIDDEN PDF TEMPLATE */}
               <div className="absolute left-[-9999px] top-[-9999px] w-[800px]">
                 <div ref={printRef} style={{ padding: '40px', fontFamily: 'sans-serif', color: '#111', background: 'white' }}>
-                  <div style={{ borderBottom: '2px solid #111', paddingBottom: '20px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between' }}>
-                    <div>
-                      <h1 style={{ margin: 0, fontSize: '28px' }}>COTIZACIÓN</h1>
-                      <p style={{ margin: '5px 0 0 0', color: '#555' }}>Nº {detailQuery.data.quotation.quotationNumber}</p>
+                  <div style={{ borderBottom: '2px solid #111', paddingBottom: '20px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                      <img src={`${window.location.origin}/logo.png`} alt="Vitalia Logo" style={{ height: '60px', width: 'auto', objectFit: 'contain' }} />
+                      <div>
+                        <h1 style={{ margin: 0, fontSize: '28px' }}>COTIZACIÓN</h1>
+                        <p style={{ margin: '5px 0 0 0', color: '#555' }}>Nº {detailQuery.data.quotation.quotationNumber}</p>
+                      </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ margin: 0 }}><strong>Fecha:</strong> {new Date(detailQuery.data.quotation.createdAt).toLocaleDateString()}</p>

@@ -33,6 +33,9 @@ import {
   DollarSign,
   FileText,
   ShoppingBag,
+  TrendingUp,
+  CreditCard,
+  Landmark,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -130,6 +133,8 @@ function DashboardLayoutContent({
     { icon: Users, label: "Proveedores", path: "/suppliers" },
     { icon: ShoppingCart, label: "Compras", path: "/purchases" },
     { icon: DollarSign, label: "Finanzas", path: "/finance" },
+    { icon: CreditCard, label: "C. por Cobrar (CXC)", path: "/accounts-receivable" },
+    { icon: Landmark, label: "C. por Pagar (CXP)", path: "/accounts-payable" },
     { icon: Users, label: "Repartidores", path: "/delivery-persons" },
     { icon: FileText, label: "Reportes", path: "/reports" },
     { icon: TrendingUp, label: "Análisis", path: "/analysis" },

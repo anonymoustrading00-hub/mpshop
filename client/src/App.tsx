@@ -11,6 +11,7 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Home from "@/pages/Home";
 import Dashboard from "@/pages/Dashboard";
+import Branches from "@/pages/Branches";
 import Orders from "@/pages/Orders";
 import Inventory from "@/pages/Inventory";
 import Tracking from "@/pages/Tracking";
@@ -30,7 +31,11 @@ import Reports from "@/pages/Reports";
 import Expenses from "@/pages/Expenses";
 import BusinessAnalysis from "@/pages/BusinessAnalysis";
 import ProductionModule from "@/pages/production/ProductionModule";
+import AccountsReceivable from "@/pages/AccountsReceivable";
+import AccountsPayable from "@/pages/AccountsPayable";
+import GlobalCommandMenu from "@/components/GlobalCommandMenu";
 import { useEffect } from "react";
+import { BranchProvider } from "./contexts/BranchContext";
 
 function ProtectedRoute({
   component: Component,
@@ -102,6 +107,9 @@ function Router() {
           <Route path="/inventory">
             <ProtectedRoute component={Inventory} adminOnly={true} />
           </Route>
+          <Route path="/branches">
+            <ProtectedRoute component={Branches} adminOnly={true} />
+          </Route>
           <Route path="/delivery-persons">
             <ProtectedRoute component={DeliveryPersons} adminOnly={true} />
           </Route>
@@ -131,6 +139,12 @@ function Router() {
           </Route>
           <Route path="/analysis">
             <ProtectedRoute component={BusinessAnalysis} adminOnly={true} />
+          </Route>
+          <Route path="/accounts-receivable">
+            <ProtectedRoute component={AccountsReceivable} adminOnly={true} />
+          </Route>
+          <Route path="/accounts-payable">
+            <ProtectedRoute component={AccountsPayable} adminOnly={true} />
           </Route>
           <Route path={"/orders"} component={Orders} />
           <Route path={"/track/:orderId"} component={Tracking} />
@@ -164,10 +178,13 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+        <BranchProvider>
+          <TooltipProvider>
+            <Toaster />
+            <GlobalCommandMenu />
+            <Router />
+          </TooltipProvider>
+        </BranchProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

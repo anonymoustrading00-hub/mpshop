@@ -99,8 +99,8 @@ export default function Expenses() {
     <div className="p-4 space-y-6 max-w-6xl mx-auto mb-20 md:mb-0">
       <div className="flex justify-between items-center no-print">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gastos Operativos</h1>
-          <p className="text-muted-foreground">Control de gastos generales del negocio.</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Gastos <span className="text-orange-600">Operativos</span></h1>
+          <p className="text-sm text-slate-500 mt-1.5">Control de gastos generales del negocio.</p>
         </div>
         <Button className="gap-2" onClick={() => setShowAddDialog(true)}>
           <Plus className="h-4 w-4" /> Nuevo Gasto

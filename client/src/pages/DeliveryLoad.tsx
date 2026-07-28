@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
 
 type LoadEntry = {
   order: any;
@@ -245,7 +246,7 @@ export default function DeliveryLoad() {
     w.document.close();
   };
 
-  const { data: user } = trpc.auth.getUser.useQuery();
+  const { data: user } = trpc.auth.me.useQuery();
   const { data: closureStatus } = trpc.finance.hasPendingClosure.useQuery();
   const isLocked = user?.role === "repartidor" && closureStatus?.hasPending;
 
@@ -548,4 +549,3 @@ export default function DeliveryLoad() {
     </div>
   );
 }
-

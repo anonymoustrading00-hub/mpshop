@@ -56,7 +56,7 @@ const formatCurrency = (val: number) => {
 
 export default function BusinessAnalysis() {
   const [activeTab, setActiveTab] = useState<"overview" | "ranking" | "bcg" | "comparison">("overview");
-  const [period, setPeriod] = useState<"7d" | "30d" | "month" | "quarter" | "year" | "custom">("30d");
+  const [period, setPeriod] = useState<"7d" | "30d" | "month" | "quarter" | "year" | "custom">("year");
   const [sortBy, setSortBy] = useState<"revenue" | "units" | "margin" | "trend">("revenue");
   const [segmentFilter, setSegmentFilter] = useState<"all" | "retail" | "wholesale">("all");
   
@@ -134,6 +134,7 @@ export default function BusinessAnalysis() {
               <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Período:</span>
               <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100">
                 <PeriodButton active={period === "month"} onClick={() => setPeriod("month")} label="Este Mes" />
+                <PeriodButton active={period === "30d"} onClick={() => setPeriod("30d")} label="30 Dias" />
                 <PeriodButton active={period === "quarter"} onClick={() => setPeriod("quarter")} label="Trimestre" />
                 <PeriodButton active={period === "year"} onClick={() => setPeriod("year")} label="Año" />
                 <PeriodButton active={period === "custom"} onClick={() => setPeriod("custom")} label="Personalizado" />
@@ -282,6 +283,8 @@ function OverviewContent({ data, segmentFilter }: { data: any, segmentFilter: st
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard title="Ingresos Brutos" value={`Bs. ${formatCurrency(revenue / 100)}`} icon={<DollarSign size={24} />} color="emerald" footer={segmentFilter === "all" ? "Total del periodo" : `Segmento ${segmentFilter}`} />
         <MetricCard title="Utilidad Neta" value={`Bs. ${formatCurrency(data.summary.netIncome / 100)}`} icon={<TrendingUp size={24} />} color="blue" footer="Ingresos - Gastos" />
+        <MetricCard title="Egresos" value={`Bs. ${formatCurrency(data.summary.totalExpenses / 100)}`} icon={<ShoppingCart size={24} />} color="orange" footer="Compras + gastos" />
+        <MetricCard title="Compras" value={`Bs. ${formatCurrency((data.summary.totalPurchases || 0) / 100)}`} icon={<Package size={24} />} color="purple" footer={`${data.summary.purchaseCount || 0} registros`} />
         <MetricCard title="Ticket Promedio" value={`Bs. ${formatCurrency(ticketPromedio / 100)}`} icon={<Award size={24} />} color="orange" footer="Promedio por operación" />
         <MetricCard title="Retención" value={`${data.summary.retentionRate}%`} icon={<RefreshCw size={24} />} color="purple" footer="Clientes recurrentes" />
       </div>

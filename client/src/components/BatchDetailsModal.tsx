@@ -25,10 +25,11 @@ interface BatchDetailsModalProps {
 export function BatchDetailsModal({ batch, isOpen, onClose }: BatchDetailsModalProps) {
   if (!batch) return null;
 
-  const { data: outputs = [], isLoading } = trpc.production.getBatchOutputs.useQuery(
+  const { data: batchDetails, isLoading } = trpc.production.getBatchDetails.useQuery(
     { batchId: batch.id },
     { enabled: isOpen }
   );
+  const outputs = batchDetails?.outputs ?? [];
 
   const isCompleted = batch.status === 'completed';
   const isElaboracion = batch.type === 'kefir_production';

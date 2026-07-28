@@ -38,7 +38,7 @@ export const ordersRouter = router({
     if (ctx.user?.role !== "admin") {
       throw new TRPCError({ code: "FORBIDDEN" });
     }
-    const allOrders = await getAllOrders();
+    const allOrders = await getAllOrders(ctx.branchId);
 
     // Extraer números de los pedidos existentes
     const orderNumbers = allOrders
@@ -61,7 +61,7 @@ export const ordersRouter = router({
     if (ctx.user?.role !== "admin") {
       throw new TRPCError({ code: "FORBIDDEN" });
     }
-    return await getAllOrders();
+    return await getAllOrders(ctx.branchId);
   }),
 
   // Hoja de reparto del dÃ­a (Admin): pedidos asignados + productos
@@ -76,7 +76,7 @@ export const ordersRouter = router({
       }
 
       const [orders, customers, sales] = await Promise.all([
-        getAllOrders(),
+        getAllOrders(ctx.branchId),
         getAllCustomers(),
         getAllSales(),
       ]);
@@ -269,7 +269,7 @@ export const ordersRouter = router({
       
       if (existingOrder) {
         // Generar un nuevo número de forma automática si ya existe
-        const allOrders = await getAllOrders();
+        const allOrders = await getAllOrders(ctx.branchId);
         const orderNumbers = allOrders
           .map((o: any) => {
             const match = o.orderNumber?.match(/\d+/);
@@ -285,6 +285,7 @@ export const ordersRouter = router({
       // Crear pedido
       const orderResult = await createOrder({
         orderNumber: finalOrderNumber,
+        branchId: ctx.branchId,
         customerId: customer.id,
         zone: input.zone,
         deliveryDate: input.deliveryDate,
@@ -349,7 +350,7 @@ export const ordersRouter = router({
       }
 
       // Descontar stock del inventario y registrar en historial
-      await deductInventoryForOrder(newOrder.id, finalOrderNumber, input.items);
+      await deductInventoryForOrder(newOrder.id, finalOrderNumber, input.items.map(i => ({ ...i, orderId: newOrder.id })));
 
       return newOrder;
     }),
@@ -423,7 +424,7 @@ export const ordersRouter = router({
         totalPrice: input.totalPrice,
         paymentMethod: input.paymentMethod,
         deliveryPersonId: input.deliveryPersonId,
-        status: input.status || (input.deliveryPersonId ? "assigned" : "pending"),
+        status: (input.status as any) || (input.deliveryPersonId ? "assigned" : "pending"),
         notes: input.notes,
         sourceChannel: input.sourceChannel,
         updatedAt: new Date(),
@@ -442,7 +443,7 @@ export const ordersRouter = router({
       }
 
       // 5. Descontar stock del nuevo inventario
-      await deductInventoryForOrder(input.id, input.orderNumber, input.items);
+      await deductInventoryForOrder(input.id, input.orderNumber, input.items.map(i => ({ ...i, orderId: input.id })));
 
       return { success: true };
     }),
@@ -661,6 +662,37 @@ export const ordersRouter = router({
       }
       return { success: true };
   }),
+
+  // Actualización masiva de estados
+  bulkUpdateStatus: protectedProcedure
+    .input(z.object({
+      orderIds: z.array(z.number()),
+      status: z.enum(["pending", "assigned", "in_transit", "delivered", "cancelled"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user?.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      let updatedCount = 0;
+      for (const orderId of input.orderIds) {
+        const order = await getOrderById(orderId);
+        if (!order) continue;
+
+        // Skip if already in the target status
+        if (order.status === input.status) continue;
+
+        if (input.status === "delivered") {
+          const currentMethod = order.paymentMethod || "cash";
+          await completeOrderDelivery(orderId, currentMethod);
+        } else {
+          await updateOrder(orderId, { status: input.status });
+        }
+        updatedCount++;
+      }
+      
+      return { success: true, updatedCount };
+    }),
 
   // Carga Extra
   assignExtraLoad: protectedProcedure

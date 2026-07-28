@@ -84,7 +84,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-full bg-background p-4 md:p-6 pb-20 md:pb-6">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
+        <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-8"><span className="text-blue-600">Dashboard</span></h1>
 
         {/* Estadísticas principales */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

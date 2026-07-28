@@ -6,14 +6,40 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ShoppingCart, Plus, Package, Calendar, User, Trash2, Eye, Printer, FileText, XCircle, Edit } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useIsMobile } from "@/hooks/useMobile";
+import {
+  ShoppingCart,
+  Plus,
+  Package,
+  Calendar,
+  User,
+  Trash2,
+  Eye,
+  Printer,
+  FileText,
+  XCircle,
+  Edit,
+  Search,
+  Banknote,
+  QrCode,
+  ArrowLeftRight,
+  TrendingUp,
+  CreditCard,
+  Building2,
+  Receipt,
+  CheckCircle2,
+  ArrowLeft,
+  RotateCcw
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogDescription,
+  DialogFooter
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -24,25 +50,25 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/currency";
-function getLocalDateInputValue() {
-  const now = new Date();
-  const offsetMs = now.getTimezoneOffset() * 60 * 1000;
-  return new Date(now.getTime() - offsetMs).toISOString().split("T")[0];
-}
 
 export default function Purchases() {
-  const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [supplierId, setSupplierId] = useState<number>(0);
   const [openNewProduct, setOpenNewProduct] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterPayment, setFilterPayment] = useState<string>("all");
+
   const [purchaseData, setPurchaseData] = useState({
     purchaseNumber: "COM-" + Math.floor(Math.random() * 10000),
     status: "received" as const,
     isCredit: 0,
     paymentMethod: "cash",
     totalAmount: 0,
+    dueDate: "",
   });
 
   const [items, setItems] = useState<any[]>([]);
@@ -64,18 +90,10 @@ export default function Purchases() {
   const createMutation = (trpc.purchases as any).create.useMutation({
     onSuccess: () => {
       toast.success("Compra registrada e inventario actualizado");
-      setOpen(false);
-      setItems([]);
-      setSupplierId(0);
-      setPurchaseData({
-        purchaseNumber: "COM-" + Math.floor(Math.random() * 10000),
-        status: "received",
-        isCredit: 0,
-        paymentMethod: "cash",
-        totalAmount: 0,
-      });
+      setIsCreateOpen(false);
+      resetCreateForm();
       utils.purchases.list.invalidate();
-      (utils as any).inventory.listInventory.invalidate(); // Invalida el inventario completo para ver las nuevas cantidades
+      (utils as any).inventory.listInventory.invalidate();
     },
     onError: (error: any) => {
       console.error("Error creating purchase:", error);
@@ -83,16 +101,27 @@ export default function Purchases() {
     }
   });
 
+  const resetCreateForm = () => {
+    setItems([]);
+    setSupplierId(0);
+    setPurchaseData({
+      purchaseNumber: "COM-" + Math.floor(Math.random() * 10000),
+      status: "received",
+      isCredit: 0,
+      paymentMethod: "cash",
+      totalAmount: 0,
+      dueDate: "",
+    });
+    setCurrentItem({ productId: 0, quantity: 1, price: 0, expiryDate: "" });
+  };
+
   const addItem = () => {
     if (currentItem.productId === 0 || currentItem.quantity <= 0) return;
     const product = (products as any[])?.find((p: any) => p.id === currentItem.productId);
-    
-    // Convertir precio a centavos para almacenamiento consistente
     const priceInCents = Math.round(currentItem.price * 100);
     
     setItems([...items, { ...currentItem, price: priceInCents, productName: product?.name }]);
     
-    // Actualizar total (en centavos)
     setPurchaseData(prev => ({
       ...prev,
       totalAmount: prev.totalAmount + (currentItem.quantity * priceInCents)
@@ -102,7 +131,6 @@ export default function Purchases() {
 
   const removeItem = (index: number) => {
     const item = items[index];
-    // item.price ya debe estar en centavos
     setPurchaseData(prev => ({
       ...prev,
       totalAmount: prev.totalAmount - (item.quantity * item.price)
@@ -117,7 +145,6 @@ export default function Purchases() {
   const balances = useMemo(() => {
     if (!transactions) return { cash: 0, qr: 0, transfer: 0 };
     
-    // Calcular ingresos y egresos base
     const getBalance = (method: string) => {
       const txs = (transactions as any[]) || [];
       const income = txs.filter(t => t.type === "income" && (t.paymentMethod === method || (!t.paymentMethod && method === 'cash'))).reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
@@ -125,7 +152,6 @@ export default function Purchases() {
       return income - expense;
     };
 
-    // Todas las aperturas históricas
     const getOpening = (method: string) => {
       const openings = (cashOpenings as any[]) || [];
       return openings
@@ -146,9 +172,10 @@ export default function Purchases() {
 
   const isInsufficient = purchaseData.totalAmount > currentBalance;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!openingStatus?.hasActive) {
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    // Las compras a crédito no requieren caja abierta (se registra la deuda, no sale efectivo)
+    if (purchaseData.isCredit === 0 && !openingStatus?.hasActive) {
       toast.error(`Caja cerrada: Para registrar compras en ${purchaseData.paymentMethod.toUpperCase()}, primero debes realizar la apertura de caja.`);
       return;
     }
@@ -156,9 +183,14 @@ export default function Purchases() {
       toast.error("Añade al menos un producto a la compra");
       return;
     }
+    if (purchaseData.isCredit === 1 && !purchaseData.dueDate) {
+      toast.error("Las compras a crédito requieren una fecha de vencimiento.");
+      return;
+    }
     const purchasePayload = {
       ...purchaseData,
       supplierId: supplierId === 0 ? undefined : supplierId,
+      dueDate: purchaseData.dueDate || undefined,
       items: items.map(item => ({
         ...item,
         expiryDate: item.expiryDate || undefined
@@ -189,6 +221,27 @@ export default function Purchases() {
     win.document.close();
     win.print();
   };
+
+  const filteredPurchases = useMemo(() => {
+    if (!purchases) return [];
+    return (purchases as any[]).filter((p: any) => {
+      const matchesSearch = !searchQuery || 
+        p.purchaseNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.supplierName?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesPayment = filterPayment === "all" || p.paymentMethod === filterPayment || (filterPayment === "credit" && p.isCredit === 1);
+      return matchesSearch && matchesPayment;
+    });
+  }, [purchases, searchQuery, filterPayment]);
+
+  const totalSpent = useMemo(() => {
+    if (!purchases) return 0;
+    return (purchases as any[]).reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+  }, [purchases]);
+
+  const creditPurchasesCount = useMemo(() => {
+    if (!purchases) return 0;
+    return (purchases as any[]).filter(p => p.isCredit === 1).length;
+  }, [purchases]);
 
   // Bloqueo de seguridad: Si tiene un cierre pendiente
   const { data: closureStatus } = trpc.finance.hasPendingClosure.useQuery();
@@ -225,146 +278,543 @@ export default function Purchases() {
   }
 
   return (
-    <div className="p-4 space-y-6 max-w-5xl mx-auto mb-20 md:mb-0">
-      <div className="flex justify-between items-center">
+    <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto mb-20 md:mb-0">
+      {/* Header con botón destacado de Nueva Compra */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Registro de Compras</h1>
-          <p className="text-muted-foreground">Ingresa nuevas facturas, notas e insumos al sistema.</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">
+            Gestión de <span className="text-blue-600">Compras</span>
+          </h1>
+          <p className="text-sm text-slate-500 mt-1.5">
+            Registro de entrada de mercancía, insumos y control de proveedores
+          </p>
         </div>
+
+        <Button
+          onClick={() => setIsCreateOpen(true)}
+          className="h-14 px-8 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-lg gap-3 shadow-xl shadow-blue-600/20 transition-all hover:scale-105 active:scale-95"
+        >
+          <Plus className="h-6 w-6" />
+          Nueva Compra
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Formulario de Compra */}
-        <Card className="lg:col-span-2 border-green-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2 text-green-700">
-              <Plus className="h-5 w-5" /> Nueva Entrada de Mercancía / Insumos
-            </CardTitle>
-            <CardDescription>
-              Completa los datos para actualizar el stock automáticamente.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2 min-w-0">
-                  <Label className="text-sm font-bold text-slate-700">Proveedor</Label>
-                  <Select
-                    value={supplierId === 0 ? "" : supplierId.toString()}
-                    onValueChange={(val) => setSupplierId(parseInt(val))}
-                  >
-                    <SelectTrigger className="truncate">
-                      <SelectValue placeholder="Sin proveedor (Directo)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(suppliers as any[])?.map((s: any) => (
-                        <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2 min-w-0">
-                  <Label className="text-sm font-bold text-slate-700">Nro de Factura/Nota</Label>
-                  <Input 
-                    value={purchaseData.purchaseNumber} 
-                    onChange={(e) => setPurchaseData({...purchaseData, purchaseNumber: e.target.value})}
-                    className="font-mono bg-white"
-                  />
-                </div>
-                <div className="space-y-2 min-w-0">
-                  <Label className="text-sm font-bold text-slate-700">Método de Pago</Label>
-                  <Select value={purchaseData.paymentMethod} onValueChange={(val: any) => setPurchaseData({...purchaseData, paymentMethod: val})}>
-                    <SelectTrigger className="bg-white">
-
-                      <SelectValue placeholder="Seleccionar..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">Efectivo</SelectItem>
-                      <SelectItem value="qr">Transferencia QR</SelectItem>
-                      <SelectItem value="transfer">Cuenta Bancaria</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className={`space-y-2 p-3 rounded-lg border transition-colors ${isInsufficient ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
-                   <Label className={`text-[10px] font-bold uppercase tracking-wider ${isInsufficient ? 'text-red-600' : 'text-slate-500'}`}>Saldo Disponible</Label>
-                   <p className={`text-xl font-black ${isInsufficient ? 'text-red-700' : 'text-slate-900'}`}>
-                     {formatCurrency(currentBalance)}
-                   </p>
-                   {isInsufficient && (
-                     <p className="text-[9px] font-bold text-red-500 animate-pulse uppercase">¡Fondos insuficientes en esta caja!</p>
-                   )}
-                </div>
+      {/* Tarjetas KPI de Resumen */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="border-0 shadow-md rounded-2xl bg-white">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-blue-50 rounded-2xl text-blue-600">
+                <Receipt className="h-5 w-5" />
               </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Registros</p>
+                <p className="text-2xl font-black text-slate-900">{purchases?.length || 0}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-              <div className="border p-4 rounded-lg bg-muted/30 space-y-4">
-                <h3 className="font-semibold flex items-center gap-2 border-b pb-2">
-                  <Package className="h-4 w-4" /> Detalle de Productos
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
-                  <div className="md:col-span-2 space-y-1 min-w-0">
-                    <Label className="text-xs font-bold text-blue-800">Producto / Insumo</Label>
-                    <div className="flex gap-2 items-center">
-                      {currentItem.productId !== 0 && selectedProduct?.imageUrl ? (
-                        <img src={selectedProduct.imageUrl} alt={selectedProduct.name} className="h-10 w-10 rounded-md object-cover border flex-shrink-0 bg-white" />
-                      ) : (
-                        <div className="h-10 w-10 rounded-md bg-blue-50 flex items-center justify-center border border-blue-100 flex-shrink-0 transition-colors">
-                          <Package className={`h-5 w-5 ${currentItem.productId === 0 ? 'text-blue-300' : 'text-blue-500'}`} />
+        <Card className="border-0 shadow-md rounded-2xl bg-white">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Invertido</p>
+                <p className="text-2xl font-black text-emerald-600">{formatCurrency(totalSpent)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-md rounded-2xl bg-white">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-amber-50 rounded-2xl text-amber-600">
+                <CreditCard className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Compras a Crédito</p>
+                <p className="text-2xl font-black text-slate-900">{creditPurchasesCount}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-md rounded-2xl bg-white">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-violet-50 rounded-2xl text-violet-600">
+                <Building2 className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Proveedores</p>
+                <p className="text-2xl font-black text-slate-900">{suppliers?.length || 0}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Historial de Compras en FILAS / TABLA (Igual a Historial de Ventas) */}
+      <Card className="border-0 shadow-xl shadow-slate-100 rounded-[2.5rem] overflow-hidden bg-white">
+        <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between px-8 py-6 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
+              <ShoppingCart className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-xl font-black text-slate-900">Historial de Compras</CardTitle>
+              <CardDescription className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                Entradas de mercancía e insumos
+              </CardDescription>
+            </div>
+          </div>
+
+          {/* Filtros */}
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Buscar por N° Nota o Proveedor..."
+                className="pl-9 h-11 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            <Select value={filterPayment} onValueChange={setFilterPayment}>
+              <SelectTrigger className="w-full sm:w-44 h-11 rounded-xl border-slate-200 bg-slate-50/50">
+                <SelectValue placeholder="Método de pago" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los pagos</SelectItem>
+                <SelectItem value="cash">Efectivo</SelectItem>
+                <SelectItem value="qr">Transferencia QR</SelectItem>
+                <SelectItem value="transfer">Cuenta Bancaria</SelectItem>
+                <SelectItem value="credit">A Crédito</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+
+        <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
+          {isMobile ? (
+            <div className="space-y-3">
+              {isPurchasesLoading ? (
+                <div className="py-10 text-center text-slate-400">Cargando compras...</div>
+              ) : filteredPurchases.length === 0 ? (
+                <div className="py-10 text-center text-slate-400">No hay compras que coincidan con el filtro.</div>
+              ) : (
+                filteredPurchases.map((purchase: any) => (
+                  <div key={purchase.id} className="group relative rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm hover:shadow-md transition-all active:scale-[0.98]">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg font-black text-slate-900">{purchase.purchaseNumber}</span>
+                          <Badge variant="outline" className={`rounded-full text-[10px] font-black uppercase ${purchase.status === 'received' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                            {purchase.status === "received" ? "OK" : "PENDIENTE"}
+                          </Badge>
                         </div>
-                      )}
-                      <div className="flex-1 min-w-0 flex gap-2">
-                        <Select 
-                          value={currentItem.productId === 0 ? "" : currentItem.productId.toString()} 
-                          onValueChange={(val) => setCurrentItem({...currentItem, productId: parseInt(val), price: 0})}
-                        >
-                          <SelectTrigger className={`bg-white truncate flex-1 ${currentItem.productId === 0 ? 'text-slate-500' : 'font-semibold'}`}>
-                            <SelectValue placeholder="Buscar o seleccionar..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(products as any[])?.map((p: any) => (
-                              <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          size="icon" 
-                          className="shrink-0 bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100" 
-                          onClick={() => setOpenNewProduct(true)}
-                          title="Nuevo Ítem de Inventario"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                        <p className="text-sm font-bold text-slate-600 truncate max-w-[200px]">{purchase.supplierName || "Sin Proveedor"}</p>
+                        <div className="flex items-center gap-1.5 mt-2">
+                           <div className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center">
+                             <User className="h-3 w-3 text-slate-400" />
+                           </div>
+                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{new Date(purchase.createdAt).toLocaleDateString("es-BO")}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-black text-slate-900">{formatCurrency(purchase.totalAmount)}</p>
+                        <div className="mt-1 flex flex-col items-end gap-1">
+                          <Badge variant="outline" className="rounded-full text-[9px] font-black uppercase tracking-wider px-2 bg-slate-50 border-slate-200">
+                            {purchase.paymentMethod === "cash" ? "Efectivo" : purchase.paymentMethod === "qr" ? "QR" : "Transferencia"}
+                          </Badge>
+                          {purchase.isCredit === 1 && (
+                            <Badge variant="destructive" className="rounded-full text-[9px] font-black uppercase tracking-widest px-2 bg-red-100 text-red-700 border-0">
+                              Crédito
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-6 flex items-center gap-2">
+                      <Button variant="outline" className="flex-1 h-11 rounded-2xl border-slate-200 text-slate-600 font-black text-xs gap-2" onClick={() => { setSelectedPurchase(purchase); setShowDetails(true); }}>
+                        <Eye className="h-4 w-4" />
+                        VER DETALLE
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-11 w-11 rounded-2xl border-slate-200" onClick={() => { setSelectedPurchase(purchase); setShowEdit(true); }} title="Editar Compra">
+                        <Edit className="h-4 w-4 text-amber-600" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-11 w-11 rounded-2xl border-slate-200" onClick={() => handlePrint(purchase)} title="Imprimir Comprobante">
+                        <Printer className="h-4 w-4 text-slate-400" />
+                      </Button>
+                    </div>
+
+                    {/* Template para impresión oculto */}
+                    <div id={`purchase-print-${purchase.id}`} className="hidden">
+                      <div className="header">
+                        <h1>Comprobante de Compra</h1>
+                        <p><strong>Nro:</strong> {purchase.purchaseNumber}</p>
+                      </div>
+                      <div className="grid">
+                        <div>
+                          <p><strong>Proveedor:</strong> {purchase.supplierName || "Sin Proveedor"}</p>
+                          <p><strong>Fecha:</strong> {new Date(purchase.createdAt).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                          <p><strong>Método:</strong> {purchase.paymentMethod}</p>
+                          <p><strong>Estado:</strong> {purchase.status}</p>
+                        </div>
+                      </div>
+                      <div className="total">
+                        TOTAL: {formatCurrency(purchase.totalAmount)}
                       </div>
                     </div>
                   </div>
+                ))
+              )}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="border-slate-100">
+                  <TableHead className="font-black text-xs uppercase text-slate-400 py-4">N° Compra</TableHead>
+                  <TableHead className="font-black text-xs uppercase text-slate-400">Proveedor</TableHead>
+                  <TableHead className="font-black text-xs uppercase text-slate-400">Estado</TableHead>
+                  <TableHead className="font-black text-xs uppercase text-slate-400">Pago</TableHead>
+                  <TableHead className="font-black text-xs uppercase text-slate-400 text-right">Total</TableHead>
+                  <TableHead className="font-black text-xs uppercase text-slate-400">Fecha</TableHead>
+                  <TableHead className="font-black text-xs uppercase text-slate-400 text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isPurchasesLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-slate-400">
+                      Cargando compras...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredPurchases.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-slate-400">
+                      No hay compras que coincidan con el filtro.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredPurchases.map((purchase: any) => (
+                    <TableRow key={purchase.id} className="group hover:bg-slate-50/80 transition-colors border-slate-100">
+                      <TableCell className="font-black text-slate-900 py-5 text-base">{purchase.purchaseNumber}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-800">{purchase.supplierName || "Sin Proveedor"}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={`rounded-full px-3 font-black text-[10px] uppercase tracking-widest ${
+                            purchase.status === "received"
+                              ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                              : "bg-amber-50 text-amber-600 border-amber-100"
+                          }`}
+                        >
+                          {purchase.status === "received" ? "OK" : "PENDIENTE"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                            {purchase.paymentMethod === "cash" ? (
+                              <Banknote className="h-3.5 w-3.5 text-emerald-500" />
+                            ) : purchase.paymentMethod === "qr" ? (
+                              <QrCode className="h-3.5 w-3.5 text-violet-500" />
+                            ) : (
+                              <ArrowLeftRight className="h-3.5 w-3.5 text-blue-500" />
+                            )}
+                            <span>{purchase.paymentMethod === "cash" ? "Efectivo" : purchase.paymentMethod === "qr" ? "QR" : "Transferencia"}</span>
+                          </div>
+                          {purchase.isCredit === 1 && (
+                            <Badge variant="destructive" className="rounded-full text-[9px] font-black uppercase tracking-wider w-fit px-2 py-0 bg-red-100 text-red-700 border-0">
+                              A Crédito
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="text-base font-black text-slate-900">{formatCurrency(purchase.totalAmount)}</span>
+                      </TableCell>
+                      <TableCell className="text-slate-500 text-xs font-medium">
+                        {new Date(purchase.createdAt).toLocaleString("es-BO", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-9 w-9 rounded-xl border-slate-200 hover:bg-blue-50 hover:text-blue-600" 
+                            onClick={() => { setSelectedPurchase(purchase); setShowDetails(true); }}
+                            title="Ver Detalle"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-9 w-9 rounded-xl border-slate-200 hover:bg-amber-50 hover:text-amber-600" 
+                            onClick={() => { setSelectedPurchase(purchase); setShowEdit(true); }}
+                            title="Editar Compra"
+                          >
+                            <Edit className="h-4 w-4 text-amber-600" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-9 w-9 rounded-xl border-slate-200" 
+                            onClick={() => handlePrint(purchase)}
+                            title="Imprimir"
+                          >
+                            <Printer className="h-4 w-4 text-slate-400" />
+                          </Button>
+                        </div>
 
-                  {/* Info del producto seleccionado */}
+                        {/* Template para impresión oculto */}
+                        <div id={`purchase-print-${purchase.id}`} className="hidden">
+                          <div className="header">
+                            <h1>Comprobante de Compra</h1>
+                            <p><strong>Nro:</strong> {purchase.purchaseNumber}</p>
+                          </div>
+                          <div className="grid">
+                            <div>
+                              <p><strong>Proveedor:</strong> {purchase.supplierName || "Sin Proveedor"}</p>
+                              <p><strong>Fecha:</strong> {new Date(purchase.createdAt).toLocaleDateString()}</p>
+                            </div>
+                            <div>
+                              <p><strong>Método:</strong> {purchase.paymentMethod}</p>
+                              <p><strong>Estado:</strong> {purchase.status}</p>
+                            </div>
+                          </div>
+                          <div className="total">
+                            TOTAL: {formatCurrency(purchase.totalAmount)}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Modal AMPLIADO de Formulario de Nueva Compra (Estilo Modal de Ventas Amplio) */}
+      <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) resetCreateForm(); }}>
+        <DialogContent
+          className={
+            isMobile
+              ? "max-h-[94vh] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-[1.6rem] border-white/70 bg-white p-4 sm:max-w-[calc(100vw-1.5rem)] sm:p-6"
+              : "flex flex-col h-[92vh] w-[min(1360px,96vw)] sm:max-w-[min(1360px,96vw)] overflow-hidden rounded-[1.8rem] border-slate-200/60 bg-white shadow-2xl shadow-slate-900/10 p-0"
+          }
+        >
+          <DialogHeader className={isMobile ? "" : "border-b border-slate-100 px-8 pt-6 pb-4 bg-gradient-to-r from-slate-50/80 to-white shrink-0"}>
+            <DialogTitle className="flex items-center gap-3 text-xl">
+              <div className="h-10 w-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-600/20">
+                <ShoppingCart className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="font-black text-slate-900">Nueva Entrada de Mercancía / Insumos</span>
+                <span className="ml-3 text-sm font-bold text-slate-400 font-mono">#{purchaseData.purchaseNumber}</span>
+              </div>
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 font-medium">
+              Registra una nueva compra con proveedores, insumos y actualización automática de stock de inventario.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className={isMobile ? "mt-6 space-y-6" : "grid min-h-0 flex-1 overflow-hidden gap-0 lg:grid-cols-[minmax(0,1.1fr)_420px]"}>
+            {/* LADO IZQUIERDO: Formulario de Selección e Ítems */}
+            <div className={isMobile ? "space-y-6" : "min-h-0 space-y-5 overflow-y-auto px-8 py-6"}>
+              {/* Card de Datos Generales */}
+              <Card className="border-slate-100 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2 text-slate-800 font-black">
+                    <Building2 className="h-4 w-4 text-blue-600" /> Datos de la Factura y Proveedor
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Proveedor</Label>
+                    <Select
+                      value={supplierId === 0 ? "" : supplierId.toString()}
+                      onValueChange={(val) => setSupplierId(parseInt(val))}
+                    >
+                      <SelectTrigger className="rounded-xl h-11 bg-slate-50/50">
+                        <SelectValue placeholder="Sin proveedor (Directo)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(suppliers as any[])?.map((s: any) => (
+                          <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nro de Factura / Nota</Label>
+                    <Input 
+                      value={purchaseData.purchaseNumber} 
+                      onChange={(e) => setPurchaseData({...purchaseData, purchaseNumber: e.target.value})}
+                      className="font-mono bg-slate-50/50 rounded-xl h-11 font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Método de Pago</Label>
+                    <Select value={purchaseData.paymentMethod} onValueChange={(val: any) => setPurchaseData({...purchaseData, paymentMethod: val})}>
+                      <SelectTrigger className="bg-slate-50/50 rounded-xl h-11">
+                        <SelectValue placeholder="Seleccionar..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Efectivo</SelectItem>
+                        <SelectItem value="qr">Transferencia QR</SelectItem>
+                        <SelectItem value="transfer">Cuenta Bancaria</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Card de Detalle de Productos */}
+              <Card className="border-slate-100 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2 text-slate-800 font-black">
+                    <Package className="h-4 w-4 text-blue-600" /> Productos e Insumos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                    <div className="sm:col-span-2 space-y-1 min-w-0">
+                      <Label className="text-xs font-bold text-slate-600 uppercase">Producto / Insumo</Label>
+                      <div className="flex gap-2 items-center">
+                        {currentItem.productId !== 0 && selectedProduct?.imageUrl ? (
+                          <img src={selectedProduct.imageUrl} alt={selectedProduct.name} className="h-11 w-11 rounded-xl object-cover border flex-shrink-0 bg-white" />
+                        ) : (
+                          <div className="h-11 w-11 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100 flex-shrink-0">
+                            <Package className={`h-5 w-5 ${currentItem.productId === 0 ? 'text-blue-300' : 'text-blue-500'}`} />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0 flex gap-2">
+                          <Select 
+                            value={currentItem.productId === 0 ? "" : currentItem.productId.toString()} 
+                            onValueChange={(val) => setCurrentItem({...currentItem, productId: parseInt(val), price: 0})}
+                          >
+                            <SelectTrigger className={`bg-slate-50/50 rounded-xl h-11 truncate flex-1 ${currentItem.productId === 0 ? 'text-slate-500' : 'font-semibold'}`}>
+                              <SelectValue placeholder="Buscar o seleccionar..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(products as any[])?.map((p: any) => (
+                                <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="icon" 
+                            className="shrink-0 h-11 w-11 rounded-xl bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100" 
+                            onClick={() => setOpenNewProduct(true)}
+                            title="Nuevo Ítem de Inventario"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold text-slate-600 uppercase">Cantidad</Label>
+                      <Input 
+                        type="number" 
+                        step="any"
+                        onFocus={(e) => e.target.select()}
+                        value={currentItem.quantity} 
+                        onChange={(e) => setCurrentItem({...currentItem, quantity: parseInt(e.target.value) || 1})}
+                        className="rounded-xl h-11 bg-slate-50/50 text-center font-black"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-bold text-emerald-700 uppercase">P. Unit. Compra (Bs)</Label>
+                      <Input 
+                        type="text" 
+                        inputMode="decimal"
+                        onFocus={(e) => e.target.select()}
+                        value={currentItem.price === 0 ? "" : currentItem.price} 
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9.]/g, '');
+                          setCurrentItem({...currentItem, price: val as any});
+                        }}
+                        placeholder="0.00"
+                        className="rounded-xl h-11 bg-slate-50/50 font-black text-right"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2 space-y-1">
+                      <Label className="text-[10px] text-orange-600 uppercase font-bold">Fecha Vencimiento (opcional)</Label>
+                      <Input 
+                        type="date" 
+                        value={currentItem.expiryDate} 
+                        onChange={(e) => setCurrentItem({...currentItem, expiryDate: e.target.value})}
+                        className="rounded-xl h-11 bg-slate-50/50"
+                      />
+                    </div>
+
+                    <div className="space-y-1 bg-blue-50/50 border border-blue-100 rounded-xl p-2 text-center flex flex-col justify-center h-11">
+                      <Label className="text-[8px] font-bold text-blue-500 uppercase">TOTAL ITEM</Label>
+                      <p className="text-sm font-black text-blue-700">
+                        {formatCurrency(Math.round(currentItem.quantity * (Number(currentItem.price) || 0) * 100))}
+                      </p>
+                    </div>
+
+                    <Button type="button" className="w-full font-black h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20" onClick={() => {
+                      const priceNum = Number(currentItem.price) || 0;
+                      setCurrentItem({...currentItem, price: priceNum});
+                      addItem();
+                    }}>
+                      Añadir Item
+                    </Button>
+                  </div>
+
+                  {/* Info del producto seleccionado & Control de Masa */}
                   {selectedProduct && (
-                    <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
-                      <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 text-center">
-                        <p className="text-[9px] font-bold uppercase text-blue-500 tracking-wide">Stock Disponible</p>
-                        <p className="text-lg font-black text-blue-700">{selectedProduct.stock ?? selectedProduct.quantity ?? 0}</p>
-                        <p className="text-[9px] text-blue-400">{selectedProduct.unit || 'unidades'}</p>
-                      </div>
-                      <div className="bg-green-50 border border-green-100 rounded-lg p-2 text-center">
-                        <p className="text-[9px] font-bold uppercase text-green-500 tracking-wide">Precio Venta Ref.</p>
-                        <p className="text-lg font-black text-green-700">{formatCurrency((selectedProduct.salePrice ?? selectedProduct.price ?? 0))}</p>
-                        <p className="text-[9px] text-green-400">por unidad</p>
-                      </div>
-                      <div className="bg-amber-50 border border-amber-100 rounded-lg p-2 text-center">
-                        <p className="text-[9px] font-bold uppercase text-amber-500 tracking-wide">Saldo Inventario</p>
-                        <p className="text-lg font-black text-amber-700">{formatCurrency((selectedProduct.stock ?? selectedProduct.quantity ?? 0) * (selectedProduct.salePrice ?? selectedProduct.price ?? 0))}</p>
-                        <p className="text-[9px] text-amber-400">valor total</p>
+                    <div className="space-y-3 pt-2">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-3 text-center">
+                          <p className="text-[9px] font-bold uppercase text-blue-500 tracking-wide">Stock Disponible</p>
+                          <p className="text-lg font-black text-blue-700">{selectedProduct.stock ?? selectedProduct.quantity ?? 0}</p>
+                          <p className="text-[9px] text-blue-400">{selectedProduct.unit || 'unidades'}</p>
+                        </div>
+                        <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-3 text-center">
+                          <p className="text-[9px] font-bold uppercase text-emerald-500 tracking-wide">Precio Venta Ref.</p>
+                          <p className="text-lg font-black text-emerald-700">{formatCurrency((selectedProduct.salePrice ?? selectedProduct.price ?? 0))}</p>
+                          <p className="text-[9px] text-emerald-400">por unidad</p>
+                        </div>
+                        <div className="bg-amber-50/60 border border-amber-100 rounded-2xl p-3 text-center">
+                          <p className="text-[9px] font-bold uppercase text-amber-500 tracking-wide">Saldo Inventario</p>
+                          <p className="text-lg font-black text-amber-700">{formatCurrency((selectedProduct.stock ?? selectedProduct.quantity ?? 0) * (selectedProduct.salePrice ?? selectedProduct.price ?? 0))}</p>
+                          <p className="text-[9px] text-amber-400">valor total</p>
+                        </div>
                       </div>
 
-                      {/* Control de Masa Visual */}
                       {(selectedProduct.presentationVolumeMl > 0 || selectedProduct.presentationWeightGr > 0 || selectedProduct.productionRole === 'milk' || selectedProduct.productionRole === 'sugar') && (
-                        <div className="md:col-span-3 bg-[#e8f6fc] border border-[#bde4f8] rounded-xl p-4 mt-2">
-                          <h4 className="text-[#3b82f6] text-xs font-bold flex items-center gap-2 mb-3 uppercase">
-                            <span className="text-lg">📏</span> CONTROL DE MASA — PRESENTACIÓN DEL INSUMO
+                        <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-4">
+                          <h4 className="text-blue-700 text-xs font-bold flex items-center gap-2 mb-2 uppercase">
+                            <span className="text-base">📏</span> CONTROL DE MASA — PRESENTACIÓN DEL INSUMO
                           </h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                             <div>
                               <p className="text-[10px] font-bold text-slate-500 uppercase">Presentación</p>
                               <p className="font-semibold text-slate-700">{selectedProduct.presentationQuantity || 1} {selectedProduct.presentationUnit || selectedProduct.unit}</p>
@@ -380,7 +830,7 @@ export default function Purchases() {
                               </p>
                             </div>
                             <div>
-                              <p className="text-[10px] font-bold text-slate-500 uppercase">Volumen/Peso Total Ingreso</p>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase">Volumen/Peso Total</p>
                               <p className="font-black text-blue-700">
                                 {currentItem.quantity * (selectedProduct.presentationVolumeMl || selectedProduct.presentationWeightGr || 0)} {selectedProduct.presentationVolumeMl ? 'ML' : 'GR'}
                               </p>
@@ -389,7 +839,7 @@ export default function Purchases() {
                               <p className="text-[10px] font-bold text-slate-500 uppercase">
                                 Costo por {selectedProduct.presentationVolumeMl ? 'Litro' : 'Kilo'}
                               </p>
-                              <p className="font-black text-green-700">
+                              <p className="font-black text-emerald-700">
                                 {currentItem.price > 0 && (selectedProduct.presentationVolumeMl > 0 || selectedProduct.presentationWeightGr > 0)
                                   ? formatCurrency((currentItem.price / (selectedProduct.presentationVolumeMl || selectedProduct.presentationWeightGr)) * 1000)
                                   : "Bs 0.00"}
@@ -400,227 +850,170 @@ export default function Purchases() {
                       )}
                     </div>
                   )}
-                  <div className="space-y-1">
-                    <Label className="text-xs">Cant.</Label>
-                    <Input 
-                      type="number" 
-                      step="any"
-                      onFocus={(e) => e.target.select()}
-                      value={currentItem.quantity} 
-                      onChange={(e) => setCurrentItem({...currentItem, quantity: parseInt(e.target.value)})}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold text-green-700 uppercase">P. Unitario Compra</Label>
-                    <Input 
-                      type="text" 
-                      inputMode="decimal"
-                      onFocus={(e) => e.target.select()}
-                      value={currentItem.price === 0 ? "" : currentItem.price} 
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9.]/g, '');
-                        setCurrentItem({...currentItem, price: val as any});
-                      }}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="md:col-span-2 space-y-1">
-                    <Label className="text-[10px] text-orange-600 uppercase">Fecha Vencimiento (opcional)</Label>
-                    <Input 
-                      type="date" 
-                      value={currentItem.expiryDate} 
-                      onChange={(e) => setCurrentItem({...currentItem, expiryDate: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-1 bg-slate-50 border rounded p-2 flex flex-col justify-center border-dashed">
-                    <Label className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">TOTAL ITEM</Label>
-                    <p className="text-sm font-black text-blue-700">
-                      {formatCurrency(Math.round(currentItem.quantity * (Number(currentItem.price) || 0) * 100))}
-                    </p>
-                  </div>
-                  <Button type="button" variant="secondary" className="w-full font-bold h-10 border-2" onClick={() => {
-                    const priceNum = Number(currentItem.price) || 0;
-                    setCurrentItem({...currentItem, price: priceNum});
-                    addItem();
-                  }}>
-                    Añadir Item
-                  </Button>
-                </div>
 
-                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
-                  {items.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center text-sm bg-background p-2 rounded border border-blue-100">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-slate-800">{item.productName}</span>
-                        <span className="text-[10px] text-muted-foreground">
-                          <span className="text-green-700 font-medium">P. Unit:</span> {formatCurrency(item.price)} x {item.quantity} unidades
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-[9px] text-slate-400 font-bold uppercase leading-none">Subtotal Item</p>
-                          <p className="font-mono font-bold text-blue-700 leading-tight">{formatCurrency(item.quantity * item.price)}</p>
-                        </div>
-                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={() => removeItem(index)}>
-                          <Trash2 className="h-4 w-4" />
+                  {/* Lista de Ítems añadidos */}
+                  <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                    <div className="flex items-center justify-between px-1">
+                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Lista de Artículos Añadidos</h3>
+                      {items.length > 0 && (
+                        <Button variant="ghost" size="sm" onClick={() => setItems([])} className="h-7 text-[10px] font-black text-red-500 uppercase hover:bg-red-50">
+                          <RotateCcw className="h-3 w-3 mr-1" /> Vaciado rápido
                         </Button>
-                      </div>
+                      )}
                     </div>
-                  ))}
-                  {items.length === 0 && (
-                    <p className="text-center text-muted-foreground text-xs py-4">No hay productos añadidos a la compra</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Sección de Resumen Mejorada */}
-              <div className="bg-slate-50 border-2 border-dashed border-slate-200 p-5 rounded-xl space-y-4">
-                <div className="flex justify-between items-center border-b border-slate-200 pb-3">
-                  <h4 className="font-bold text-slate-700 uppercase text-xs tracking-wider">Resumen de la Transacción</h4>
-                  <Badge variant="outline" className="bg-white">
-                    {items.length} {items.length === 1 ? 'Producto' : 'Productos'}
-                  </Badge>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm text-slate-600">
-                    <span>Subtotal de items:</span>
-                    <span className="font-mono">{formatCurrency(purchaseData.totalAmount)}</span>
+                    {items.map((item, index) => (
+                      <div key={index} className="flex justify-between items-center text-sm bg-white p-3 rounded-2xl border border-slate-100 shadow-sm hover:border-slate-200">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                            <Package className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-800">{item.productName}</p>
+                            <p className="text-[11px] text-slate-500">
+                              <span className="text-emerald-700 font-bold">P. Unit:</span> {formatCurrency(item.price)} x {item.quantity} unidades
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="text-[9px] text-slate-400 font-bold uppercase">Subtotal Item</p>
+                            <p className="font-mono font-bold text-blue-700 text-base">{formatCurrency(item.quantity * item.price)}</p>
+                          </div>
+                          <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-red-500 hover:bg-red-50 rounded-xl" onClick={() => removeItem(index)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    {items.length === 0 && (
+                      <div className="py-10 text-center rounded-2xl border-2 border-dashed border-slate-100 bg-white/50">
+                        <Package className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                        <p className="text-xs text-slate-400 font-medium">No hay productos añadidos a la compra todavía.</p>
+                      </div>
+                    )}
                   </div>
-                  
-                  <div className="flex justify-between items-center py-1">
-                    <div className="flex items-center gap-2 cursor-pointer group" onClick={() => setPurchaseData({...purchaseData, isCredit: purchaseData.isCredit === 1 ? 0 : 1})}>
-                      <div className={`h-5 w-5 rounded border flex items-center justify-center transition-colors ${purchaseData.isCredit === 1 ? 'bg-red-500 border-red-500 text-white' : 'bg-white border-slate-300 group-hover:border-slate-400'}`}>
-                        {purchaseData.isCredit === 1 && <ShoppingCart className="h-3 w-3" />}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* LADO DERECHO: Resumen de la Transacción & Botón de Acción */}
+            <div className={isMobile ? "space-y-6" : "min-h-0 space-y-5 overflow-y-auto border-l border-slate-100 bg-gradient-to-b from-slate-50/80 to-white px-6 py-6"}>
+              <div className="space-y-4">
+                {/* Resumen Tipo Ticket */}
+                <div className="rounded-[2.2rem] border-2 border-slate-900 bg-white shadow-xl overflow-hidden relative">
+                  <div className="bg-slate-900 px-6 py-5 text-white">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center">
+                          <Receipt className="h-4 w-4" />
+                        </div>
+                        <span className="font-black uppercase tracking-widest text-xs">Entrada de Mercancía</span>
                       </div>
-                      <Label className="text-xs font-semibold text-slate-700 cursor-pointer">Marcar como compra a crédito</Label>
+                      <Badge className="bg-blue-600 text-white border-none font-black text-[10px]">OFICIAL</Badge>
                     </div>
+                    <div className="mt-4">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Comprobante N°</p>
+                      <p className="text-lg font-black font-mono tracking-tighter">{purchaseData.purchaseNumber}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-600 px-6 py-6 text-white border-b border-white/10 relative overflow-hidden">
+                    <div className="absolute top-[-20%] right-[-10%] h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-100 mb-1">Total a Pagar</p>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-black">{formatCurrency(purchaseData.totalAmount).split(' ')[1]}</span>
+                      <span className="text-sm font-bold opacity-80">Bs.</span>
+                    </div>
+                  </div>
+
+                  <div className="px-6 py-5 space-y-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Artículos Añadidos</span>
+                      <span className="font-black text-slate-900">{items.reduce((sum, i) => sum + i.quantity, 0)} uds.</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Caja Seleccionada</span>
+                      <span className="font-bold text-slate-900 capitalize">{purchaseData.paymentMethod}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Saldo Disponible</span>
+                      <span className={`font-bold ${isInsufficient ? 'text-red-600' : 'text-emerald-600'}`}>{formatCurrency(currentBalance)}</span>
+                    </div>
+
+                    <div className="py-2">
+                      <div className="border-t border-dashed border-slate-200 w-full" />
+                    </div>
+
+                    <div className="flex items-center justify-between py-1">
+                      <div className="flex items-center gap-2 cursor-pointer group" onClick={() => setPurchaseData({...purchaseData, isCredit: purchaseData.isCredit === 1 ? 0 : 1, dueDate: ""})}>
+                        <div className={`h-5 w-5 rounded border flex items-center justify-center transition-colors ${purchaseData.isCredit === 1 ? 'bg-red-500 border-red-500 text-white' : 'bg-white border-slate-300 group-hover:border-slate-400'}`}>
+                          {purchaseData.isCredit === 1 && <ShoppingCart className="h-3 w-3" />}
+                        </div>
+                        <Label className="text-xs font-bold text-slate-700 cursor-pointer">Marcar como compra a crédito</Label>
+                      </div>
+                      {purchaseData.isCredit === 1 && (
+                        <Badge variant="destructive" className="animate-pulse text-[9px] font-black">Crédito</Badge>
+                      )}
+                    </div>
+
+                    {/* Campo de fecha de vencimiento para compras a crédito */}
                     {purchaseData.isCredit === 1 && (
-                      <Badge variant="destructive" className="animate-pulse">Pendiente de Pago</Badge>
+                      <div className="p-3 rounded-2xl bg-red-50 border border-red-200 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-red-600 shrink-0" />
+                          <Label className="text-xs font-black text-red-700 uppercase tracking-wider">Fecha de Vencimiento del Crédito *</Label>
+                        </div>
+                        <Input
+                          type="date"
+                          value={purchaseData.dueDate}
+                          onChange={(e) => setPurchaseData({...purchaseData, dueDate: e.target.value})}
+                          className="rounded-xl h-10 border-red-200 bg-white font-bold text-slate-800 focus:border-red-400"
+                          min={new Date().toISOString().split('T')[0]}
+                        />
+                        {!purchaseData.dueDate && (
+                          <p className="text-[10px] text-red-600 font-bold">⚠ Obligatorio para registrar a crédito</p>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
 
-                <div className="flex justify-between items-end pt-2">
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Total a Pagar</p>
-                    <p className="text-3xl font-black text-slate-900 leading-none">
-                      {formatCurrency(purchaseData.totalAmount)}
-                    </p>
-                  </div>
-                  <div className="text-right text-[10px] text-slate-400 font-medium">
-                    Actualiza stock al finalizar
-                  </div>
-                </div>
-
                 {!openingStatus?.hasActive && (
-                  <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold flex items-center gap-2">
-                    <XCircle className="h-4 w-4 shrink-0" />
-                    LA CAJA DE {purchaseData.paymentMethod.toUpperCase()} ESTÁ CERRADA. ABRA LA CAJA EN FINANZAS PARA CONTINUAR.
+                  <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold flex items-center gap-2">
+                    <XCircle className="h-4 w-4 shrink-0 text-amber-600" />
+                    <span>LA CAJA DE {purchaseData.paymentMethod.toUpperCase()} ESTÁ CERRADA. ABRA LA CAJA EN FINANZAS.</span>
                   </div>
                 )}
               </div>
-
-              <Button type="submit" className="w-full h-12 text-lg font-bold bg-green-600 hover:bg-green-700" disabled={createMutation.isPending || items.length === 0 || !openingStatus?.hasActive}>
-                {createMutation.isPending ? "Procesando..." : "Registrar y Finalizar Compra"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Historial Reciente */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-bold flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-muted-foreground" /> Últimos Registros
-          </h2>
-          <div className="space-y-3">
-            {isPurchasesLoading ? (
-              <p className="text-sm text-muted-foreground">Cargando historial...</p>
-            ) : (purchases as any[])?.map((purchase: any) => (
-              <Card key={purchase.id} className="hover:shadow-sm transition-shadow border-l-4 border-l-blue-400 overflow-hidden">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <p className="font-bold text-blue-700">{purchase.purchaseNumber}</p>
-                    <Badge variant={purchase.status === "received" ? "default" : "outline"} className="text-[10px] h-5">
-                      {purchase.status === "received" ? "OK" : "P"}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground flex items-center gap-1 mb-2">
-                    <User className="h-3 w-3" /> {purchase.supplierName}
-                  </p>
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <p className="text-[10px] text-muted-foreground">{new Date(purchase.createdAt).toLocaleDateString()}</p>
-                      <p className="font-mono font-bold text-lg">{formatCurrency(purchase.totalAmount)}</p>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button 
-                        size="icon" 
-                        variant="outline" 
-                        className="h-8 w-8 rounded-full border-blue-200 hover:bg-blue-50 text-blue-600"
-                        title="Ver Registro"
-                        onClick={() => {
-                          setSelectedPurchase(purchase);
-                          setShowDetails(true);
-                        }}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        size="icon" 
-                        variant="outline" 
-                        className="h-8 w-8 rounded-full border-amber-200 hover:bg-amber-50 text-amber-600"
-                        title="Editar Compra"
-                        onClick={() => {
-                          setSelectedPurchase(purchase);
-                          setShowEdit(true);
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        size="icon" 
-                        variant="outline" 
-                        className="h-8 w-8 rounded-full border-slate-200 hover:bg-slate-50 text-slate-600"
-                        title="Imprimir"
-                        onClick={() => handlePrint(purchase)}
-                      >
-                        <Printer className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  {purchase.isCredit === 1 && (
-                    <div className="mt-2">
-                       <Badge variant="destructive" className="bg-red-50 text-red-600 border-red-100 hover:bg-red-50 w-full justify-center">Crédito</Badge>
-                    </div>
-                  )}
-
-                  {/* Template para impresión (oculto) */}
-                  <div id={`purchase-print-${purchase.id}`} className="hidden">
-                    <div className="header">
-                      <h1>Comprobante de Compra</h1>
-                      <p><strong>Nro:</strong> {purchase.purchaseNumber}</p>
-                    </div>
-                    <div className="grid">
-                      <div>
-                        <p><strong>Proveedor:</strong> {purchase.supplierName}</p>
-                        <p><strong>Fecha:</strong> {new Date(purchase.createdAt).toLocaleDateString()}</p>
-                      </div>
-                      <div>
-                        <p><strong>Método:</strong> {purchase.paymentMethod}</p>
-                        <p><strong>Estado:</strong> {purchase.status}</p>
-                      </div>
-                    </div>
-                    <div className="total">
-                      TOTAL: {formatCurrency(purchase.totalAmount)}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            </div>
           </div>
-        </div>
-      </div>
+
+          <DialogFooter className={isMobile ? "gap-2" : "border-t border-slate-100 bg-gradient-to-r from-slate-50/60 to-white px-8 py-4 gap-3 shrink-0"}>
+            <Button
+              variant="outline"
+              onClick={() => { setIsCreateOpen(false); resetCreateForm(); }}
+              className="min-w-36 h-12 rounded-xl border-slate-200 font-bold text-slate-600 hover:bg-slate-50"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1.5" />
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => handleSubmit()}
+              disabled={createMutation.isPending || items.length === 0 || (purchaseData.isCredit === 0 && !openingStatus?.hasActive) || (purchaseData.isCredit === 1 && !purchaseData.dueDate)}
+              className="min-w-72 gap-2.5 h-12 rounded-xl text-base bg-blue-600 hover:bg-blue-700 text-white font-black shadow-lg shadow-blue-600/20 transition-all hover:shadow-xl hover:shadow-blue-600/30"
+            >
+              {createMutation.isPending ? (
+                "Registrando..."
+              ) : (
+                <>
+                  <CheckCircle2 className="h-5 w-5" />
+                  Registrar Compra · {formatCurrency(purchaseData.totalAmount)}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog de Detalles de Compra */}
       <PurchaseDetailDialog 
@@ -638,7 +1031,7 @@ export default function Purchases() {
       <QuickCreateProductDialog
         open={openNewProduct}
         onOpenChange={setOpenNewProduct}
-        onSuccess={(newProduct) => {
+        onSuccess={(newProduct: any) => {
           setCurrentItem({...currentItem, productId: newProduct.id, price: newProduct.price / 100});
         }}
       />
@@ -654,84 +1047,84 @@ function PurchaseDetailDialog({ purchase, open, onOpenChange }: any) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl rounded-[2rem] p-6 bg-white border-0 shadow-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" /> Detalle de Compra: {purchase?.purchaseNumber}
+          <DialogTitle className="flex items-center gap-2 text-xl font-black">
+            <FileText className="h-5 w-5 text-blue-600" /> Detalle de Compra: {purchase?.purchaseNumber}
           </DialogTitle>
         </DialogHeader>
         
         {purchase && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 bg-muted/30 p-3 rounded-lg text-sm">
+          <div className="space-y-4 mt-2">
+            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl text-sm border border-slate-100">
               <div>
-                <p className="text-muted-foreground uppercase text-[10px] font-bold">Proveedor</p>
-                <p className="font-semibold">{purchase.supplierName}</p>
+                <p className="text-slate-400 uppercase text-[10px] font-bold tracking-wider">Proveedor</p>
+                <p className="font-bold text-slate-800">{purchase.supplierName || "Sin Proveedor"}</p>
               </div>
               <div>
-                <p className="text-muted-foreground uppercase text-[10px] font-bold">Fecha</p>
-                <p className="font-semibold">{new Date(purchase.createdAt).toLocaleString()}</p>
+                <p className="text-slate-400 uppercase text-[10px] font-bold tracking-wider">Fecha</p>
+                <p className="font-bold text-slate-800">{new Date(purchase.createdAt).toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-muted-foreground uppercase text-[10px] font-bold">Método de Pago</p>
-                <Badge variant="outline" className="capitalize">{purchase.paymentMethod}</Badge>
+                <p className="text-slate-400 uppercase text-[10px] font-bold tracking-wider">Método de Pago</p>
+                <Badge variant="outline" className="capitalize rounded-full font-bold">{purchase.paymentMethod}</Badge>
               </div>
               <div>
-                <p className="text-muted-foreground uppercase text-[10px] font-bold">Estado</p>
-                <Badge variant={purchase.status === "received" ? "default" : "outline"} className="capitalize">
+                <p className="text-slate-400 uppercase text-[10px] font-bold tracking-wider">Estado</p>
+                <Badge variant={purchase.status === "received" ? "default" : "outline"} className="capitalize rounded-full font-bold">
                   {purchase.status === "received" ? "Recibido" : purchase.status}
                 </Badge>
               </div>
             </div>
 
-            <div className="border rounded-lg overflow-hidden">
+            <div className="border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
               <table className="w-full text-sm">
-                <thead className="bg-muted text-muted-foreground">
+                <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium">Producto</th>
-                    <th className="px-3 py-2 text-center font-medium">Cant.</th>
-                    <th className="px-3 py-2 text-right font-medium">Precio Uni.</th>
-                    <th className="px-3 py-2 text-right font-medium">Subtotal</th>
+                    <th className="px-4 py-3 text-left font-black text-xs uppercase">Producto</th>
+                    <th className="px-4 py-3 text-center font-black text-xs uppercase">Cant.</th>
+                    <th className="px-4 py-3 text-right font-black text-xs uppercase">Precio Uni.</th>
+                    <th className="px-4 py-3 text-right font-black text-xs uppercase">Subtotal</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-slate-100">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={4} className="px-3 py-10 text-center text-muted-foreground italic">
+                      <td colSpan={4} className="px-4 py-10 text-center text-slate-400 italic">
                         Cargando items...
                       </td>
                     </tr>
                   ) : items?.map((item: any) => (
-                    <tr key={item.id} className="hover:bg-slate-50">
-                      <td className="px-3 py-2">
-                        <p className="font-medium">{item.productName}</p>
-                        <p className="text-[10px] text-muted-foreground">{item.productCode}</p>
+                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-slate-800">{item.productName}</p>
+                        <p className="text-[10px] text-slate-400">{item.productCode}</p>
                       </td>
-                      <td className="px-3 py-2 text-center font-bold px-4">{item.quantity}</td>
-                      <td className="px-3 py-2 text-right font-mono">{formatCurrency(item.price)}</td>
-                      <td className="px-3 py-2 text-right font-bold text-blue-700">{formatCurrency(item.quantity * item.price)}</td>
+                      <td className="px-4 py-3 text-center font-bold">{item.quantity}</td>
+                      <td className="px-4 py-3 text-right font-mono font-medium">{formatCurrency(item.price)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-blue-600">{formatCurrency(item.quantity * item.price)}</td>
                     </tr>
                   ))}
                   {(!items || items.length === 0) && !isLoading && (
                     <tr>
-                      <td colSpan={4} className="px-3 py-4 text-center text-muted-foreground italic">
-                        No hay detalles disponibles (posible ajuste manual).
+                      <td colSpan={4} className="px-4 py-6 text-center text-slate-400 italic">
+                        No hay detalles disponibles para esta compra.
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
-              <div className="bg-slate-50 p-3 flex justify-between items-center border-t border-slate-200">
-                <span className="text-xs font-bold text-slate-500 uppercase">Total Compra</span>
-                <span className="text-xl font-black text-slate-900 font-mono">
+              <div className="bg-slate-900 text-white p-4 flex justify-between items-center">
+                <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Total Compra</span>
+                <span className="text-2xl font-black font-mono">
                   {formatCurrency(purchase.totalAmount)}
                 </span>
               </div>
             </div>
 
             {purchase.notes && (
-              <div className="text-xs text-muted-foreground bg-amber-50 border border-amber-100 p-2 rounded">
-                 <p className="font-bold uppercase text-[9px] mb-1">Notas:</p>
+              <div className="text-xs text-slate-600 bg-amber-50 border border-amber-100 p-3 rounded-xl">
+                 <p className="font-bold uppercase text-[9px] text-amber-800 mb-1">Notas:</p>
                  {purchase.notes}
               </div>
             )}
@@ -762,8 +1155,6 @@ function EditPurchaseDialog({ purchase, open, onOpenChange }: any) {
     { enabled: !!purchase?.id }
   );
 
-  const selectedProduct = (products as any[])?.find((p: any) => p.id === currentItem.productId);
-
   const updateMutation = (trpc.purchases as any).update.useMutation({
     onSuccess: () => {
       toast.success("Compra actualizada correctamente");
@@ -777,7 +1168,6 @@ function EditPurchaseDialog({ purchase, open, onOpenChange }: any) {
     }
   });
 
-  // Load initial data when dialog opens
   if (open && purchase && items.length === 0 && originalItems && !isLoading && purchaseData.id !== purchase.id) {
     setSupplierId(purchase.supplierId || 0);
     setPurchaseData({
@@ -798,7 +1188,6 @@ function EditPurchaseDialog({ purchase, open, onOpenChange }: any) {
     })));
   }
 
-  // Handle closing and resetting state
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
       setPurchaseData({});
@@ -849,9 +1238,9 @@ function EditPurchaseDialog({ purchase, open, onOpenChange }: any) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[2rem] p-6 bg-white border-0 shadow-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-xl font-black">
             <Edit className="h-5 w-5 text-amber-600" /> Editar Compra: {purchase?.purchaseNumber}
           </DialogTitle>
         </DialogHeader>
@@ -860,9 +1249,9 @@ function EditPurchaseDialog({ purchase, open, onOpenChange }: any) {
           <form onSubmit={handleSubmit} className="space-y-6 mt-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label className="text-sm font-bold">Proveedor</Label>
+                <Label className="text-xs font-bold uppercase tracking-wider text-slate-700">Proveedor</Label>
                 <Select value={supplierId === 0 ? "" : supplierId.toString()} onValueChange={(val) => setSupplierId(parseInt(val))}>
-                  <SelectTrigger><SelectValue placeholder="Sin proveedor" /></SelectTrigger>
+                  <SelectTrigger className="rounded-xl h-11"><SelectValue placeholder="Sin proveedor" /></SelectTrigger>
                   <SelectContent>
                     {(suppliers as any[])?.map((s: any) => (
                       <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
@@ -871,9 +1260,9 @@ function EditPurchaseDialog({ purchase, open, onOpenChange }: any) {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-sm font-bold">Método de Pago</Label>
+                <Label className="text-xs font-bold uppercase tracking-wider text-slate-700">Método de Pago</Label>
                 <Select value={purchaseData.paymentMethod} onValueChange={(val: any) => setPurchaseData({...purchaseData, paymentMethod: val})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cash">Efectivo</SelectItem>
                     <SelectItem value="qr">Transferencia QR</SelectItem>
@@ -881,24 +1270,24 @@ function EditPurchaseDialog({ purchase, open, onOpenChange }: any) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2 bg-slate-50 p-2 rounded border">
-                <Label className="text-xs font-bold text-slate-500 uppercase">Total Actualizado</Label>
+              <div className="space-y-1 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase">Total Actualizado</Label>
                 <p className="text-xl font-black text-slate-900">{formatCurrency(purchaseData.totalAmount || 0)}</p>
               </div>
             </div>
 
-            <div className="border p-4 rounded-lg bg-muted/30 space-y-4">
-              <h3 className="font-semibold flex items-center gap-2 border-b pb-2">
-                <Package className="h-4 w-4" /> Modificar Productos
+            <div className="border border-slate-100 p-5 rounded-3xl bg-slate-50/50 space-y-4">
+              <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2 border-b border-slate-200 pb-2">
+                <Package className="h-4 w-4 text-amber-600" /> Modificar Productos
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
                 <div className="md:col-span-2 space-y-1">
-                  <Label className="text-xs font-bold text-blue-800">Producto</Label>
+                  <Label className="text-xs font-bold text-slate-600">Producto</Label>
                   <Select 
                     value={currentItem.productId === 0 ? "" : currentItem.productId.toString()} 
                     onValueChange={(val) => setCurrentItem({...currentItem, productId: parseInt(val), price: 0})}
                   >
-                    <SelectTrigger className="bg-white truncate">
+                    <SelectTrigger className="bg-white rounded-xl h-11 truncate">
                       <SelectValue placeholder="Seleccionar..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -909,28 +1298,28 @@ function EditPurchaseDialog({ purchase, open, onOpenChange }: any) {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Cant.</Label>
-                  <Input type="number" value={currentItem.quantity} onChange={(e) => setCurrentItem({...currentItem, quantity: parseInt(e.target.value) || 1})} />
+                  <Label className="text-xs font-bold">Cant.</Label>
+                  <Input type="number" className="rounded-xl h-11" value={currentItem.quantity} onChange={(e) => setCurrentItem({...currentItem, quantity: parseInt(e.target.value) || 1})} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-bold text-green-700 uppercase">P. Unit.</Label>
-                  <Input type="number" step="any" value={currentItem.price} onChange={(e) => setCurrentItem({...currentItem, price: parseFloat(e.target.value) || 0})} />
+                  <Label className="text-[10px] font-bold text-emerald-700 uppercase">P. Unit. (Bs)</Label>
+                  <Input type="number" step="any" className="rounded-xl h-11" value={currentItem.price} onChange={(e) => setCurrentItem({...currentItem, price: parseFloat(e.target.value) || 0})} />
                 </div>
-                <Button type="button" variant="secondary" className="w-full font-bold h-10 border-2 md:col-span-4" onClick={addItem}>
+                <Button type="button" variant="secondary" className="w-full font-bold h-11 rounded-xl border-2 md:col-span-4" onClick={addItem}>
                   Añadir Item
                 </Button>
               </div>
 
               <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
                 {items.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center text-sm bg-background p-2 rounded border border-amber-100">
+                  <div key={index} className="flex justify-between items-center text-sm bg-white p-3 rounded-2xl border border-amber-100">
                     <div className="flex flex-col">
-                      <span className="font-semibold text-slate-800">{item.productName}</span>
-                      <span className="text-[10px] text-muted-foreground">{formatCurrency(item.price)} x {item.quantity} unidades</span>
+                      <span className="font-bold text-slate-800">{item.productName}</span>
+                      <span className="text-[11px] text-slate-500">{formatCurrency(item.price)} x {item.quantity} unidades</span>
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="font-mono font-bold text-blue-700">{formatCurrency(item.quantity * item.price)}</span>
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={() => removeItem(index)}>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 rounded-xl" onClick={() => removeItem(index)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -939,7 +1328,7 @@ function EditPurchaseDialog({ purchase, open, onOpenChange }: any) {
               </div>
             </div>
 
-            <Button type="submit" className="w-full h-12 text-lg font-bold bg-amber-600 hover:bg-amber-700" disabled={updateMutation.isPending || items.length === 0}>
+            <Button type="submit" className="w-full h-12 text-lg font-black rounded-xl bg-amber-600 hover:bg-amber-700 text-white" disabled={updateMutation.isPending || items.length === 0}>
               {updateMutation.isPending ? "Guardando..." : "Guardar Cambios de Compra"}
             </Button>
           </form>
@@ -989,7 +1378,6 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
     }
 
     try {
-      // 1. Create Product
       const prodRes = await createProductMutation.mutateAsync({
         code: `INS-${Math.floor(Math.random() * 10000)}`,
         name: formData.name,
@@ -1004,19 +1392,18 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
       });
 
       if (prodRes.success && prodRes.productId) {
-        // 2. Register Initial Stock as Purchase if > 0
         if (formData.initialStock > 0) {
           await createPurchaseMutation.mutateAsync({
             purchaseNumber: `INI-${Math.floor(Math.random() * 10000)}`,
             status: "received",
             isCredit: 0,
             paymentMethod: formData.paymentMethod,
-            totalAmount: costNum * formData.initialStock * 100, // in cents
+            totalAmount: costNum * formData.initialStock * 100,
             supplierId: undefined,
             items: [{
               productId: prodRes.productId,
               quantity: formData.initialStock,
-              price: costNum * 100, // in cents
+              price: costNum * 100,
             }]
           });
         }
@@ -1037,13 +1424,13 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md bg-white border-0 shadow-2xl p-0 overflow-hidden">
+      <DialogContent className="max-w-md bg-white border-0 shadow-2xl p-0 overflow-hidden rounded-[2rem]">
         <div className="bg-slate-50 border-b px-6 py-4 flex items-center gap-3">
-          <div className="h-10 w-10 bg-blue-100 rounded-xl flex items-center justify-center">
-            <Package className="h-5 w-5 text-blue-600" />
+          <div className="h-10 w-10 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600">
+            <Package className="h-5 w-5" />
           </div>
           <div>
-            <DialogTitle className="text-xl font-bold text-slate-800">Nuevo Ítem de Inventario</DialogTitle>
+            <DialogTitle className="text-xl font-black text-slate-800">Nuevo Ítem de Inventario</DialogTitle>
             <p className="text-xs text-slate-500">Materia prima o insumo con movimiento de caja</p>
           </div>
         </div>
@@ -1056,7 +1443,7 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
                 value={formData.name}
                 onChange={(e) => setFormData({...formData, name: e.target.value})}
                 placeholder="Ej. Leche natural, Azúcar blanca..."
-                className="font-medium"
+                className="font-medium rounded-xl h-11"
               />
             </div>
 
@@ -1064,7 +1451,7 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
               <div className="space-y-1">
                 <Label className="text-xs font-bold text-slate-600 uppercase">Unidad *</Label>
                 <Select value={formData.unit} onValueChange={(v) => setFormData({...formData, unit: v})}>
-                  <SelectTrigger><SelectValue/></SelectTrigger>
+                  <SelectTrigger className="rounded-xl h-11"><SelectValue/></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="bolsa">Bolsa</SelectItem>
                     <SelectItem value="litro">Litro</SelectItem>
@@ -1080,6 +1467,7 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
                   type="number" min="0" 
                   value={formData.initialStock}
                   onChange={(e) => setFormData({...formData, initialStock: parseFloat(e.target.value) || 0})}
+                  className="rounded-xl h-11 font-bold"
                 />
               </div>
             </div>
@@ -1090,17 +1478,17 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
                 type="number" min="0" 
                 value={formData.minStock}
                 onChange={(e) => setFormData({...formData, minStock: parseFloat(e.target.value) || 0})}
+                className="rounded-xl h-11"
               />
             </div>
 
-            <div className="bg-[#f0f9ff] border border-[#bae6fd] rounded-xl p-5 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1 h-full bg-[#38bdf8]"></div>
-              <h4 className="text-[#0284c7] text-xs font-bold flex items-center gap-2 mb-4 uppercase">
+            <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-5 relative overflow-hidden">
+              <h4 className="text-blue-700 text-xs font-bold flex items-center gap-2 mb-3 uppercase">
                 <span className="text-sm">📏</span> CONTROL DE MASA — PRESENTACIÓN
               </h4>
               
               <p className="text-[10px] text-slate-500 mb-3 leading-relaxed">
-                Ingresa el volumen/peso de cada {formData.unit} para que el sistema calcule automáticamente cuántas unidades necesitas por lote y el sobrante.
+                Ingresa el volumen/peso de cada {formData.unit} para que el sistema calcule automáticamente cuántas unidades necesitas por lote.
               </p>
 
               <div className="space-y-4">
@@ -1111,7 +1499,7 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
                     placeholder={isVolume ? "Ej. 800 para bolsas de 800ml" : "Ej. 1000 para bolsa de 1kg"}
                     value={isVolume ? (formData.volumeMl || '') : (formData.weightGr || '')}
                     onChange={(e) => setFormData({...formData, [isVolume ? 'volumeMl' : 'weightGr']: parseFloat(e.target.value) || 0})}
-                    className="bg-white"
+                    className="bg-white rounded-xl h-11"
                   />
                 </div>
 
@@ -1126,7 +1514,7 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
                         setFormData({...formData, costPerUnit: val as any});
                       }}
                       placeholder="0.00"
-                      className="bg-white font-bold"
+                      className="bg-white font-bold rounded-xl h-11"
                     />
                   </div>
                   <div className="flex justify-center text-slate-400">
@@ -1134,7 +1522,7 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold text-slate-600 uppercase">Costo por {isVolume ? 'Litro' : 'Kilo'} (Bs)</Label>
-                    <div className="h-10 bg-white border rounded-md flex items-center px-3 font-bold text-slate-500">
+                    <div className="h-11 bg-white border rounded-xl flex items-center px-3 font-bold text-slate-500 text-sm">
                       {formatCurrency(costPerUnitCalc * 100)}
                     </div>
                   </div>
@@ -1143,14 +1531,14 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
             </div>
 
             {formData.initialStock > 0 && (
-              <div className="space-y-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="space-y-2 p-3 bg-slate-50 rounded-2xl border border-slate-200">
                 <Label className="text-[10px] font-bold text-slate-600 uppercase">Movimiento de Caja (Pago por Stock Inicial)</Label>
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-xs text-slate-500">Total a debitar:</span>
                   <span className="font-bold text-red-600">{formatCurrency(costNum * formData.initialStock * 100)}</span>
                 </div>
                 <Select value={formData.paymentMethod} onValueChange={(v) => setFormData({...formData, paymentMethod: v})}>
-                  <SelectTrigger className="bg-white"><SelectValue/></SelectTrigger>
+                  <SelectTrigger className="bg-white rounded-xl h-11"><SelectValue/></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cash">Efectivo</SelectItem>
                     <SelectItem value="qr">Transferencia QR</SelectItem>
@@ -1165,10 +1553,10 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
           </div>
 
           <div className="flex gap-3 pt-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" className="flex-1 rounded-xl h-11 font-bold" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" className="flex-1 bg-[#38bdf8] hover:bg-[#0284c7] text-white font-bold" disabled={createProductMutation.isPending || createPurchaseMutation.isPending}>
+            <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl h-11 shadow-lg shadow-blue-600/20" disabled={createProductMutation.isPending || createPurchaseMutation.isPending}>
               {createProductMutation.isPending ? "Procesando..." : "+ Registrar en Inventario"}
             </Button>
           </div>

@@ -41,6 +41,32 @@ export const sessions = mysqlTable("sessions", {
 export type Session = typeof sessions.$inferSelect;
 export type InsertSession = typeof sessions.$inferInsert;
 
+// Tabla de sucursales
+export const branches = mysqlTable("branches", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  address: text("address"),
+  phone: varchar("phone", { length: 50 }),
+  isMainWarehouse: int("isMainWarehouse").default(0).notNull(), // 1 para Bodega Principal
+  status: mysqlEnum("status", ["active", "inactive"]).notNull().default("active"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Branch = typeof branches.$inferSelect;
+export type InsertBranch = typeof branches.$inferInsert;
+
+// Tabla intermedia Usuarios - Sucursales
+export const userBranches = mysqlTable("userBranches", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  branchId: int("branchId").notNull().references(() => branches.id),
+  isDefault: int("isDefault").default(0).notNull(), // 1 para la sucursal por defecto del usuario
+});
+
+export type UserBranch = typeof userBranches.$inferSelect;
+export type InsertUserBranch = typeof userBranches.$inferInsert;
+
 // Tabla de clientes
 export const customers = mysqlTable("customers", {
   id: int("id").autoincrement().primaryKey(),
@@ -62,7 +88,10 @@ export const customers = mysqlTable("customers", {
   interestDigestiveIssues: int("interestDigestiveIssues").notNull().default(0),
   lifestyleGym: int("lifestyleGym").notNull().default(0),
   lifestyleVegan: int("lifestyleVegan").notNull().default(0),
-  lifestyleBiohacking: int("lifestyleBiohacking").notNull().default(0),
+  taxId: varchar("taxId", { length: 50 }), // NIT o CI
+  creditLimit: int("creditLimit").notNull().default(0), // Limite de credito en centavos (ej: 500000 = Bs 5000)
+  creditDays: int("creditDays").notNull().default(30), // Dias de credito permitidos
+  allowCredit: int("allowCredit").notNull().default(1), // 1 permite venta a credito, 0 prohibido
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -104,6 +133,7 @@ export type InsertProduct = typeof products.$inferInsert;
 export const inventory = mysqlTable("inventory", {
   id: int("id").autoincrement().primaryKey(),
   productId: int("productId").notNull().references(() => products.id),
+  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
   batchNumber: varchar("batchNumber", { length: 50 }), // Nuevo: Número de lote
   quantity: int("quantity").notNull().default(0),
   minStock: int("minStock").notNull().default(10),
@@ -115,6 +145,7 @@ export const inventory = mysqlTable("inventory", {
 export const inventoryMovements = mysqlTable("inventoryMovements", {
   id: int("id").autoincrement().primaryKey(),
   productId: int("productId").notNull().references(() => products.id),
+  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
   type: mysqlEnum("type", ["entry", "exit", "adjustment"]).notNull(), // Entrada, Salida, Ajuste
   quantity: int("quantity").notNull(),
   reason: varchar("reason", { length: 255 }), // Razón del movimiento
@@ -136,6 +167,7 @@ export type InsertInventory = typeof inventory.$inferInsert;
 export const orders = mysqlTable("orders", {
   id: int("id").autoincrement().primaryKey(),
   orderNumber: varchar("orderNumber", { length: 50 }).notNull().unique(),
+  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
   customerId: int("customerId").notNull().references(() => customers.id),
   deliveryPersonId: int("deliveryPersonId").references(() => users.id),
   zone: varchar("zone", { length: 100 }),
@@ -201,6 +233,8 @@ export const suppliers = mysqlTable("suppliers", {
   phone: varchar("phone", { length: 20 }),
   taxId: varchar("taxId", { length: 50 }), // NIT o CI
   address: text("address"),
+  creditDays: int("creditDays").notNull().default(30), // Dias de credito del proveedor
+  creditLimit: int("creditLimit").notNull().default(0), // Limite de credito en centavos
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -241,18 +275,61 @@ export const purchaseItems = mysqlTable("purchaseItems", {
 export type PurchaseItem = typeof purchaseItems.$inferSelect;
 export type InsertPurchaseItem = typeof purchaseItems.$inferInsert;
 
-// Tabla de cuentas por pagar
+// Tabla de cuentas por pagar (CXP)
 export const accountsPayable = mysqlTable("accountsPayable", {
   id: int("id").autoincrement().primaryKey(),
   purchaseId: int("purchaseId").notNull().references(() => purchases.id),
-  amount: int("amount").notNull(),
-  dueDate: timestamp("dueDate"),
-  status: mysqlEnum("status", ["unpaid", "partially_paid", "paid"]).default("unpaid").notNull(),
+  supplierId: int("supplierId").notNull().references(() => suppliers.id),
+  totalAmount: int("totalAmount").notNull(), // Monto total en centavos
+  paidAmount: int("paidAmount").notNull().default(0), // Monto pagado hasta la fecha
+  balance: int("balance").notNull(), // Saldo pendiente en centavos
+  dueDate: varchar("dueDate", { length: 10 }), // YYYY-MM-DD
+  status: mysqlEnum("status", ["unpaid", "partially_paid", "paid", "overdue"]).default("unpaid").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export type AccountsPayable = typeof accountsPayable.$inferSelect;
 export type InsertAccountsPayable = typeof accountsPayable.$inferInsert;
+
+// Tabla de cuentas por cobrar (CXC)
+export const accountsReceivable = mysqlTable("accountsReceivable", {
+  id: int("id").autoincrement().primaryKey(),
+  saleId: int("saleId").notNull().references(() => sales.id),
+  customerId: int("customerId").notNull().references(() => customers.id),
+  totalAmount: int("totalAmount").notNull(), // Monto total en centavos
+  paidAmount: int("paidAmount").notNull().default(0), // Monto abonado
+  balance: int("balance").notNull(), // Saldo pendiente en centavos
+  dueDate: varchar("dueDate", { length: 10 }), // YYYY-MM-DD
+  status: mysqlEnum("status", ["unpaid", "partially_paid", "paid", "overdue"]).default("unpaid").notNull(),
+  adminOverrideUserId: int("adminOverrideUserId").references(() => users.id),
+  adminOverrideReason: text("adminOverrideReason"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AccountsReceivable = typeof accountsReceivable.$inferSelect;
+export type InsertAccountsReceivable = typeof accountsReceivable.$inferInsert;
+
+// Tabla de historial de abonos / pagos a deudas (CXC y CXP)
+export const creditPayments = mysqlTable("creditPayments", {
+  id: int("id").autoincrement().primaryKey(),
+  type: mysqlEnum("type", ["receivable", "payable"]).notNull(), // receivable (CXC) o payable (CXP)
+  accountsReceivableId: int("accountsReceivableId").references(() => accountsReceivable.id),
+  accountsPayableId: int("accountsPayableId").references(() => accountsPayable.id),
+  customerId: int("customerId").references(() => customers.id),
+  supplierId: int("supplierId").references(() => suppliers.id),
+  amount: int("amount").notNull(), // Monto abonado en centavos
+  paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer"]).notNull().default("cash"),
+  reference: varchar("reference", { length: 255 }), // Numero de recibo o comprobante de pago
+  notes: text("notes"),
+  userId: int("userId").notNull().references(() => users.id), // Quien cobró o pagó
+  receiptNumber: varchar("receiptNumber", { length: 50 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CreditPayment = typeof creditPayments.$inferSelect;
+export type InsertCreditPayment = typeof creditPayments.$inferInsert;
 
 // Tabla de gastos de repartidor
 export const deliveryExpenses = mysqlTable("deliveryExpenses", {
@@ -271,6 +348,7 @@ export type InsertDeliveryExpense = typeof deliveryExpenses.$inferInsert;
 // Tabla de gastos operativos (servicios, publicidad, alquiler, etc.)
 export const operationalExpenses = mysqlTable("operationalExpenses", {
   id: int("id").autoincrement().primaryKey(),
+  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
   description: varchar("description", { length: 255 }).notNull(),
   category: mysqlEnum("category", [
     "facebook_ads",
@@ -307,6 +385,7 @@ export type InsertOperationalExpense = typeof operationalExpenses.$inferInsert;
 // Tabla de transacciones financieras (Libro Diario)
 export const financialTransactions = mysqlTable("financialTransactions", {
   id: int("id").autoincrement().primaryKey(),
+  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
   type: mysqlEnum("type", ["income", "expense"]).notNull(),
   category: varchar("category", { length: 100 }).notNull(), // sale, purchase, salary, fuel, etc.
   paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer"]).default("cash"),
@@ -337,6 +416,7 @@ export type InsertGPSTracking = typeof gpsTracking.$inferInsert;
 // Tabla de cierres de caja (NUEVO)
 export const cashClosures = mysqlTable("cash_closures", {
   id: int("id").autoincrement().primaryKey(),
+  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
   userId: int("userId").notNull().references(() => users.id),
   date: varchar("date", { length: 10 }).notNull(), // Formato YYYY-MM-DD
   initialCash: int("initialCash").default(0), // Monto asignado
@@ -359,6 +439,7 @@ export type InsertCashClosure = typeof cashClosures.$inferInsert;
 // Tabla de aperturas de caja
 export const cashOpenings = mysqlTable("cash_openings", {
   id: int("id").autoincrement().primaryKey(),
+  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
   openingDate: varchar("openingDate", { length: 10 }).notNull(), // Formato YYYY-MM-DD
   openingAmount: int("openingAmount").notNull().default(0),
   paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer"]).default("cash"),
@@ -376,6 +457,7 @@ export type InsertCashOpening = typeof cashOpenings.$inferInsert;
 export const sales = mysqlTable("sales", {
   id: int("id").autoincrement().primaryKey(),
   saleNumber: varchar("saleNumber", { length: 50 }).notNull().unique(),
+  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
   customerId: int("customerId").references(() => customers.id), // Nulo = venta anónima
   customerName: varchar("customerName", { length: 255 }), // Para ventas anónimas
   saleChannel: mysqlEnum("saleChannel", ["local", "delivery"]).notNull().default("local"),
@@ -387,8 +469,10 @@ export const sales = mysqlTable("sales", {
   discountValue: int("discountValue").notNull().default(0), // Porcentaje entero o monto fijo en centavos
   discountAmount: int("discountAmount").notNull().default(0), // Descuento global adicional
   total: int("total").notNull(), // Total final en centavos
-  paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer"]).notNull(),
+  paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer", "credit"]).notNull(),
   paymentStatus: mysqlEnum("paymentStatus", ["pending", "completed"]).default("completed").notNull(),
+  dueDate: varchar("dueDate", { length: 10 }), // YYYY-MM-DD para ventas a credito
+  adminOverrideUserId: int("adminOverrideUserId").references(() => users.id), // Admin que autorizó excepcion
   notes: text("notes"),
   cancelReason: text("cancelReason"),
   cancelledAt: timestamp("cancelledAt"),
@@ -618,12 +702,14 @@ export const productsRelations = relations(products, ({ many }) => ({
   inventoryTransferItems: many(inventoryTransferItems),
 }));
 
-// Tabla de Traspasos de Inventario (General <-> Producción)
+// Tabla de Traspasos de Inventario (Sucursal <-> Sucursal y Producción)
 export const inventoryTransfers = mysqlTable("inventory_transfers", {
   id: int("id").autoincrement().primaryKey(),
   transferNumber: varchar("transferNumber", { length: 50 }).notNull().unique(),
-  direction: mysqlEnum("direction", ["to_production", "to_general"]).notNull(),
-  status: mysqlEnum("status", ["completed", "cancelled"]).default("completed").notNull(),
+  direction: mysqlEnum("direction", ["to_production", "to_general", "branch_transfer"]).notNull().default("branch_transfer"),
+  sourceBranchId: int("sourceBranchId").notNull().default(1).references(() => branches.id),
+  destinationBranchId: int("destinationBranchId").notNull().default(1).references(() => branches.id),
+  status: mysqlEnum("status", ["pending", "in_transit", "completed", "cancelled"]).default("pending").notNull(),
   userId: int("userId").notNull().references(() => users.id),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -650,6 +736,16 @@ export const inventoryTransfersRelations = relations(inventoryTransfers, ({ one,
     fields: [inventoryTransfers.userId],
     references: [users.id],
   }),
+  sourceBranch: one(branches, {
+    fields: [inventoryTransfers.sourceBranchId],
+    references: [branches.id],
+    relationName: "sourceTransfers",
+  }),
+  destinationBranch: one(branches, {
+    fields: [inventoryTransfers.destinationBranchId],
+    references: [branches.id],
+    relationName: "destinationTransfers",
+  }),
   items: many(inventoryTransferItems),
 }));
 
@@ -661,5 +757,25 @@ export const inventoryTransferItemsRelations = relations(inventoryTransferItems,
   product: one(products, {
     fields: [inventoryTransferItems.productId],
     references: [products.id],
+  }),
+}));
+
+export const branchesRelations = relations(branches, ({ many }) => ({
+  users: many(userBranches),
+  inventory: many(inventory),
+  sales: many(sales),
+  orders: many(orders),
+  transfersFrom: many(inventoryTransfers, { relationName: "sourceTransfers" }),
+  transfersTo: many(inventoryTransfers, { relationName: "destinationTransfers" }),
+}));
+
+export const userBranchesRelations = relations(userBranches, ({ one }) => ({
+  user: one(users, {
+    fields: [userBranches.userId],
+    references: [users.id],
+  }),
+  branch: one(branches, {
+    fields: [userBranches.branchId],
+    references: [branches.id],
   }),
 }));

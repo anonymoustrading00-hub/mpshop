@@ -3,11 +3,57 @@
     {
       "clientNumber": "68188260",
       "name": "gemii",
-      "zone": "preado",
+      "zone": "prado casa nro 34 ",
       "sourceChannel": "facebook",
       "customerType": "retail",
       "id": 1,
-      "createdAt": "2026-06-07T21:06:01.641Z"
+      "createdAt": "2026-06-07T21:06:01.641Z",
+      "updatedAt": "2026-07-21T03:20:02.076Z"
+    },
+    {
+      "clientNumber": "879879879879",
+      "name": "djai",
+      "phone": "879879879879",
+      "taxId": "546546546546",
+      "zone": "Venta Directa",
+      "sourceChannel": "other",
+      "customerType": "retail",
+      "id": 2,
+      "createdAt": "2026-07-28T20:57:33.297Z"
+    },
+    {
+      "clientNumber": "73572498",
+      "name": "PAREDES",
+      "phone": "73572498",
+      "taxId": "6153127",
+      "zone": "Venta Directa",
+      "sourceChannel": "other",
+      "customerType": "retail",
+      "id": 3,
+      "createdAt": "2026-07-28T21:50:08.791Z"
+    },
+    {
+      "clientNumber": "78987879",
+      "name": "SANTRALLA",
+      "phone": "78987879",
+      "taxId": "121213213",
+      "zone": "Venta Directa",
+      "sourceChannel": "other",
+      "customerType": "retail",
+      "id": 4,
+      "createdAt": "2026-07-28T21:58:11.829Z",
+      "updatedAt": "2026-07-28T21:58:19.823Z"
+    },
+    {
+      "clientNumber": "78879879879",
+      "name": "CLUBE",
+      "phone": "78879879879",
+      "taxId": "546546546546546",
+      "zone": "Venta Directa",
+      "sourceChannel": "other",
+      "customerType": "retail",
+      "id": 5,
+      "createdAt": "2026-07-28T22:12:41.369Z"
     }
   ],
   "MOCK_USERS": [
@@ -20,7 +66,7 @@
       "openId": "demo_admin",
       "createdAt": "2026-05-05T06:13:29.383Z",
       "updatedAt": "2026-05-05T06:13:29.383Z",
-      "lastSignedIn": "2026-06-07T21:06:01.638Z",
+      "lastSignedIn": "2026-07-28T23:02:14.427Z",
       "email": "admin@demo.com",
       "loginMethod": "traditional"
     },
@@ -36,6 +82,27 @@
       "lastSignedIn": "2026-05-05T06:13:29.383Z",
       "email": "root@vitaliapro.com",
       "loginMethod": "traditional"
+    },
+    {
+      "username": "CRISTIAN",
+      "passwordHash": "$2b$10$bJbRZkwv90WFA7ZimejRHOLhal8q.Q9r.4u68neSPDInjHztiN1f2",
+      "name": "CRISTIAN HUANCA ",
+      "role": "user",
+      "loginMethod": "traditional",
+      "id": 116,
+      "createdAt": "2026-07-18T01:41:24.485Z",
+      "updatedAt": "2026-07-18T01:41:24.485Z"
+    },
+    {
+      "username": "manolo",
+      "passwordHash": "$2b$10$GVmeaPvVSQTxNzMpbUsAfOBMEbd5G.dBg/XhpkU9baN7pzpw9tCzy",
+      "name": "manolo",
+      "role": "user",
+      "loginMethod": "traditional",
+      "id": 625,
+      "createdAt": "2026-07-21T03:15:44.064Z",
+      "updatedAt": "2026-07-21T03:15:44.064Z",
+      "lastSignedIn": "2026-07-21T03:28:18.198Z"
     }
   ],
   "MOCK_PRODUCTS": [
@@ -50,14 +117,27 @@
       "updatedAt": "2026-05-05T06:13:29.385Z"
     },
     {
-      "name": "Frutilla",
+      "name": "kefir frutilla 1 litro ",
       "code": "FRU",
-      "price": 10,
-      "salePrice": 15,
-      "category": "Helados",
+      "price": 2000,
+      "salePrice": 2800,
+      "category": "finished_product",
       "id": 2,
       "createdAt": "2026-05-05T06:13:29.390Z",
-      "updatedAt": "2026-05-05T06:13:29.390Z"
+      "updatedAt": "2026-07-28T21:17:44.157Z",
+      "wholesalePrice": 0,
+      "discountPrice": 0,
+      "imageUrl": "",
+      "status": "active",
+      "unit": "unidad",
+      "presentationQuantity": 1,
+      "presentationUnit": "unidad",
+      "presentationVolumeMl": 0,
+      "presentationWeightGr": 0,
+      "productionRole": "none",
+      "storageLocation": null,
+      "supplierName": null,
+      "productionNotes": null
     },
     {
       "name": "Natural",
@@ -83,7 +163,7 @@
       "code": "leche kream",
       "name": "leche kream 800 ml",
       "category": "raw_material",
-      "price": 730,
+      "price": 2000,
       "salePrice": 0,
       "wholesalePrice": 0,
       "discountPrice": 0,
@@ -99,7 +179,7 @@
       "productionNotes": null,
       "id": 5,
       "createdAt": "2026-05-19T22:28:58.280Z",
-      "updatedAt": "2026-06-07T04:37:42.061Z",
+      "updatedAt": "2026-07-28T20:24:31.453Z",
       "imageUrl": ""
     },
     {
@@ -129,7 +209,7 @@
       "code": "MAT-LECHE-DESCREMADA",
       "name": "Leche Descremada",
       "category": "raw_material",
-      "price": 6.5,
+      "price": 0,
       "salePrice": 0,
       "wholesalePrice": 0,
       "discountPrice": 0,
@@ -144,7 +224,7 @@
       "supplierName": null,
       "productionNotes": null,
       "createdAt": "2026-05-25T17:16:17.693Z",
-      "updatedAt": "2026-05-25T17:16:17.693Z"
+      "updatedAt": "2026-07-28T21:17:44.157Z"
     },
     {
       "id": 8,
@@ -195,7 +275,7 @@
       "code": "ENV-BOTELLA-500ML",
       "name": "Botella 500ml",
       "category": "insumo",
-      "price": 1,
+      "price": 0,
       "salePrice": 0,
       "wholesalePrice": 0,
       "discountPrice": 0,
@@ -210,7 +290,7 @@
       "supplierName": null,
       "productionNotes": null,
       "createdAt": "2026-05-25T17:16:17.694Z",
-      "updatedAt": "2026-05-25T17:16:17.694Z"
+      "updatedAt": "2026-07-28T21:17:44.157Z"
     },
     {
       "id": 11,
@@ -283,7 +363,7 @@
       "code": "ENV-TAPA",
       "name": "Tapa",
       "category": "insumo",
-      "price": 0.2,
+      "price": 0,
       "salePrice": 0,
       "wholesalePrice": 0,
       "discountPrice": 0,
@@ -298,7 +378,7 @@
       "supplierName": null,
       "productionNotes": null,
       "createdAt": "2026-05-25T17:16:17.694Z",
-      "updatedAt": "2026-05-25T17:16:17.694Z"
+      "updatedAt": "2026-07-28T21:24:02.967Z"
     },
     {
       "id": 15,
@@ -393,8 +473,8 @@
       "code": "KEF-LECHE-NAT-1000",
       "name": "Kéfir de Leche Natural 1L",
       "category": "finished_product",
-      "price": 3.5,
-      "salePrice": 6,
+      "price": 2000,
+      "salePrice": 2800,
       "wholesalePrice": 0,
       "discountPrice": 0,
       "status": "active",
@@ -408,7 +488,8 @@
       "supplierName": null,
       "productionNotes": null,
       "createdAt": "2026-05-25T17:16:17.695Z",
-      "updatedAt": "2026-05-25T17:16:17.695Z"
+      "updatedAt": "2026-07-20T02:30:56.955Z",
+      "imageUrl": ""
     },
     {
       "id": 20,
@@ -437,9 +518,9 @@
       "code": "KEF-AGUA-NAT-500",
       "name": "Kéfir de Agua Natural 500ml",
       "category": "finished_product",
-      "price": 1.5,
-      "salePrice": 3,
-      "wholesalePrice": 0,
+      "price": 2000,
+      "salePrice": 2800,
+      "wholesalePrice": 2700,
       "discountPrice": 0,
       "status": "active",
       "unit": "unidad",
@@ -452,7 +533,8 @@
       "supplierName": null,
       "productionNotes": null,
       "createdAt": "2026-05-25T17:16:17.695Z",
-      "updatedAt": "2026-05-25T17:16:17.695Z"
+      "updatedAt": "2026-07-20T00:34:33.630Z",
+      "imageUrl": ""
     },
     {
       "id": 22,
@@ -546,13 +628,13 @@
       "code": "PROD-011",
       "name": "KEFIR MARACUYA",
       "category": "finished_product",
-      "price": 0,
+      "price": 2000,
       "salePrice": 2800,
       "wholesalePrice": 2800,
       "discountPrice": 2800,
       "wholesaleDiscountType": "percentage",
       "wholesaleDiscountValue": 0,
-      "imageUrl": null,
+      "imageUrl": "",
       "status": "active",
       "unit": "unidad",
       "presentationQuantity": 1,
@@ -565,7 +647,7 @@
       "productionNotes": "Tipo: kefir | Sabor: MARACUYA",
       "id": 26,
       "createdAt": "2026-06-05T03:17:24.417Z",
-      "updatedAt": "2026-06-05T03:17:24.417Z"
+      "updatedAt": "2026-07-20T02:34:11.440Z"
     },
     {
       "code": "PROD-011",
@@ -591,6 +673,31 @@
       "id": 27,
       "createdAt": "2026-06-06T03:02:30.663Z",
       "updatedAt": "2026-06-06T03:02:30.663Z"
+    },
+    {
+      "code": "LP HP 05",
+      "name": "LAPTOP HP I5",
+      "category": "finished_product",
+      "price": 10000,
+      "salePrice": 12000,
+      "wholesalePrice": 0,
+      "discountPrice": 0,
+      "wholesaleDiscountType": "percentage",
+      "wholesaleDiscountValue": 0,
+      "imageUrl": "/uploads/product-1784602232857-nwx7v.jpeg",
+      "status": "active",
+      "unit": "unidad",
+      "presentationQuantity": 1,
+      "presentationUnit": "unidad",
+      "presentationVolumeMl": 0,
+      "presentationWeightGr": 0,
+      "productionRole": "none",
+      "storageLocation": null,
+      "supplierName": null,
+      "productionNotes": null,
+      "id": 28,
+      "createdAt": "2026-07-21T02:50:49.833Z",
+      "updatedAt": "2026-07-21T02:54:30.415Z"
     }
   ],
   "MOCK_INVENTORY": [
@@ -599,190 +706,243 @@
       "productId": 1,
       "quantity": 1,
       "minStock": 10,
-      "lastUpdated": "2026-05-05T06:24:45.308Z"
+      "lastUpdated": "2026-05-05T06:24:45.308Z",
+      "branchId": 1
     },
     {
       "id": 2,
       "productId": 2,
-      "quantity": 2,
+      "quantity": 11,
       "minStock": 10,
-      "lastUpdated": "2026-05-05T06:24:45.312Z"
+      "lastUpdated": "2026-07-28T21:17:44.157Z",
+      "branchId": 1,
+      "expiryDate": "2026-08-29"
     },
     {
       "id": 3,
       "productId": 3,
       "quantity": 2,
       "minStock": 10,
-      "lastUpdated": "2026-05-05T06:18:07.534Z"
+      "lastUpdated": "2026-05-05T06:18:07.534Z",
+      "branchId": 1
     },
     {
       "id": 4,
       "productId": 4,
       "quantity": 2,
       "minStock": 10,
-      "lastUpdated": "2026-05-05T06:18:07.535Z"
+      "lastUpdated": "2026-05-05T06:18:07.535Z",
+      "branchId": 1
     },
     {
       "id": 5,
       "productId": 5,
-      "quantity": 0,
+      "quantity": 5,
       "minStock": 10,
-      "lastUpdated": "2026-06-07T04:26:26.373Z",
-      "expiryDate": "2026-06-27"
+      "lastUpdated": "2026-07-28T20:24:31.453Z",
+      "expiryDate": "2026-06-27",
+      "branchId": 1
     },
     {
       "id": 6,
       "productId": 6,
       "quantity": 150,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.693Z"
+      "lastUpdated": "2026-05-25T17:16:17.693Z",
+      "branchId": 1
     },
     {
       "id": 7,
       "productId": 7,
-      "quantity": 100,
+      "quantity": 101,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.693Z"
+      "lastUpdated": "2026-07-28T21:17:44.157Z",
+      "branchId": 1
     },
     {
       "id": 8,
       "productId": 8,
       "quantity": 50,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.694Z"
+      "lastUpdated": "2026-05-25T17:16:17.694Z",
+      "branchId": 1
     },
     {
       "id": 9,
       "productId": 9,
       "quantity": 50,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.694Z"
+      "lastUpdated": "2026-05-25T17:16:17.694Z",
+      "branchId": 1
     },
     {
       "id": 10,
       "productId": 10,
-      "quantity": 500,
+      "quantity": 501,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.694Z"
+      "lastUpdated": "2026-07-28T21:17:44.157Z",
+      "branchId": 1
     },
     {
       "id": 11,
       "productId": 11,
-      "quantity": 300,
+      "quantity": 299,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.694Z"
+      "lastUpdated": "2026-05-25T17:16:17.694Z",
+      "branchId": 1
     },
     {
       "id": 12,
       "productId": 12,
       "quantity": 300,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.694Z"
+      "lastUpdated": "2026-05-25T17:16:17.694Z",
+      "branchId": 1
     },
     {
       "id": 13,
       "productId": 13,
       "quantity": 200,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.694Z"
+      "lastUpdated": "2026-05-25T17:16:17.694Z",
+      "branchId": 1
     },
     {
       "id": 14,
       "productId": 14,
-      "quantity": 1000,
+      "quantity": 1011,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.694Z"
+      "lastUpdated": "2026-07-28T22:32:24.844Z",
+      "branchId": 1,
+      "expiryDate": "2026-07-30"
     },
     {
       "id": 15,
       "productId": 15,
       "quantity": 1000,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.694Z"
+      "lastUpdated": "2026-05-25T17:16:17.694Z",
+      "branchId": 1
     },
     {
       "id": 16,
       "productId": 16,
       "quantity": 20,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.694Z"
+      "lastUpdated": "2026-05-25T17:16:17.694Z",
+      "branchId": 1
     },
     {
       "id": 17,
       "productId": 17,
       "quantity": 20,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.695Z"
+      "lastUpdated": "2026-05-25T17:16:17.695Z",
+      "branchId": 1
     },
     {
       "id": 18,
       "productId": 18,
       "quantity": 20,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.695Z"
+      "lastUpdated": "2026-05-25T17:16:17.695Z",
+      "branchId": 1
     },
     {
       "id": 19,
       "productId": 19,
-      "quantity": 15,
+      "quantity": 28,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.695Z"
+      "lastUpdated": "2026-07-20T02:30:06.488Z",
+      "branchId": 1,
+      "expiryDate": "2026-08-10"
     },
     {
       "id": 20,
       "productId": 20,
       "quantity": 15,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.695Z"
+      "lastUpdated": "2026-05-25T17:16:17.695Z",
+      "branchId": 1
     },
     {
       "id": 21,
       "productId": 21,
-      "quantity": 10,
+      "quantity": 1,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.695Z"
+      "lastUpdated": "2026-07-28T22:12:41.370Z",
+      "branchId": 1
     },
     {
       "id": 22,
       "productId": 22,
       "quantity": 10,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.695Z"
+      "lastUpdated": "2026-05-25T17:16:17.695Z",
+      "branchId": 1
     },
     {
       "id": 23,
       "productId": 23,
-      "quantity": 10,
+      "quantity": 9,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.695Z"
+      "lastUpdated": "2026-07-21T03:09:25.488Z",
+      "branchId": 1
     },
     {
       "id": 24,
       "productId": 24,
-      "quantity": 10,
+      "quantity": 8,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.695Z"
+      "lastUpdated": "2026-07-16T05:38:58.216Z",
+      "branchId": 1
     },
     {
       "id": 25,
       "productId": 25,
       "quantity": 5,
       "minStock": 10,
-      "lastUpdated": "2026-05-25T17:16:17.695Z"
+      "lastUpdated": "2026-05-25T17:16:17.695Z",
+      "branchId": 1
     },
     {
       "id": 26,
       "productId": 26,
-      "quantity": 0,
+      "quantity": 1,
       "minStock": 10,
-      "lastUpdated": "2026-06-05T03:17:24.417Z"
+      "lastUpdated": "2026-07-28T21:58:19.825Z",
+      "branchId": 1
     },
     {
       "id": 27,
       "productId": 27,
       "quantity": 0,
       "minStock": 10,
-      "lastUpdated": "2026-06-06T03:02:30.663Z"
+      "lastUpdated": "2026-06-06T03:02:30.663Z",
+      "branchId": 1
+    },
+    {
+      "id": 28,
+      "productId": 24,
+      "branchId": 2,
+      "quantity": 1,
+      "minStock": 0,
+      "lastUpdated": "2026-07-16T05:38:24.236Z"
+    },
+    {
+      "id": 29,
+      "productId": 11,
+      "branchId": 2,
+      "quantity": 1,
+      "minStock": 0,
+      "lastUpdated": "2026-07-18T01:32:55.715Z"
+    },
+    {
+      "id": 30,
+      "productId": 28,
+      "quantity": 10,
+      "minStock": 10,
+      "lastUpdated": "2026-07-21T02:54:30.415Z"
     }
   ],
   "MOCK_ORDERS": [
@@ -798,7 +958,8 @@
       "deliveryDate": "2026-05-05T06:13:29.397Z",
       "id": 1,
       "deliveryPersonName": null,
-      "sourceChannel": "other"
+      "sourceChannel": "other",
+      "branchId": 1
     },
     {
       "orderNumber": "ORD-012",
@@ -815,7 +976,28 @@
       "id": 2,
       "createdAt": "2026-06-07T21:06:01.642Z",
       "updatedAt": "2026-06-07T21:06:01.642Z",
-      "deliveryPersonName": null
+      "deliveryPersonName": null,
+      "branchId": 1
+    },
+    {
+      "orderNumber": "ORD-013",
+      "branchId": 1,
+      "customerId": 1,
+      "zone": "prado casa nro 34 ",
+      "deliveryDate": "2026-07-20",
+      "deliveryTime": "23:30",
+      "totalPrice": 4800,
+      "paymentMethod": "cash",
+      "deliveryPersonId": 625,
+      "status": "delivered",
+      "paymentStatus": "completed",
+      "notes": "llamar antes por que trabaja en oficina",
+      "sourceChannel": "facebook",
+      "id": 3,
+      "createdAt": "2026-07-21T03:20:02.081Z",
+      "updatedAt": "2026-07-21T03:26:57.671Z",
+      "deliveryPersonName": null,
+      "deliveredAt": "2026-07-21T03:26:57.671Z"
     }
   ],
   "MOCK_ORDER_ITEMS": [
@@ -826,9 +1008,34 @@
       "quantity": 1,
       "price": 15,
       "id": 1
+    },
+    {
+      "orderId": 3,
+      "productId": 19,
+      "pricingType": "unit",
+      "quantity": 1,
+      "price": 2000,
+      "id": 2
+    },
+    {
+      "orderId": 3,
+      "productId": 26,
+      "pricingType": "unit",
+      "quantity": 1,
+      "price": 2800,
+      "id": 3
     }
   ],
-  "MOCK_PAYMENTS": [],
+  "MOCK_PAYMENTS": [
+    {
+      "orderId": 3,
+      "amount": 4800,
+      "method": "cash",
+      "status": "completed",
+      "id": 1,
+      "createdAt": "2026-07-21T03:26:57.668Z"
+    }
+  ],
   "MOCK_MOVEMENTS": [
     {
       "productId": 5,
@@ -838,7 +1045,8 @@
       "reason": "Producto creado",
       "notes": "Creado por Administrador (Modo Demo) con precio compra Bs. 7.30, venta unitaria Bs. 0.00, mayorista Bs. 0.00 y descuento Bs. 0.00. Estado inicial: activo.",
       "id": 1,
-      "createdAt": "2026-05-19T22:28:58.287Z"
+      "createdAt": "2026-05-19T22:28:58.287Z",
+      "branchId": 1
     },
     {
       "productId": 26,
@@ -848,7 +1056,8 @@
       "reason": "Producto creado",
       "notes": "Creado por Administrador (Modo Demo) con precio compra Bs. 0.00, venta unitaria Bs. 28.00, mayorista Bs. 28.00 y descuento Bs. 28.00. Estado inicial: activo.",
       "id": 2,
-      "createdAt": "2026-06-05T03:17:24.427Z"
+      "createdAt": "2026-06-05T03:17:24.427Z",
+      "branchId": 1
     },
     {
       "productId": 27,
@@ -858,7 +1067,8 @@
       "reason": "Producto creado",
       "notes": "Creado por Administrador (Modo Demo) con precio compra Bs. 0.00, venta unitaria Bs. 28.00, mayorista Bs. 28.00 y descuento Bs. 28.00. Estado inicial: activo.",
       "id": 3,
-      "createdAt": "2026-06-06T03:02:30.670Z"
+      "createdAt": "2026-06-06T03:02:30.670Z",
+      "branchId": 1
     },
     {
       "id": 4,
@@ -868,7 +1078,8 @@
       "quantity": 10,
       "reason": "Traspaso a Producción",
       "notes": "Traspaso TR-2026-0001",
-      "createdAt": "2026-06-07T04:26:26.373Z"
+      "createdAt": "2026-06-07T04:26:26.373Z",
+      "branchId": 1
     },
     {
       "productId": 5,
@@ -878,7 +1089,8 @@
       "reason": "Datos del producto actualizados",
       "notes": "Administrador (Modo Demo) modificó imagen actualizada.",
       "id": 5,
-      "createdAt": "2026-06-07T04:29:27.757Z"
+      "createdAt": "2026-06-07T04:29:27.757Z",
+      "branchId": 1
     },
     {
       "productId": 5,
@@ -888,7 +1100,8 @@
       "reason": "Datos del producto actualizados",
       "notes": "Administrador (Modo Demo) modificó nombre: leche kream -> leche kream 800 ml.",
       "id": 6,
-      "createdAt": "2026-06-07T04:37:42.062Z"
+      "createdAt": "2026-06-07T04:37:42.062Z",
+      "branchId": 1
     },
     {
       "id": 7,
@@ -897,10 +1110,377 @@
       "quantity": 1,
       "reason": "Pedido reservado ORD-012",
       "orderId": 2,
-      "createdAt": "2026-06-07T21:06:01.645Z"
+      "createdAt": "2026-06-07T21:06:01.645Z",
+      "branchId": 1
+    },
+    {
+      "productId": 24,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-001",
+      "notes": "Salida por venta VTA-001",
+      "saleId": 1,
+      "userId": 999,
+      "id": 8,
+      "createdAt": "2026-07-16T05:38:58.216Z"
+    },
+    {
+      "productId": 21,
+      "userId": 999,
+      "type": "adjustment",
+      "quantity": 0,
+      "reason": "Precios actualizados",
+      "notes": "Administrador (Modo Demo) actualizó precios. Compra: Bs. 0.01 -> Bs. 20.00. Venta: Bs. 0.03 -> Bs. 28.00. Mayorista: Bs. 0.00 -> Bs. 27.00. Descuento: Bs. 0.00 -> Bs. 0.00.",
+      "id": 9,
+      "createdAt": "2026-07-20T00:34:33.631Z"
+    },
+    {
+      "productId": 21,
+      "userId": 999,
+      "type": "adjustment",
+      "quantity": 0,
+      "reason": "Datos del producto actualizados",
+      "notes": "Administrador (Modo Demo) modificó imagen actualizada.",
+      "id": 10,
+      "createdAt": "2026-07-20T00:34:33.632Z"
+    },
+    {
+      "productId": 2,
+      "userId": 999,
+      "type": "adjustment",
+      "quantity": 0,
+      "reason": "Producto reactivado",
+      "notes": "Administrador (Modo Demo) cambió el estado de activo a activo.",
+      "id": 11,
+      "createdAt": "2026-07-20T00:36:01.025Z"
+    },
+    {
+      "productId": 2,
+      "userId": 999,
+      "type": "adjustment",
+      "quantity": 0,
+      "reason": "Precios actualizados",
+      "notes": "Administrador (Modo Demo) actualizó precios. Compra: Bs. 0.10 -> Bs. 20.00. Venta: Bs. 0.15 -> Bs. 28.00. Mayorista: Bs. 0.00 -> Bs. 0.00. Descuento: Bs. 0.00 -> Bs. 0.00.",
+      "id": 12,
+      "createdAt": "2026-07-20T00:36:01.026Z"
+    },
+    {
+      "productId": 2,
+      "userId": 999,
+      "type": "adjustment",
+      "quantity": 0,
+      "reason": "Datos del producto actualizados",
+      "notes": "Administrador (Modo Demo) modificó nombre: Frutilla -> kefir frutilla 1 litro , categoría: Helados -> finished_product, imagen actualizada.",
+      "id": 13,
+      "createdAt": "2026-07-20T00:36:01.027Z"
+    },
+    {
+      "productId": 19,
+      "userId": 999,
+      "type": "adjustment",
+      "quantity": 0,
+      "reason": "Precios actualizados",
+      "notes": "Administrador (Modo Demo) actualizó precios. Compra: Bs. 20.00 -> Bs. 20.00. Venta: Bs. 0.06 -> Bs. 28.00. Mayorista: Bs. 0.00 -> Bs. 0.00. Descuento: Bs. 0.00 -> Bs. 0.00.",
+      "id": 14,
+      "createdAt": "2026-07-20T02:30:56.957Z"
+    },
+    {
+      "productId": 19,
+      "userId": 999,
+      "type": "adjustment",
+      "quantity": 0,
+      "reason": "Datos del producto actualizados",
+      "notes": "Administrador (Modo Demo) modificó imagen actualizada.",
+      "id": 15,
+      "createdAt": "2026-07-20T02:30:56.959Z"
+    },
+    {
+      "productId": 26,
+      "userId": 999,
+      "type": "adjustment",
+      "quantity": 0,
+      "reason": "Precios actualizados",
+      "notes": "Administrador (Modo Demo) actualizó precios. Compra: Bs. 0.00 -> Bs. 20.00. Venta: Bs. 28.00 -> Bs. 28.00. Mayorista: Bs. 28.00 -> Bs. 28.00. Descuento: Bs. 28.00 -> Bs. 28.00.",
+      "id": 16,
+      "createdAt": "2026-07-20T02:31:35.188Z"
+    },
+    {
+      "productId": 26,
+      "userId": 999,
+      "type": "adjustment",
+      "quantity": 0,
+      "reason": "Datos del producto actualizados",
+      "notes": "Administrador (Modo Demo) modificó imagen actualizada.",
+      "id": 17,
+      "createdAt": "2026-07-20T02:31:35.189Z"
+    },
+    {
+      "productId": 21,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-002",
+      "notes": "Salida por venta VTA-002",
+      "saleId": 2,
+      "userId": 999,
+      "id": 18,
+      "createdAt": "2026-07-20T02:38:03.598Z"
+    },
+    {
+      "productId": 21,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-003",
+      "notes": "Salida por venta VTA-003",
+      "saleId": 3,
+      "userId": 999,
+      "id": 19,
+      "createdAt": "2026-07-21T02:26:53.139Z"
+    },
+    {
+      "id": 20,
+      "productId": 5,
+      "userId": 999,
+      "type": "exit",
+      "quantity": 10,
+      "reason": "Traspaso a Producción",
+      "notes": "Traspaso TR-2026-0004",
+      "createdAt": "2026-07-21T02:29:33.106Z"
+    },
+    {
+      "productId": 2,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-004",
+      "notes": "Salida por venta VTA-004",
+      "saleId": 4,
+      "userId": 999,
+      "id": 21,
+      "createdAt": "2026-07-21T02:32:31.055Z"
+    },
+    {
+      "productId": 28,
+      "userId": 999,
+      "type": "adjustment",
+      "quantity": 0,
+      "reason": "Producto creado",
+      "notes": "Creado por Administrador (Modo Demo) con precio compra Bs. 100.00, venta unitaria Bs. 120.00, mayorista Bs. 0.00 y descuento Bs. 0.00. Estado inicial: activo.",
+      "id": 22,
+      "createdAt": "2026-07-21T02:50:49.837Z"
+    },
+    {
+      "productId": 26,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-005",
+      "notes": "Salida por venta VTA-005",
+      "saleId": 5,
+      "userId": 999,
+      "id": 23,
+      "createdAt": "2026-07-21T03:09:25.487Z"
+    },
+    {
+      "productId": 23,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-005",
+      "notes": "Salida por venta VTA-005",
+      "saleId": 5,
+      "userId": 999,
+      "id": 24,
+      "createdAt": "2026-07-21T03:09:25.488Z"
+    },
+    {
+      "productId": 2,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-006",
+      "notes": "Salida por venta VTA-006",
+      "saleId": 6,
+      "userId": 999,
+      "id": 25,
+      "createdAt": "2026-07-21T03:14:40.947Z"
+    },
+    {
+      "productId": 21,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-006",
+      "notes": "Salida por venta VTA-006",
+      "saleId": 6,
+      "userId": 999,
+      "id": 26,
+      "createdAt": "2026-07-21T03:14:40.950Z"
+    },
+    {
+      "productId": 26,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-006",
+      "notes": "Salida por venta VTA-006",
+      "saleId": 6,
+      "userId": 999,
+      "id": 27,
+      "createdAt": "2026-07-21T03:14:40.966Z"
+    },
+    {
+      "id": 28,
+      "productId": 19,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Pedido reservado ORD-013",
+      "orderId": 3,
+      "createdAt": "2026-07-21T03:20:02.092Z"
+    },
+    {
+      "id": 29,
+      "productId": 26,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Pedido reservado ORD-013",
+      "orderId": 3,
+      "createdAt": "2026-07-21T03:20:02.092Z"
+    },
+    {
+      "id": 30,
+      "productId": 19,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Entrega Pedido ORD-013",
+      "orderId": 3,
+      "createdAt": "2026-07-21T03:26:57.671Z"
+    },
+    {
+      "id": 31,
+      "productId": 26,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Entrega Pedido ORD-013",
+      "orderId": 3,
+      "createdAt": "2026-07-21T03:26:57.671Z"
+    },
+    {
+      "productId": 2,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-007",
+      "notes": "Salida por venta VTA-007",
+      "saleId": 7,
+      "userId": 999,
+      "id": 32,
+      "createdAt": "2026-07-28T20:22:42.190Z"
+    },
+    {
+      "productId": 2,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-008",
+      "notes": "Salida por venta VTA-008",
+      "saleId": 8,
+      "userId": 999,
+      "id": 33,
+      "createdAt": "2026-07-28T20:28:13.704Z"
+    },
+    {
+      "productId": 2,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-009",
+      "notes": "Salida por venta VTA-009",
+      "saleId": 9,
+      "userId": 999,
+      "id": 34,
+      "createdAt": "2026-07-28T20:33:46.896Z"
+    },
+    {
+      "productId": 2,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-010",
+      "notes": "Salida por venta VTA-010",
+      "saleId": 10,
+      "userId": 999,
+      "id": 35,
+      "createdAt": "2026-07-28T20:44:11.107Z"
+    },
+    {
+      "productId": 2,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-011",
+      "notes": "Salida por venta VTA-011",
+      "saleId": 11,
+      "userId": 999,
+      "id": 36,
+      "createdAt": "2026-07-28T20:56:24.696Z"
+    },
+    {
+      "productId": 2,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-012",
+      "notes": "Salida por venta VTA-012",
+      "saleId": 12,
+      "userId": 999,
+      "id": 37,
+      "createdAt": "2026-07-28T20:57:33.298Z"
+    },
+    {
+      "productId": 21,
+      "type": "exit",
+      "quantity": 5,
+      "reason": "Venta VTA-013",
+      "notes": "Salida por venta VTA-013",
+      "saleId": 13,
+      "userId": 999,
+      "id": 38,
+      "createdAt": "2026-07-28T21:50:08.793Z"
+    },
+    {
+      "productId": 26,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-014",
+      "notes": "Salida por venta VTA-014",
+      "saleId": 14,
+      "userId": 999,
+      "id": 39,
+      "createdAt": "2026-07-28T21:58:11.831Z"
+    },
+    {
+      "productId": 26,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-015",
+      "notes": "Salida por venta VTA-015",
+      "saleId": 15,
+      "userId": 999,
+      "id": 40,
+      "createdAt": "2026-07-28T21:58:19.825Z"
+    },
+    {
+      "productId": 21,
+      "type": "exit",
+      "quantity": 1,
+      "reason": "Venta VTA-016",
+      "notes": "Salida por venta VTA-016",
+      "saleId": 16,
+      "userId": 999,
+      "id": 41,
+      "createdAt": "2026-07-28T22:12:41.370Z"
     }
   ],
-  "MOCK_SUPPLIERS": [],
+  "MOCK_SUPPLIERS": [
+    {
+      "name": "PROVBEDOR DE LAPTOS",
+      "contactName": "",
+      "phone": "",
+      "taxId": "",
+      "address": "",
+      "id": 1,
+      "createdAt": "2026-07-21T02:51:38.637Z",
+      "updatedAt": "2026-07-21T02:51:38.637Z"
+    }
+  ],
   "MOCK_PURCHASES": [
     {
       "purchaseNumber": "COM-3117",
@@ -912,6 +1492,120 @@
       "id": 1,
       "createdAt": "2026-05-19T22:31:05.587Z",
       "updatedAt": "2026-05-19T22:31:05.587Z"
+    },
+    {
+      "purchaseNumber": "COM-8746",
+      "totalAmount": 14000,
+      "status": "received",
+      "paymentStatus": "pending",
+      "paymentMethod": "cash",
+      "isCredit": 0,
+      "id": 2,
+      "createdAt": "2026-07-20T00:33:02.100Z",
+      "updatedAt": "2026-07-20T00:33:02.100Z"
+    },
+    {
+      "purchaseNumber": "COM-4023",
+      "totalAmount": 14000,
+      "status": "received",
+      "paymentStatus": "pending",
+      "paymentMethod": "cash",
+      "isCredit": 0,
+      "id": 3,
+      "createdAt": "2026-07-20T00:36:42.985Z",
+      "updatedAt": "2026-07-20T00:36:42.985Z"
+    },
+    {
+      "purchaseNumber": "COM-7635",
+      "totalAmount": 14000,
+      "status": "received",
+      "paymentStatus": "pending",
+      "paymentMethod": "cash",
+      "isCredit": 0,
+      "id": 4,
+      "createdAt": "2026-07-20T02:30:06.488Z",
+      "updatedAt": "2026-07-20T02:30:06.488Z"
+    },
+    {
+      "purchaseNumber": "COM-7291",
+      "totalAmount": 12000,
+      "status": "received",
+      "paymentStatus": "pending",
+      "paymentMethod": "cash",
+      "isCredit": 0,
+      "id": 5,
+      "createdAt": "2026-07-20T02:34:11.440Z",
+      "updatedAt": "2026-07-20T02:34:11.440Z"
+    },
+    {
+      "purchaseNumber": "COM-4752",
+      "totalAmount": 7000,
+      "status": "received",
+      "paymentStatus": "pending",
+      "paymentMethod": "cash",
+      "isCredit": 0,
+      "id": 6,
+      "createdAt": "2026-07-21T02:28:59.903Z",
+      "updatedAt": "2026-07-21T02:28:59.903Z"
+    },
+    {
+      "supplierId": 1,
+      "purchaseNumber": "COM-2983",
+      "totalAmount": 100000,
+      "status": "received",
+      "paymentStatus": "pending",
+      "paymentMethod": "qr",
+      "isCredit": 0,
+      "id": 7,
+      "createdAt": "2026-07-21T02:54:30.415Z",
+      "updatedAt": "2026-07-21T02:54:30.415Z"
+    },
+    {
+      "supplierId": 1,
+      "purchaseNumber": "COM-9024",
+      "totalAmount": 10000,
+      "status": "received",
+      "paymentStatus": "pending",
+      "paymentMethod": "cash",
+      "isCredit": 1,
+      "id": 8,
+      "createdAt": "2026-07-28T20:24:31.453Z",
+      "updatedAt": "2026-07-28T20:24:31.453Z"
+    },
+    {
+      "purchaseNumber": "COM-2422",
+      "totalAmount": 20000,
+      "status": "received",
+      "paymentStatus": "pending",
+      "paymentMethod": "cash",
+      "isCredit": 1,
+      "id": 9,
+      "createdAt": "2026-07-28T21:17:44.156Z",
+      "updatedAt": "2026-07-28T21:17:44.156Z"
+    },
+    {
+      "purchaseNumber": "COM-7975",
+      "totalAmount": 0,
+      "status": "received",
+      "paymentStatus": "pending",
+      "paymentMethod": "cash",
+      "isCredit": 1,
+      "id": 10,
+      "createdAt": "2026-07-28T21:24:02.967Z",
+      "updatedAt": "2026-07-28T21:24:02.967Z"
+    },
+    {
+      "supplierId": 1,
+      "purchaseNumber": "COM-7061",
+      "totalAmount": 10000,
+      "status": "received",
+      "paymentStatus": "pending",
+      "paymentMethod": "qr",
+      "isCredit": 1,
+      "dueDate": "2026-08-30",
+      "id": 11,
+      "createdAt": "2026-07-28T22:32:24.844Z",
+      "updatedAt": "2026-07-28T22:32:24.844Z"
     }
   ],
   "MOCK_PURCHASE_ITEMS": [
@@ -923,11 +1617,196 @@
       "id": 1,
       "purchaseId": 1,
       "createdAt": "2026-05-19T22:31:05.587Z"
+    },
+    {
+      "productId": 19,
+      "quantity": 7,
+      "price": 2000,
+      "expiryDate": "2026-07-31",
+      "id": 2,
+      "purchaseId": 2,
+      "createdAt": "2026-07-20T00:33:02.100Z"
+    },
+    {
+      "productId": 2,
+      "quantity": 7,
+      "price": 2000,
+      "expiryDate": "2026-07-31",
+      "id": 3,
+      "purchaseId": 3,
+      "createdAt": "2026-07-20T00:36:42.985Z"
+    },
+    {
+      "productId": 19,
+      "quantity": 7,
+      "price": 2000,
+      "expiryDate": "2026-08-10",
+      "id": 4,
+      "purchaseId": 4,
+      "createdAt": "2026-07-20T02:30:06.488Z"
+    },
+    {
+      "productId": 26,
+      "quantity": 6,
+      "price": 2000,
+      "id": 5,
+      "purchaseId": 5,
+      "createdAt": "2026-07-20T02:34:11.440Z"
+    },
+    {
+      "productId": 5,
+      "quantity": 10,
+      "price": 700,
+      "id": 6,
+      "purchaseId": 6,
+      "createdAt": "2026-07-21T02:28:59.903Z"
+    },
+    {
+      "productId": 28,
+      "quantity": 10,
+      "price": 10000,
+      "id": 7,
+      "purchaseId": 7,
+      "createdAt": "2026-07-21T02:54:30.415Z"
+    },
+    {
+      "productId": 5,
+      "quantity": 5,
+      "price": 2000,
+      "id": 8,
+      "purchaseId": 8,
+      "createdAt": "2026-07-28T20:24:31.453Z"
+    },
+    {
+      "productId": 7,
+      "quantity": 1,
+      "price": 0,
+      "id": 9,
+      "purchaseId": 9,
+      "createdAt": "2026-07-28T21:17:44.156Z"
+    },
+    {
+      "productId": 10,
+      "quantity": 1,
+      "price": 0,
+      "id": 10,
+      "purchaseId": 9,
+      "createdAt": "2026-07-28T21:17:44.156Z"
+    },
+    {
+      "productId": 2,
+      "quantity": 10,
+      "price": 2000,
+      "expiryDate": "2026-08-29",
+      "id": 11,
+      "purchaseId": 9,
+      "createdAt": "2026-07-28T21:17:44.156Z"
+    },
+    {
+      "productId": 14,
+      "quantity": 1,
+      "price": 0,
+      "expiryDate": "2026-07-30",
+      "id": 12,
+      "purchaseId": 10,
+      "createdAt": "2026-07-28T21:24:02.967Z"
+    },
+    {
+      "productId": 14,
+      "quantity": 10,
+      "price": 1000,
+      "id": 13,
+      "purchaseId": 11,
+      "createdAt": "2026-07-28T22:32:24.844Z"
     }
   ],
-  "MOCK_ACCOUNTS_PAYABLE": [],
-  "MOCK_DELIVERY_EXPENSES": [],
-  "MOCK_OPERATIONAL_EXPENSES": [],
+  "MOCK_ACCOUNTS_PAYABLE": [
+    {
+      "id": 1,
+      "purchaseId": 8,
+      "amount": 10000,
+      "status": "paid",
+      "dueDate": "2026-08-27T20:24:31.453Z",
+      "createdAt": "2026-07-28T20:24:31.453Z",
+      "totalAmount": 10000,
+      "paidAmount": 10000,
+      "balance": 0,
+      "updatedAt": "2026-07-28T22:15:22.401Z"
+    },
+    {
+      "id": 2,
+      "purchaseId": 9,
+      "amount": 20000,
+      "status": "paid",
+      "dueDate": "2026-08-27T21:17:44.157Z",
+      "createdAt": "2026-07-28T21:17:44.157Z",
+      "totalAmount": 20000,
+      "paidAmount": 20000,
+      "balance": 0,
+      "updatedAt": "2026-07-28T22:27:33.946Z"
+    },
+    {
+      "id": 3,
+      "purchaseId": 10,
+      "amount": 0,
+      "status": "unpaid",
+      "dueDate": "2026-08-27T21:24:02.968Z",
+      "createdAt": "2026-07-28T21:24:02.968Z"
+    },
+    {
+      "id": 4,
+      "purchaseId": 11,
+      "supplierId": 1,
+      "supplierName": "PROVBEDOR DE LAPTOS",
+      "purchaseNumber": "COM-7061",
+      "totalAmount": 10000,
+      "paidAmount": 10000,
+      "balance": 0,
+      "dueDate": "2026-08-30T04:00:00.000Z",
+      "status": "paid",
+      "notes": null,
+      "createdAt": "2026-07-28T22:32:24.844Z",
+      "updatedAt": "2026-07-28T22:39:43.729Z"
+    },
+    {
+      "id": 5,
+      "purchaseId": 11,
+      "supplierId": 1,
+      "purchaseNumber": "COM-7061",
+      "totalAmount": 10000,
+      "paidAmount": 0,
+      "balance": 10000,
+      "status": "unpaid",
+      "dueDate": "2026-08-27T22:32:24.844Z",
+      "createdAt": "2026-07-28T22:32:24.845Z",
+      "updatedAt": "2026-07-28T22:32:24.845Z"
+    }
+  ],
+  "MOCK_DELIVERY_EXPENSES": [
+    {
+      "deliveryPersonId": 625,
+      "amount": 1000,
+      "type": "subsistence",
+      "notes": "",
+      "id": 1,
+      "createdAt": "2026-07-21T03:23:13.388Z"
+    }
+  ],
+  "MOCK_OPERATIONAL_EXPENSES": [
+    {
+      "description": "alquiler",
+      "category": "rent",
+      "amount": 10000,
+      "paymentMethod": "cash",
+      "expenseDate": "2026-07-20T00:00:00.000Z",
+      "dueDate": "2026-07-20T00:00:00.000Z",
+      "status": "paid",
+      "userId": 999,
+      "id": 1,
+      "createdAt": "2026-07-21T03:36:17.197Z",
+      "updatedAt": "2026-07-21T03:39:32.637Z"
+    }
+  ],
   "MOCK_FINANCIAL_TRANSACTIONS": [
     {
       "id": 1,
@@ -937,10 +1816,311 @@
       "referenceId": 1,
       "notes": "Compra COM-3117",
       "paymentMethod": "cash",
-      "createdAt": "2026-05-19T22:31:05.588Z"
+      "createdAt": "2026-05-19T22:31:05.588Z",
+      "branchId": 1
+    },
+    {
+      "type": "income",
+      "category": "sale_local",
+      "amount": 5,
+      "referenceId": 1,
+      "notes": "Venta VTA-001",
+      "paymentMethod": "cash",
+      "userId": 999,
+      "id": 2,
+      "createdAt": "2026-07-16T05:38:58.218Z"
+    },
+    {
+      "id": 3,
+      "type": "expense",
+      "category": "purchase",
+      "amount": 14000,
+      "referenceId": 2,
+      "notes": "Compra COM-8746",
+      "paymentMethod": "cash",
+      "createdAt": "2026-07-20T00:33:02.100Z"
+    },
+    {
+      "id": 4,
+      "type": "expense",
+      "category": "purchase",
+      "amount": 14000,
+      "referenceId": 3,
+      "notes": "Compra COM-4023",
+      "paymentMethod": "cash",
+      "createdAt": "2026-07-20T00:36:42.985Z"
+    },
+    {
+      "id": 5,
+      "type": "expense",
+      "category": "purchase",
+      "amount": 14000,
+      "referenceId": 4,
+      "notes": "Compra COM-7635",
+      "paymentMethod": "cash",
+      "createdAt": "2026-07-20T02:30:06.488Z"
+    },
+    {
+      "id": 6,
+      "type": "expense",
+      "category": "purchase",
+      "amount": 12000,
+      "referenceId": 5,
+      "notes": "Compra COM-7291",
+      "paymentMethod": "cash",
+      "createdAt": "2026-07-20T02:34:11.440Z"
+    },
+    {
+      "type": "income",
+      "category": "sale_local",
+      "amount": 2800,
+      "referenceId": 2,
+      "notes": "Venta VTA-002",
+      "paymentMethod": "cash",
+      "userId": 999,
+      "id": 7,
+      "createdAt": "2026-07-20T02:38:03.599Z"
+    },
+    {
+      "type": "income",
+      "category": "sale_local",
+      "amount": 2800,
+      "referenceId": 3,
+      "notes": "Venta VTA-003",
+      "paymentMethod": "cash",
+      "userId": 999,
+      "id": 8,
+      "createdAt": "2026-07-21T02:26:53.155Z"
+    },
+    {
+      "id": 9,
+      "type": "expense",
+      "category": "purchase",
+      "amount": 7000,
+      "referenceId": 6,
+      "notes": "Compra COM-4752",
+      "paymentMethod": "cash",
+      "createdAt": "2026-07-21T02:28:59.904Z"
+    },
+    {
+      "type": "income",
+      "category": "sale_local",
+      "amount": 2800,
+      "referenceId": 4,
+      "notes": "Venta VTA-004",
+      "paymentMethod": "cash",
+      "userId": 999,
+      "id": 10,
+      "createdAt": "2026-07-21T02:32:31.056Z"
+    },
+    {
+      "type": "income",
+      "category": "other_income",
+      "paymentMethod": "qr",
+      "amount": 100000,
+      "userId": 999,
+      "notes": "DEUDA QUE ME PAGARON",
+      "id": 11,
+      "createdAt": "2026-07-21T02:45:21.919Z"
+    },
+    {
+      "type": "expense",
+      "category": "transfer_between_registers",
+      "amount": 20000,
+      "paymentMethod": "cash",
+      "userId": 999,
+      "notes": "Traspaso hacia QR - COMPRA DE MATERIAL",
+      "id": 12,
+      "createdAt": "2026-07-21T02:46:04.596Z"
+    },
+    {
+      "type": "income",
+      "category": "transfer_between_registers",
+      "amount": 20000,
+      "paymentMethod": "qr",
+      "userId": 999,
+      "notes": "Traspaso desde CASH - COMPRA DE MATERIAL",
+      "id": 13,
+      "createdAt": "2026-07-21T02:46:04.598Z"
+    },
+    {
+      "id": 14,
+      "type": "expense",
+      "category": "purchase",
+      "amount": 100000,
+      "referenceId": 7,
+      "notes": "Compra COM-2983",
+      "paymentMethod": "qr",
+      "createdAt": "2026-07-21T02:54:30.415Z"
+    },
+    {
+      "type": "income",
+      "category": "sale_delivery",
+      "amount": 2803,
+      "referenceId": 5,
+      "notes": "Venta VTA-005",
+      "paymentMethod": "qr",
+      "userId": 999,
+      "id": 15,
+      "createdAt": "2026-07-21T03:09:25.490Z"
+    },
+    {
+      "type": "income",
+      "category": "sale_local",
+      "amount": 8400,
+      "referenceId": 6,
+      "notes": "Venta VTA-006",
+      "paymentMethod": "qr",
+      "userId": 999,
+      "id": 16,
+      "createdAt": "2026-07-21T03:14:40.968Z"
+    },
+    {
+      "type": "expense",
+      "category": "subsistence",
+      "amount": 1000,
+      "notes": "Gasto de repartidor",
+      "paymentMethod": "cash",
+      "userId": 625,
+      "referenceId": null,
+      "id": 17,
+      "createdAt": "2026-07-21T03:23:13.389Z"
+    },
+    {
+      "id": 18,
+      "type": "income",
+      "category": "order_delivery",
+      "amount": 4800,
+      "referenceId": 3,
+      "userId": 625,
+      "notes": "Entrega Pedido ORD-013",
+      "paymentMethod": "cash",
+      "createdAt": "2026-07-21T03:26:57.671Z"
+    },
+    {
+      "type": "expense",
+      "category": "rent",
+      "amount": 10000,
+      "paymentMethod": "cash",
+      "notes": "alquiler",
+      "referenceId": 1,
+      "id": 19,
+      "createdAt": "2026-07-21T03:39:32.637Z"
+    },
+    {
+      "id": 20,
+      "type": "expense",
+      "category": "purchase",
+      "amount": 10000,
+      "referenceId": 8,
+      "notes": "Compra COM-9024",
+      "paymentMethod": "cash",
+      "createdAt": "2026-07-28T20:24:31.453Z"
+    },
+    {
+      "id": 21,
+      "type": "expense",
+      "category": "purchase",
+      "amount": 20000,
+      "referenceId": 9,
+      "notes": "Compra COM-2422",
+      "paymentMethod": "cash",
+      "createdAt": "2026-07-28T21:17:44.157Z"
+    },
+    {
+      "id": 22,
+      "type": "expense",
+      "category": "purchase",
+      "amount": 0,
+      "referenceId": 10,
+      "notes": "Compra COM-7975",
+      "paymentMethod": "cash",
+      "createdAt": "2026-07-28T21:24:02.967Z"
+    },
+    {
+      "type": "income",
+      "category": "sale_local",
+      "amount": 2800,
+      "referenceId": 11,
+      "notes": "Venta VTA-011",
+      "paymentMethod": "cash",
+      "userId": 999,
+      "id": 23,
+      "createdAt": "2026-07-28T21:34:42.513Z"
+    },
+    {
+      "type": "income",
+      "category": "ar_payment",
+      "amount": 2800,
+      "referenceId": 1,
+      "notes": "Cobro de CXC (REC-0001) - Venta #16",
+      "paymentMethod": "qr",
+      "userId": 999,
+      "id": 24,
+      "createdAt": "2026-07-28T22:14:31.755Z"
+    },
+    {
+      "type": "expense",
+      "category": "ap_payment",
+      "amount": 10000,
+      "referenceId": 1,
+      "notes": "Pago de CXP (REC-0002) - Compra #8",
+      "paymentMethod": "qr",
+      "userId": 999,
+      "id": 25,
+      "createdAt": "2026-07-28T22:15:22.401Z"
+    },
+    {
+      "type": "expense",
+      "category": "ap_payment",
+      "amount": 20000,
+      "referenceId": 2,
+      "notes": "Pago de CXP (REC-0003) - Compra #9",
+      "paymentMethod": "cash",
+      "userId": 999,
+      "id": 26,
+      "createdAt": "2026-07-28T22:27:33.946Z"
+    },
+    {
+      "id": 27,
+      "type": "expense",
+      "category": "purchase",
+      "amount": 10000,
+      "referenceId": 11,
+      "notes": "Compra COM-7061",
+      "paymentMethod": "qr",
+      "createdAt": "2026-07-28T22:32:24.844Z"
+    },
+    {
+      "type": "expense",
+      "category": "ap_payment",
+      "amount": 10000,
+      "referenceId": 4,
+      "notes": "Pago de CXP (REC-0004) - Compra #11",
+      "paymentMethod": "qr",
+      "userId": 999,
+      "id": 28,
+      "createdAt": "2026-07-28T22:39:43.730Z"
     }
   ],
-  "MOCK_CASH_CLOSURES": [],
+  "MOCK_CASH_CLOSURES": [
+    {
+      "userId": 625,
+      "date": "2026-07-20",
+      "initialCash": 0,
+      "reportedCash": 4800,
+      "reportedQr": 0,
+      "reportedTransfer": 0,
+      "expectedCash": 4800,
+      "expectedQr": 0,
+      "expectedTransfer": 0,
+      "expenses": 0,
+      "pendingOrders": 0,
+      "status": "approved",
+      "id": 1,
+      "createdAt": "2026-07-21T03:27:59.204Z"
+    }
+  ],
   "MOCK_CASH_OPENINGS": [
     {
       "openingAmount": 100000,
@@ -950,7 +2130,8 @@
       "openedByUserId": 999,
       "status": "open",
       "id": 1,
-      "createdAt": "2026-05-19T22:30:24.274Z"
+      "createdAt": "2026-05-19T22:30:24.274Z",
+      "branchId": 1
     },
     {
       "openingAmount": 0,
@@ -961,7 +2142,8 @@
       "notes": "Apertura automática (CASH)",
       "status": "open",
       "id": 2,
-      "createdAt": "2026-05-19T22:30:24.407Z"
+      "createdAt": "2026-05-19T22:30:24.407Z",
+      "branchId": 1
     },
     {
       "openingAmount": 0,
@@ -972,13 +2154,918 @@
       "notes": "Apertura automática (CASH)",
       "status": "open",
       "id": 3,
-      "createdAt": "2026-05-19T22:30:24.408Z"
+      "createdAt": "2026-05-19T22:30:24.408Z",
+      "branchId": 1
+    },
+    {
+      "openingAmount": 0,
+      "paymentMethod": "cash",
+      "openingDate": "2026-07-21",
+      "responsibleUserId": 625,
+      "openedByUserId": 999,
+      "notes": "Apertura rápida desde lista de repartidores",
+      "status": "closed",
+      "id": 4,
+      "createdAt": "2026-07-21T03:22:49.286Z"
+    },
+    {
+      "openingAmount": 0,
+      "paymentMethod": "qr",
+      "openingDate": "2026-07-21",
+      "responsibleUserId": 625,
+      "openedByUserId": 999,
+      "notes": "Apertura automática (CASH)",
+      "status": "closed",
+      "id": 5,
+      "createdAt": "2026-07-21T03:22:49.289Z"
+    },
+    {
+      "openingAmount": 0,
+      "paymentMethod": "transfer",
+      "openingDate": "2026-07-21",
+      "responsibleUserId": 625,
+      "openedByUserId": 999,
+      "notes": "Apertura automática (CASH)",
+      "status": "closed",
+      "id": 6,
+      "createdAt": "2026-07-21T03:22:49.291Z"
     }
   ],
-  "MOCK_SALES": [],
-  "MOCK_SALE_ITEMS": [],
-  "MOCK_QUOTATIONS": [],
-  "MOCK_QUOTATION_ITEMS": [],
+  "MOCK_SALES": [
+    {
+      "id": 1,
+      "saleNumber": "VTA-001",
+      "customerId": null,
+      "customerName": "Cliente anónimo",
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 5,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 5,
+      "paymentMethod": "cash",
+      "paymentStatus": "completed",
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-16T05:38:58.216Z"
+    },
+    {
+      "id": 2,
+      "saleNumber": "VTA-002",
+      "customerId": null,
+      "customerName": "Cliente anónimo",
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2800,
+      "paymentMethod": "cash",
+      "paymentStatus": "completed",
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-20T02:38:03.598Z"
+    },
+    {
+      "id": 3,
+      "saleNumber": "VTA-003",
+      "customerId": null,
+      "customerName": "Cliente anónimo",
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2800,
+      "paymentMethod": "cash",
+      "paymentStatus": "completed",
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-21T02:26:53.139Z"
+    },
+    {
+      "id": 4,
+      "saleNumber": "VTA-004",
+      "customerId": null,
+      "customerName": "Cliente anónimo",
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2800,
+      "paymentMethod": "cash",
+      "paymentStatus": "completed",
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-21T02:32:31.054Z"
+    },
+    {
+      "id": 5,
+      "saleNumber": "VTA-005",
+      "customerId": null,
+      "customerName": "Cliente anónimo",
+      "saleChannel": "delivery",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 2803,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2803,
+      "paymentMethod": "qr",
+      "paymentStatus": "completed",
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-21T03:09:25.487Z"
+    },
+    {
+      "id": 6,
+      "saleNumber": "VTA-006",
+      "customerId": 1,
+      "customerName": null,
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 8400,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 8400,
+      "paymentMethod": "qr",
+      "paymentStatus": "completed",
+      "notes": "COTIZACION SOLO PARA LAPAZ . ",
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-21T03:14:40.947Z"
+    },
+    {
+      "id": 7,
+      "saleNumber": "VTA-007",
+      "customerId": null,
+      "customerName": "Cliente anónimo",
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2800,
+      "paymentMethod": "cash",
+      "paymentStatus": "completed",
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-28T20:22:42.190Z"
+    },
+    {
+      "id": 8,
+      "saleNumber": "VTA-008",
+      "customerId": null,
+      "customerName": "Cliente anónimo",
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2800,
+      "paymentMethod": "cash",
+      "paymentStatus": "completed",
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-28T20:28:13.704Z"
+    },
+    {
+      "id": 9,
+      "saleNumber": "VTA-009",
+      "customerId": null,
+      "customerName": "Cliente Anónimo (VTA-009)",
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2800,
+      "paymentMethod": "credit",
+      "paymentStatus": "pending",
+      "dueDate": "2026-08-27",
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-28T20:33:46.896Z"
+    },
+    {
+      "id": 10,
+      "saleNumber": "VTA-010",
+      "customerId": null,
+      "customerName": "Cliente Crédito (VTA-010)",
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2800,
+      "paymentMethod": "credit",
+      "paymentStatus": "pending",
+      "dueDate": "2026-08-27",
+      "adminOverrideUserId": null,
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-28T20:44:11.107Z"
+    },
+    {
+      "id": 11,
+      "saleNumber": "VTA-011",
+      "customerId": null,
+      "customerName": "Anónimo",
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2800,
+      "paymentMethod": "cash",
+      "paymentStatus": "completed",
+      "dueDate": null,
+      "adminOverrideUserId": null,
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-28T20:56:24.696Z"
+    },
+    {
+      "id": 12,
+      "saleNumber": "VTA-012",
+      "customerId": 2,
+      "customerName": null,
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2800,
+      "paymentMethod": "credit",
+      "paymentStatus": "pending",
+      "dueDate": "2026-08-27",
+      "adminOverrideUserId": null,
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-28T20:57:33.298Z"
+    },
+    {
+      "id": 13,
+      "saleNumber": "VTA-013",
+      "customerId": 3,
+      "customerName": null,
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 14000,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 14000,
+      "paymentMethod": "credit",
+      "paymentStatus": "pending",
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-28T21:50:08.793Z"
+    },
+    {
+      "id": 14,
+      "saleNumber": "VTA-014",
+      "customerId": 4,
+      "customerName": null,
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2800,
+      "paymentMethod": "credit",
+      "paymentStatus": "pending",
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-28T21:58:11.830Z"
+    },
+    {
+      "id": 15,
+      "saleNumber": "VTA-015",
+      "customerId": 4,
+      "customerName": null,
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2800,
+      "paymentMethod": "credit",
+      "paymentStatus": "pending",
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-28T21:58:19.825Z"
+    },
+    {
+      "id": 16,
+      "saleNumber": "VTA-016",
+      "customerId": 5,
+      "customerName": null,
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2800,
+      "paymentMethod": "credit",
+      "paymentStatus": "pending",
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-07-28T22:12:41.370Z"
+    }
+  ],
+  "MOCK_SALE_ITEMS": [
+    {
+      "id": 1,
+      "saleId": 1,
+      "productId": 24,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 5,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 5,
+      "subtotal": 5,
+      "createdAt": "2026-07-16T05:38:58.216Z"
+    },
+    {
+      "id": 2,
+      "saleId": 2,
+      "productId": 21,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-20T02:38:03.598Z"
+    },
+    {
+      "id": 3,
+      "saleId": 3,
+      "productId": 21,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-21T02:26:53.139Z"
+    },
+    {
+      "id": 4,
+      "saleId": 4,
+      "productId": 2,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-21T02:32:31.055Z"
+    },
+    {
+      "id": 5,
+      "saleId": 5,
+      "productId": 26,
+      "pricingType": "discount",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-21T03:09:25.487Z"
+    },
+    {
+      "id": 6,
+      "saleId": 5,
+      "productId": 23,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 3,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 3,
+      "subtotal": 3,
+      "createdAt": "2026-07-21T03:09:25.488Z"
+    },
+    {
+      "id": 7,
+      "saleId": 6,
+      "productId": 2,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-21T03:14:40.947Z"
+    },
+    {
+      "id": 8,
+      "saleId": 6,
+      "productId": 21,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-21T03:14:40.950Z"
+    },
+    {
+      "id": 9,
+      "saleId": 6,
+      "productId": 26,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-21T03:14:40.966Z"
+    },
+    {
+      "id": 10,
+      "saleId": 7,
+      "productId": 2,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-28T20:22:42.190Z"
+    },
+    {
+      "id": 11,
+      "saleId": 8,
+      "productId": 2,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-28T20:28:13.704Z"
+    },
+    {
+      "id": 12,
+      "saleId": 9,
+      "productId": 2,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-28T20:33:46.896Z"
+    },
+    {
+      "id": 13,
+      "saleId": 10,
+      "productId": 2,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-28T20:44:11.107Z"
+    },
+    {
+      "id": 14,
+      "saleId": 11,
+      "productId": 2,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-28T20:56:24.696Z"
+    },
+    {
+      "id": 15,
+      "saleId": 12,
+      "productId": 2,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-28T20:57:33.298Z"
+    },
+    {
+      "id": 16,
+      "saleId": 13,
+      "productId": 21,
+      "pricingType": "unit",
+      "quantity": 5,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 14000,
+      "createdAt": "2026-07-28T21:50:08.793Z"
+    },
+    {
+      "id": 17,
+      "saleId": 14,
+      "productId": 26,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-28T21:58:11.830Z"
+    },
+    {
+      "id": 18,
+      "saleId": 15,
+      "productId": 26,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-28T21:58:19.825Z"
+    },
+    {
+      "id": 19,
+      "saleId": 16,
+      "productId": 21,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "createdAt": "2026-07-28T22:12:41.370Z"
+    }
+  ],
+  "MOCK_QUOTATIONS": [
+    {
+      "quotationNumber": "COT-20260715-01",
+      "customerName": "Cliente anónimo",
+      "status": "pending",
+      "subtotal": 2798,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2798,
+      "validUntil": null,
+      "notes": "",
+      "termsAndConditions": "Validez de la cotización: 7 días hábiles. Precios sujetos a cambios sin previo aviso.",
+      "createdBy": 999,
+      "id": 1,
+      "createdAt": "2026-07-16T01:33:36.911Z",
+      "updatedAt": "2026-07-16T01:33:36.911Z"
+    },
+    {
+      "quotationNumber": "COT-20260715-02",
+      "customerName": "Cliente anónimo",
+      "status": "pending",
+      "subtotal": 5600,
+      "discountType": "fixed",
+      "discountValue": 2,
+      "discountAmount": 2,
+      "total": 5598,
+      "validUntil": null,
+      "notes": "",
+      "termsAndConditions": "Validez de la cotización: 7 días hábiles. Precios sujetos a cambios sin previo aviso.",
+      "createdBy": 999,
+      "id": 2,
+      "createdAt": "2026-07-16T01:36:14.218Z",
+      "updatedAt": "2026-07-16T01:36:14.218Z"
+    },
+    {
+      "quotationNumber": "COT-20260717-01",
+      "customerName": "Cliente anónimo",
+      "status": "pending",
+      "subtotal": 5598,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 5598,
+      "validUntil": "2026-07-18T00:00:00.000Z",
+      "notes": "",
+      "termsAndConditions": "Validez de la cotización: 7 días hábiles. Precios sujetos a cambios sin previo aviso.",
+      "createdBy": 999,
+      "id": 3,
+      "createdAt": "2026-07-18T02:37:38.881Z",
+      "updatedAt": "2026-07-18T02:37:38.881Z"
+    },
+    {
+      "quotationNumber": "COT-20260717-02",
+      "customerName": "Cliente anónimo",
+      "status": "pending",
+      "subtotal": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2800,
+      "validUntil": null,
+      "notes": "",
+      "termsAndConditions": "Validez de la cotización: 7 días hábiles. Precios sujetos a cambios sin previo aviso.",
+      "createdBy": 999,
+      "id": 4,
+      "createdAt": "2026-07-18T02:38:02.521Z",
+      "updatedAt": "2026-07-18T02:38:02.521Z"
+    },
+    {
+      "quotationNumber": "COT-20260717-03",
+      "customerName": "Cliente anónimo",
+      "status": "pending",
+      "subtotal": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 2800,
+      "validUntil": null,
+      "notes": "",
+      "termsAndConditions": "Validez de la cotización: 7 días hábiles. Precios sujetos a cambios sin previo aviso.",
+      "createdBy": 999,
+      "id": 5,
+      "createdAt": "2026-07-18T02:43:34.583Z",
+      "updatedAt": "2026-07-18T02:43:34.583Z"
+    },
+    {
+      "quotationNumber": "COT-20260720-01",
+      "customerId": 1,
+      "status": "pending",
+      "subtotal": 8400,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 8400,
+      "validUntil": "2026-07-25T00:00:00.000Z",
+      "notes": "COTIZACION SOLO PARA LAPAZ . ",
+      "termsAndConditions": "Validez de la cotización: 7 días hábiles. Precios sujetos a cambios sin previo aviso.",
+      "createdBy": 999,
+      "id": 6,
+      "createdAt": "2026-07-21T03:13:12.381Z",
+      "updatedAt": "2026-07-21T03:13:12.381Z"
+    }
+  ],
+  "MOCK_QUOTATION_ITEMS": [
+    {
+      "productId": 26,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "fixed",
+      "discountValue": 2,
+      "discountAmount": 2,
+      "finalUnitPrice": 2798,
+      "subtotal": 2798,
+      "id": 1,
+      "quotationId": 1,
+      "createdAt": "2026-07-16T01:33:36.911Z"
+    },
+    {
+      "productId": 26,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "id": 2,
+      "quotationId": 2,
+      "createdAt": "2026-07-16T01:36:14.218Z"
+    },
+    {
+      "productId": 27,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "id": 3,
+      "quotationId": 2,
+      "createdAt": "2026-07-16T01:36:14.218Z"
+    },
+    {
+      "productId": 26,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "fixed",
+      "discountValue": 1,
+      "discountAmount": 1,
+      "finalUnitPrice": 2799,
+      "subtotal": 2799,
+      "id": 4,
+      "quotationId": 3,
+      "createdAt": "2026-07-18T02:37:38.881Z"
+    },
+    {
+      "productId": 27,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "fixed",
+      "discountValue": 1,
+      "discountAmount": 1,
+      "finalUnitPrice": 2799,
+      "subtotal": 2799,
+      "id": 5,
+      "quotationId": 3,
+      "createdAt": "2026-07-18T02:37:38.881Z"
+    },
+    {
+      "productId": 27,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "id": 6,
+      "quotationId": 4,
+      "createdAt": "2026-07-18T02:38:02.521Z"
+    },
+    {
+      "productId": 27,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "id": 7,
+      "quotationId": 5,
+      "createdAt": "2026-07-18T02:43:34.583Z"
+    },
+    {
+      "productId": 2,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "id": 8,
+      "quotationId": 6,
+      "createdAt": "2026-07-21T03:13:12.381Z"
+    },
+    {
+      "productId": 21,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "id": 9,
+      "quotationId": 6,
+      "createdAt": "2026-07-21T03:13:12.381Z"
+    },
+    {
+      "productId": 26,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 2800,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 2800,
+      "subtotal": 2800,
+      "id": 10,
+      "quotationId": 6,
+      "createdAt": "2026-07-21T03:13:12.381Z"
+    }
+  ],
   "MOCK_DELIVERY_EXTRA_LOAD": [],
   "MOCK_PRODUCTION_BATCHES": [],
   "MOCK_PRODUCTION_OUTPUTS": [],
@@ -987,8 +3074,8 @@
     {
       "id": 1,
       "productId": 5,
-      "quantity": 10,
-      "lastUpdated": "2026-06-07T04:26:26.373Z"
+      "quantity": 20,
+      "lastUpdated": "2026-07-21T02:29:33.106Z"
     }
   ],
   "MOCK_INVENTORY_TRANSFERS": [
@@ -1000,6 +3087,35 @@
       "userId": 999,
       "notes": null,
       "createdAt": "2026-06-07T04:26:26.373Z"
+    },
+    {
+      "id": 2,
+      "transferNumber": "TRB-2026-0002",
+      "direction": "branch_transfer",
+      "sourceBranchId": 1,
+      "destinationBranchId": 2,
+      "status": "completed",
+      "userId": 999,
+      "createdAt": "2026-07-16T05:38:24.236Z"
+    },
+    {
+      "id": 3,
+      "transferNumber": "TRB-2026-0003",
+      "direction": "branch_transfer",
+      "sourceBranchId": 1,
+      "destinationBranchId": 2,
+      "status": "completed",
+      "userId": 999,
+      "createdAt": "2026-07-18T01:32:55.714Z"
+    },
+    {
+      "id": 4,
+      "transferNumber": "TR-2026-0004",
+      "direction": "to_production",
+      "status": "completed",
+      "userId": 999,
+      "notes": null,
+      "createdAt": "2026-07-21T02:29:33.106Z"
     }
   ],
   "MOCK_INVENTORY_TRANSFER_ITEMS": [
@@ -1011,6 +3127,118 @@
       "productName": "leche kream",
       "productUnit": "unidad",
       "createdAt": "2026-06-07T04:26:26.373Z"
+    },
+    {
+      "id": 2,
+      "transferId": 2,
+      "productId": 24,
+      "quantity": 1,
+      "productName": "Queso Labneh Natural 250g",
+      "productUnit": "unidad"
+    },
+    {
+      "id": 3,
+      "transferId": 3,
+      "productId": 11,
+      "quantity": 1,
+      "productName": "Botella 1L",
+      "productUnit": "unidad"
+    },
+    {
+      "id": 4,
+      "transferId": 4,
+      "productId": 5,
+      "quantity": 10,
+      "productName": "leche kream 800 ml",
+      "productUnit": "unidad",
+      "createdAt": "2026-07-21T02:29:33.106Z"
+    }
+  ],
+  "MOCK_ACCOUNTS_RECEIVABLE": [
+    {
+      "id": 1,
+      "saleId": 16,
+      "customerId": 5,
+      "customerName": "CLUBE",
+      "saleNumber": "VTA-016",
+      "totalAmount": 2800,
+      "paidAmount": 2800,
+      "balance": 0,
+      "dueDate": "2026-08-27",
+      "status": "paid",
+      "notes": null,
+      "createdAt": "2026-07-28T22:12:41.372Z",
+      "updatedAt": "2026-07-28T22:14:31.755Z"
+    }
+  ],
+  "MOCK_CREDIT_PAYMENTS": [
+    {
+      "id": 1,
+      "type": "receivable",
+      "accountsReceivableId": 1,
+      "customerId": 5,
+      "amount": 2800,
+      "paymentMethod": "qr",
+      "notes": "PAGAO",
+      "userId": 999,
+      "receiptNumber": "REC-0001",
+      "createdAt": "2026-07-28T22:14:31.755Z"
+    },
+    {
+      "id": 2,
+      "type": "payable",
+      "accountsPayableId": 1,
+      "amount": 10000,
+      "paymentMethod": "qr",
+      "notes": null,
+      "userId": 999,
+      "receiptNumber": "REC-0002",
+      "createdAt": "2026-07-28T22:15:22.401Z"
+    },
+    {
+      "id": 3,
+      "type": "payable",
+      "accountsPayableId": 2,
+      "amount": 20000,
+      "paymentMethod": "cash",
+      "notes": null,
+      "userId": 999,
+      "receiptNumber": "REC-0003",
+      "createdAt": "2026-07-28T22:27:33.946Z"
+    },
+    {
+      "id": 4,
+      "type": "payable",
+      "accountsPayableId": 4,
+      "supplierId": 1,
+      "amount": 10000,
+      "paymentMethod": "qr",
+      "notes": null,
+      "userId": 999,
+      "receiptNumber": "REC-0004",
+      "createdAt": "2026-07-28T22:39:43.729Z"
+    }
+  ],
+  "MOCK_BRANCHES": [
+    {
+      "name": "jhonny ",
+      "address": "",
+      "phone": "",
+      "isMainWarehouse": 0,
+      "status": "active",
+      "id": 1,
+      "createdAt": "2026-07-28T23:02:03.259Z",
+      "updatedAt": "2026-07-28T23:02:03.259Z"
+    },
+    {
+      "name": "GSGA",
+      "address": "",
+      "phone": "",
+      "isMainWarehouse": 0,
+      "status": "active",
+      "id": 2,
+      "createdAt": "2026-07-28T23:02:14.427Z",
+      "updatedAt": "2026-07-28T23:02:14.427Z"
     }
   ]
 }
