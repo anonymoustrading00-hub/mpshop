@@ -297,12 +297,12 @@ export const financeRouter = router({
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
 
-      // Verificar si ya existe un cierre para esta fecha
-      const lastClosure = await getCashClosureByUserIdAndDate(userId, input.date);
+      // Verificar si ya existe un cierre para esta fecha en esta sucursal
+      const lastClosure = await getCashClosureByUserIdAndDate(userId, input.date, ctx.branchId);
       if (lastClosure?.status === "pending") {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Ya tienes un cierre de caja pendiente de aprobación. Espera a que el administrador lo valide."
+          message: "Ya tienes un cierre de caja pendiente de aprobación en esta sucursal. Espera a que el administrador lo valide."
         });
       }
 
@@ -312,6 +312,7 @@ export const financeRouter = router({
 
       const result = await createCashClosure({
         userId,
+        branchId: ctx.branchId,
         date: input.date,
         initialCash: Math.round(input.initialCash),
         reportedCash: Math.round(input.reportedCash),
@@ -347,7 +348,7 @@ export const financeRouter = router({
     .query(async ({ ctx, input }) => {
       const userId = ctx.user?.id;
       if (!userId) return null;
-      return await getCashClosureByUserIdAndDate(userId, input.date);
+      return await getCashClosureByUserIdAndDate(userId, input.date, ctx.branchId);
     }),
   
   // Verificar si tiene algún cierre pendiente (de cualquier fecha)

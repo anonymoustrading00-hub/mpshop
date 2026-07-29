@@ -688,30 +688,47 @@ export async function createProduct(data: InsertProduct) {
 }
 
 // Inventario
-export async function getInventoryByProductId(productId: number) {
+export async function getInventoryByProductId(productId: number, branchId?: number) {
   const db = await getDb();
+  const targetBranchId = branchId || 1;
   if (!db) {
-    return MOCK_INVENTORY.find(inv => inv.productId === productId);
+    return MOCK_INVENTORY.find(inv => inv.productId === productId && (inv.branchId || 1) === targetBranchId);
   }
-  const result = await db.select().from(inventory).where(eq(inventory.productId, productId)).limit(1);
+  const result = await db.select().from(inventory).where(
+    and(
+      eq(inventory.productId, productId),
+      eq(inventory.branchId, targetBranchId)
+    )
+  ).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
-export async function getAllInventory() {
+export async function getAllInventory(branchId?: number) {
   const db = await getDb();
   if (!db) {
-    return MOCK_INVENTORY.map(inv => ({
+    let list = MOCK_INVENTORY;
+    if (branchId) {
+      list = list.filter(inv => (inv.branchId || 1) === branchId);
+    }
+    return list.map(inv => ({
       ...inv,
       product: MOCK_PRODUCTS.find(p => p.id === inv.productId)
     }));
   }
 
-  const results = await db.select({
+  let query = db.select({
     inventory: inventory,
     product: products
   })
   .from(inventory)
-  .leftJoin(products, eq(inventory.productId, products.id));
+  .leftJoin(products, eq(inventory.productId, products.id))
+  .$dynamic();
+
+  if (branchId) {
+    query = query.where(eq(inventory.branchId, branchId));
+  }
+
+  const results = await query;
 
   return results.map(r => ({
     ...r.inventory,
@@ -719,23 +736,33 @@ export async function getAllInventory() {
   }));
 }
 
-export async function updateInventory(productId: number, quantity: number, expiryDate?: string | null, batchNumber?: string | null) {
+export async function updateInventory(
+  productId: number, 
+  quantity: number, 
+  expiryDate?: string | null, 
+  batchNumber?: string | null,
+  branchId?: number
+) {
   const db = await getDb();
+  const targetBranchId = branchId || 1;
   if (!db) {
-    // Modo Demo: Buscar lote específico o crear uno nuevo
+    // Modo Demo: Buscar lote específico en la sucursal o crear uno nuevo
     let inv = MOCK_INVENTORY.find(inv => 
       inv.productId === productId && 
+      (inv.branchId || 1) === targetBranchId &&
       (batchNumber ? inv.batchNumber === batchNumber : !inv.batchNumber)
     );
 
     if (inv) {
       inv.quantity = quantity;
+      inv.branchId = targetBranchId;
       if (expiryDate !== undefined) inv.expiryDate = expiryDate ? new Date(expiryDate) : null;
       inv.lastUpdated = new Date();
     } else {
       MOCK_INVENTORY.push({
         id: MOCK_INVENTORY.length + 1,
         productId,
+        branchId: targetBranchId,
         batchNumber: batchNumber || null,
         quantity,
         minStock: 5,
@@ -747,9 +774,10 @@ export async function updateInventory(productId: number, quantity: number, expir
     return;
   }
 
-  // Real DB: Buscar lote por productId y batchNumber
+  // Real DB: Buscar lote por productId, batchNumber y branchId
   const existing = await db.select().from(inventory).where(and(
     eq(inventory.productId, productId),
+    eq(inventory.branchId, targetBranchId),
     batchNumber ? eq(inventory.batchNumber, batchNumber) : isNull(inventory.batchNumber)
   )).limit(1);
 
@@ -761,6 +789,7 @@ export async function updateInventory(productId: number, quantity: number, expir
     // Crear nuevo lote
     return await db.insert(inventory).values({
       productId,
+      branchId: targetBranchId,
       batchNumber: batchNumber || null,
       quantity,
       expiryDate: expiryDate || null,
@@ -2376,12 +2405,16 @@ export async function getAllCashOpenings() {
 }
 
 // Cierres de Caja
-export async function getCashClosureByUserIdAndDate(userId: number, date: string) {
+export async function getCashClosureByUserIdAndDate(userId: number, date: string, branchId?: number) {
   const db = await getDb();
   if (!db) {
     // Para validación de "ya existe un cierre", buscamos el que esté 'pending'
     // Para visualización de "mi estado hoy", buscamos el último creado hoy
-    const matches = MOCK_CASH_CLOSURES.filter((c: any) => c.userId === userId && c.date === date);
+    const matches = MOCK_CASH_CLOSURES.filter((c: any) => 
+      c.userId === userId && 
+      c.date === date && 
+      (!branchId || c.branchId === branchId)
+    );
     if (matches.length === 0) return undefined;
     return matches
       .slice()
@@ -2393,9 +2426,15 @@ export async function getCashClosureByUserIdAndDate(userId: number, date: string
   }
   
   // Buscar cierres del usuario para hoy, ordenados por el más reciente
-  const result = await db.select().from(cashClosures).where(
+  let query = db.select().from(cashClosures).where(
     sql`${cashClosures.userId} = ${userId} AND (${cashClosures.date} = ${date} OR DATE(DATE_SUB(${cashClosures.createdAt}, INTERVAL 4 HOUR)) = ${date})`
-  ).orderBy(desc(cashClosures.createdAt)).limit(1);
+  ).$dynamic();
+
+  if (branchId) {
+    query = query.where(eq(cashClosures.branchId, branchId));
+  }
+
+  const result = await query.orderBy(desc(cashClosures.createdAt)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
@@ -2403,7 +2442,7 @@ export async function createCashClosure(data: InsertCashClosure) {
   const db = await getDb();
   if (!db) {
     const newId = MOCK_CASH_CLOSURES.length + 1;
-    const closure = { ...data, id: newId, createdAt: new Date() };
+    const closure = { ...data, branchId: data.branchId || 1, id: newId, createdAt: new Date() };
     MOCK_CASH_CLOSURES.push(closure);
     syncMocksToDisk();
     return { insertId: newId };
@@ -2411,18 +2450,30 @@ export async function createCashClosure(data: InsertCashClosure) {
   return await db.insert(cashClosures).values(data);
 }
 
-export async function getAllCashClosures() {
+export async function getAllCashClosures(branchId?: number) {
   const db = await getDb();
   if (!db) {
-    return MOCK_CASH_CLOSURES.map(c => {
+    let list = MOCK_CASH_CLOSURES;
+    if (branchId) {
+      list = list.filter(c => c.branchId === branchId);
+    }
+    return list.map(c => {
       const user = MOCK_USERS.find(u => u.id === c.userId);
-      return { ...c, userName: user?.name || "Usuario #" + c.userId };
+      const branch = MOCK_BRANCHES.find(b => b.id === (c.branchId || 1));
+      return { ...c, userName: user?.name || "Usuario #" + c.userId, branchName: branch?.name };
     });
   }
-  return await db.select({
+
+  let query = db.select({
     ...cashClosures,
     userName: users.name,
-  }).from(cashClosures).leftJoin(users, eq(cashClosures.userId, users.id));
+  }).from(cashClosures).leftJoin(users, eq(cashClosures.userId, users.id)).$dynamic();
+
+  if (branchId) {
+    query = query.where(eq(cashClosures.branchId, branchId));
+  }
+
+  return await query;
 }
 
 export async function getCashClosuresByUserId(userId: number) {

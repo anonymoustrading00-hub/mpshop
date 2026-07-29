@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useIsMobile } from "@/hooks/useMobile";
+import { useBranch } from "@/contexts/BranchContext";
 import {
   Box,
   Edit2,
@@ -305,6 +306,7 @@ export default function Inventory() {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const utils = trpc.useContext();
+  const { activeBranchId, setActiveBranchId, branches } = useBranch();
   const { data: inventory, isLoading, refetch } = trpc.inventory.listInventory.useQuery();
   const [activeTab, setActiveTab] = useState<InventoryTab>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -326,13 +328,16 @@ export default function Inventory() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = viewMode === "list" ? 15 : 12;
 
+  const currentBranch = branches.find((b: any) => b.id === activeBranchId);
+
   useEffect(() => {
     if (selectedItem) {
-      setPrice("");
-      setExpiryDate(
-        selectedItem.expiryDate ? new Date(selectedItem.expiryDate).toISOString().split("T")[0] : ""
-      );
+      setQuantity("");
       setReason("");
+      setType("adjustment");
+      setPrice("");
+      setExpiryDate(selectedItem.expiryDate ? new Date(selectedItem.expiryDate).toISOString().split("T")[0] : "");
+      setBatchNumber(selectedItem.batchNumber || "");
       setRegisterPurchase(false);
       setPaymentMethod("cash");
     }
@@ -578,10 +583,24 @@ export default function Inventory() {
       <div className="page-container space-y-6 print:hidden">
         <section className="p-0 sm:p-2 md:p-4">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-            <div className="max-w-3xl">
+            <div className="flex flex-wrap items-center gap-3">
               <h1 className="mt-2 text-4xl font-black text-slate-900 tracking-tight">
                 Inventario
               </h1>
+              <div className="mt-2 flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sucursal:</span>
+                <select
+                  value={activeBranchId}
+                  onChange={(e) => setActiveBranchId(Number(e.target.value))}
+                  className="bg-transparent text-sm font-extrabold text-blue-600 outline-none cursor-pointer"
+                >
+                  {branches.map((b: any) => (
+                    <option key={b.id} value={b.id}>
+                      {b.isMainWarehouse ? "🏢 " : "🏪 "}{b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {user?.role === "admin" ? (
