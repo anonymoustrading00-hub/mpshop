@@ -15,8 +15,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Clock as ClockIcon, Calendar as CalendarIcon, CheckCircle, XCircle, MoreHorizontal, CheckSquare } from "lucide-react";
+import { useBranch } from "@/contexts/BranchContext";
 
 export default function Orders() {
+  const { activeBranchId, setActiveBranchId, branches } = useBranch();
   const { user } = useAuth();
   const getLocalDateInputValue = () => {
     const now = new Date();
@@ -479,7 +481,23 @@ export default function Orders() {
       <div className="max-w-7xl mx-auto p-4 md:p-0">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
           <div>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight">Gestión de <span className="text-blue-600">Pedidos</span></h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-4xl font-black text-slate-900 tracking-tight">Gestión de <span className="text-blue-600">Pedidos</span></h1>
+              <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sucursal:</span>
+                <select
+                  value={activeBranchId}
+                  onChange={(e) => setActiveBranchId(Number(e.target.value))}
+                  className="bg-transparent text-sm font-extrabold text-blue-600 outline-none cursor-pointer"
+                >
+                  {branches.map((b: any) => (
+                    <option key={b.id} value={b.id}>
+                      {b.isMainWarehouse ? '🏢 ' : '🏪 '}{b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <p className="text-slate-500 font-medium mt-1">Administra y monitorea todas las entregas de Vitalia</p>
           </div>
           <div className="flex items-center gap-3">

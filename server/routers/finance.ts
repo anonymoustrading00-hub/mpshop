@@ -30,11 +30,11 @@ export const financeRouter = router({
   getTransactions: protectedProcedure.query(async ({ ctx }) => {
     // Si es repartidor, solo ve las suyas. Si es admin, ve todas.
     const userId = ctx.user?.role === "admin" ? undefined : ctx.user?.id;
-    return await getFinancialTransactions(userId);
+    return await getFinancialTransactions(userId, ctx.branchId);
   }),
 
-  getGlobalBalances: protectedProcedure.query(async () => {
-    const transactions = await getFinancialTransactions(undefined);
+  getGlobalBalances: protectedProcedure.query(async ({ ctx }) => {
+    const transactions = await getFinancialTransactions(undefined, ctx.branchId);
     const openings = await getAllCashOpenings();
 
     const calc = (method: "cash" | "qr" | "transfer") => {
@@ -146,6 +146,7 @@ export const financeRouter = router({
         amount: amountInCents,
         paymentMethod: input.fromMethod,
         userId: ctx.user.id,
+        branchId: ctx.branchId,
         notes: `Traspaso hacia ${input.toMethod.toUpperCase()}` + (input.notes ? ` - ${input.notes}` : ""),
       });
 
@@ -155,6 +156,7 @@ export const financeRouter = router({
         amount: amountInCents,
         paymentMethod: input.toMethod,
         userId: ctx.user.id,
+        branchId: ctx.branchId,
         notes: `Traspaso desde ${input.fromMethod.toUpperCase()}` + (input.notes ? ` - ${input.notes}` : ""),
       });
 
@@ -179,6 +181,7 @@ export const financeRouter = router({
         paymentMethod: input.paymentMethod,
         amount: input.amount,
         userId: ctx.user.id,
+        branchId: ctx.branchId,
         notes: input.notes,
       });
     }),

@@ -50,8 +50,10 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/currency";
+import { useBranch } from "@/contexts/BranchContext";
 
 export default function Purchases() {
+  const { activeBranchId, setActiveBranchId, branches } = useBranch();
   const isMobile = useIsMobile();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [supplierId, setSupplierId] = useState<number>(0);
@@ -282,9 +284,25 @@ export default function Purchases() {
       {/* Header con botón destacado de Nueva Compra */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">
-            Gestión de <span className="text-blue-600">Compras</span>
-          </h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight">
+              Gestión de <span className="text-blue-600">Compras</span>
+            </h1>
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sucursal:</span>
+              <select
+                value={activeBranchId}
+                onChange={(e) => setActiveBranchId(Number(e.target.value))}
+                className="bg-transparent text-sm font-extrabold text-blue-600 outline-none cursor-pointer"
+              >
+                {branches.map((b: any) => (
+                  <option key={b.id} value={b.id}>
+                    {b.isMainWarehouse ? '🏢 ' : '🏪 '}{b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <p className="text-sm text-slate-500 mt-1.5">
             Registro de entrada de mercancía, insumos y control de proveedores
           </p>

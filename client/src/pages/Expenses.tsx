@@ -13,6 +13,7 @@ import { formatCurrency } from "@/lib/currency";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useBranch } from "@/contexts/BranchContext";
 
 function getLocalDateInputValue() {
   const now = new Date();
@@ -46,6 +47,7 @@ function getCategoryColor(category: string) {
 }
 
 export default function Expenses() {
+  const { activeBranchId, setActiveBranchId, branches } = useBranch();
   const { user } = useAuth();
   const { data: expenses, isLoading, refetch } = trpc.expenses.list.useQuery();
   const { data: totals } = trpc.expenses.totals.useQuery();
@@ -99,7 +101,23 @@ export default function Expenses() {
     <div className="p-4 space-y-6 max-w-6xl mx-auto mb-20 md:mb-0">
       <div className="flex justify-between items-center no-print">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Gastos <span className="text-orange-600">Operativos</span></h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight">Gastos <span className="text-orange-600">Operativos</span></h1>
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sucursal:</span>
+              <select
+                value={activeBranchId}
+                onChange={(e) => setActiveBranchId(Number(e.target.value))}
+                className="bg-transparent text-sm font-extrabold text-blue-600 outline-none cursor-pointer"
+              >
+                {branches.map((b: any) => (
+                  <option key={b.id} value={b.id}>
+                    {b.isMainWarehouse ? '🏢 ' : '🏪 '}{b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <p className="text-sm text-slate-500 mt-1.5">Control de gastos generales del negocio.</p>
         </div>
         <Button className="gap-2" onClick={() => setShowAddDialog(true)}>

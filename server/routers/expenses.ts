@@ -14,7 +14,7 @@ export const expensesRouter = router({
     if (ctx.user?.role !== "admin") {
       throw new TRPCError({ code: "FORBIDDEN" });
     }
-    return await getOperationalExpenses();
+    return await getOperationalExpenses(ctx.branchId);
   }),
 
   getById: protectedProcedure
@@ -68,6 +68,7 @@ export const expensesRouter = router({
       return await createOperationalExpense({
         ...input,
         userId: ctx.user.id,
+        branchId: ctx.branchId,
         expenseDate: input.expenseDate ? new Date(input.expenseDate) : new Date(),
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
       });
@@ -156,7 +157,7 @@ export const expensesRouter = router({
       throw new TRPCError({ code: "FORBIDDEN" });
     }
 
-    const expenses = await getOperationalExpenses();
+    const expenses = await getOperationalExpenses(ctx.branchId);
 
     const summary: Record<string, { pending: number; paid: number; total: number; count: number }> = {};
 
@@ -190,7 +191,7 @@ export const expensesRouter = router({
       throw new TRPCError({ code: "FORBIDDEN" });
     }
 
-    const expenses = await getOperationalExpenses();
+    const expenses = await getOperationalExpenses(ctx.branchId);
 
     let totalPending = 0;
     let totalPaid = 0;

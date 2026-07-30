@@ -807,14 +807,16 @@ export async function getOrderByNumber(orderNumber: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-export async function getAllOrders() {
+export async function getAllOrders(branchId?: number) {
   const db = await getDb();
   if (!db) {
-    // Resolver nombres de repartidores en modo demo
-    return MOCK_ORDERS.map(order => {
+    let list = MOCK_ORDERS;
+    if (branchId) {
+      list = list.filter((o: any) => (o.branchId || 1) === branchId);
+    }
+    return list.map(order => {
       const deliveryPerson = MOCK_USERS.find(u => u.id === order.deliveryPersonId);
       const customer = MOCK_CUSTOMERS.find(c => c.id === order.customerId);
-      // Incluir el administrador demo si es el repartidor 999
       const adminName = order.deliveryPersonId === 999 ? "Administrador (Demo)" : null;
       return {
         ...order,
@@ -824,7 +826,7 @@ export async function getAllOrders() {
       };
     });
   }
-  return await db.select({
+  let query = db.select({
     ...orders,
     deliveryPersonName: users.name,
     customerPhone: customers.phone,
@@ -832,7 +834,12 @@ export async function getAllOrders() {
     customerNumber: customers.clientNumber,
   }).from(orders)
     .leftJoin(users, eq(orders.deliveryPersonId, users.id))
-    .leftJoin(customers, eq(orders.customerId, customers.id));
+    .leftJoin(customers, eq(orders.customerId, customers.id))
+    .$dynamic();
+  if (branchId) {
+    query = query.where(eq(orders.branchId, branchId));
+  }
+  return await query;
 }
 
 export async function getRepurchaseSuggestions() {
@@ -1475,10 +1482,14 @@ export async function getPurchaseById(id: number) {
 }
 
 // Compras
-export async function getAllPurchases() {
+export async function getAllPurchases(branchId?: number) {
   const db = await getDb();
   if (!db) {
-    return MOCK_PURCHASES.map(p => {
+    let list = MOCK_PURCHASES;
+    if (branchId) {
+      list = list.filter((p: any) => (p.branchId || 1) === branchId);
+    }
+    return list.map(p => {
       const supplier = MOCK_SUPPLIERS.find(s => s.id === p.supplierId);
       return { ...p, supplierName: supplier?.name || "Proveedor Desconocido" };
     });
@@ -2007,7 +2018,7 @@ export async function createFinancialTransaction(data: any) {
   const db = await getDb();
   if (!db) {
     const newId = MOCK_FINANCIAL_TRANSACTIONS.length + 1;
-    MOCK_FINANCIAL_TRANSACTIONS.push({ ...data, id: newId, createdAt: new Date() });
+    MOCK_FINANCIAL_TRANSACTIONS.push({ ...data, branchId: data.branchId || 1, id: newId, createdAt: new Date() });
     syncMocksToDisk();
     return { insertId: newId };
   }
@@ -2021,32 +2032,37 @@ export async function createFinancialTransaction(data: any) {
       }
     }
 
-    const result = await tx.insert(financialTransactions).values(data);
+    const result = await tx.insert(financialTransactions).values({ ...data, branchId: data.branchId || 1 });
     return result;
   });
 }
 
-export async function getFinancialTransactions(userId?: number) {
+export async function getFinancialTransactions(userId?: number, branchId?: number) {
   const db = await getDb();
   if (!db) {
+    let list = MOCK_FINANCIAL_TRANSACTIONS;
+    if (branchId) {
+      list = list.filter((t: any) => (t.branchId || 1) === branchId);
+    }
     if (userId) {
-      return MOCK_FINANCIAL_TRANSACTIONS.filter((t: any) => {
+      return list.filter((t: any) => {
         if (t.userId === userId) return true;
-
         // Backfill para transacciones antiguas sin userId (ventas)
         if (!t.userId && (t.category === "sale" || t.category === "sale_cancellation") && t.referenceId) {
           const sale = MOCK_SALES.find((s: any) => s.id === t.referenceId);
           return sale?.soldBy === userId;
         }
-
         return false;
       });
     }
-    return MOCK_FINANCIAL_TRANSACTIONS;
+    return list;
   }
-  const query = db.select().from(financialTransactions);
+  let query = db.select().from(financialTransactions).$dynamic();
+  if (branchId) {
+    query = query.where(eq(financialTransactions.branchId, branchId));
+  }
   if (userId) {
-    return await query.where(eq(financialTransactions.userId, userId));
+    query = query.where(eq(financialTransactions.userId, userId));
   }
   return await query;
 }
@@ -2092,14 +2108,22 @@ export async function createDeliveryExpense(data: any) {
 }
 
 // Gastos Operativos
-export async function getOperationalExpenses() {
+export async function getOperationalExpenses(branchId?: number) {
   const db = await getDb();
   if (!db) {
-    return MOCK_OPERATIONAL_EXPENSES.sort((a: any, b: any) =>
+    let list = MOCK_OPERATIONAL_EXPENSES;
+    if (branchId) {
+      list = list.filter((e: any) => (e.branchId || 1) === branchId);
+    }
+    return list.sort((a: any, b: any) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
   }
-  return await db.select().from(operationalExpenses).orderBy(desc(operationalExpenses.createdAt));
+  let query = db.select().from(operationalExpenses).orderBy(desc(operationalExpenses.createdAt)).$dynamic();
+  if (branchId) {
+    query = query.where(eq(operationalExpenses.branchId, branchId));
+  }
+  return await query;
 }
 
 export async function getOperationalExpenseById(id: number) {
@@ -3311,16 +3335,25 @@ export async function cancelSaleRecord(saleId: number, cancelledByUserId: number
   return { success: true };
 }
 
-export async function getAllSales() {
+export async function getAllSales(branchId?: number) {
   const db = await getDb();
   if (!db) {
-    return MOCK_SALES.map((sale: any) => {
+    let list = MOCK_SALES;
+    if (branchId) {
+      list = list.filter((s: any) => (s.branchId || 1) === branchId);
+    }
+    return list.map((sale: any) => {
       return mapSaleWithRelations(sale, MOCK_USERS, MOCK_CUSTOMERS);
     }).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
+  let rawSalesQuery = db.select().from(sales).$dynamic();
+  if (branchId) {
+    rawSalesQuery = rawSalesQuery.where(eq(sales.branchId, branchId));
+  }
+
   const [rawSales, usersList, customersList] = await Promise.all([
-    db.select().from(sales),
+    rawSalesQuery,
     db.select({ id: users.id, name: users.name }).from(users),
     db.select({ id: customers.id, name: customers.name, clientNumber: customers.clientNumber }).from(customers),
   ]);

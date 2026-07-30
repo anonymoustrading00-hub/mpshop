@@ -8,7 +8,7 @@ export const purchasesRouter = router({
     if (ctx.user?.role !== "admin") {
       throw new TRPCError({ code: "FORBIDDEN" });
     }
-    return await getAllPurchases();
+    return await getAllPurchases(ctx.branchId);
   }),
 
   getItems: protectedProcedure
@@ -46,7 +46,7 @@ export const purchasesRouter = router({
         throw new TRPCError({ code: "FORBIDDEN" });
       }
       const { items, ...purchaseData } = input;
-      return await createPurchase(purchaseData, items, ctx.user!.id);
+      return await createPurchase({ ...purchaseData, branchId: ctx.branchId }, items, ctx.user!.id);
     }),
 
   update: protectedProcedure

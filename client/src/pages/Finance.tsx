@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArqueoDialog } from "@/components/ArqueoDialog";
+import { useBranch } from "@/contexts/BranchContext";
 
 function getLocalDateInputValue() {
   const now = new Date();
@@ -114,6 +115,7 @@ function BoxStatusIndicator({ method, openings }: { method: string, openings: an
 }
 
 export default function Finance() {
+  const { activeBranchId, setActiveBranchId, branches } = useBranch();
   const { data: transactions, isLoading } = trpc.finance.getTransactions.useQuery();
   const { data: cashOpenings, isLoading: isLoadingOpenings } = trpc.finance.getCashOpenings.useQuery();
   const [cashHistoryOpen, setCashHistoryOpen] = useState(false);
@@ -159,7 +161,23 @@ export default function Finance() {
     <div className="p-4 space-y-6 max-w-5xl mx-auto mb-20 md:mb-10 min-h-full">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 no-print">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight"><span className="text-green-600">Finanzas</span></h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight"><span className="text-green-600">Finanzas</span></h1>
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sucursal:</span>
+              <select
+                value={activeBranchId}
+                onChange={(e) => setActiveBranchId(Number(e.target.value))}
+                className="bg-transparent text-sm font-extrabold text-blue-600 outline-none cursor-pointer"
+              >
+                {branches.map((b: any) => (
+                  <option key={b.id} value={b.id}>
+                    {b.isMainWarehouse ? '🏢 ' : '🏪 '}{b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <p className="text-sm text-slate-500 mt-1.5">Resumen de ingresos, egresos y rentabilidad.</p>
         </div>
         <div className="flex flex-wrap gap-2">
