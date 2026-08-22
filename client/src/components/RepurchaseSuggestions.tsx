@@ -38,7 +38,7 @@ export function RepurchaseSuggestions() {
     const phone = s.customerWhatsapp || s.customerPhone;
     if (!phone) return;
     
-    const cleanPhone = phone.replace(/\D/g, "");
+    const cleanPhone = String(phone || "").replace(/\D/g, "");
     window.open(`https://wa.me/${cleanPhone}?text=${encodedMessage}`, "_blank");
   };
 

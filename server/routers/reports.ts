@@ -6,7 +6,6 @@ import {
   MOCK_OPERATIONAL_EXPENSES,
   MOCK_ORDERS,
   MOCK_ORDER_ITEMS,
-  MOCK_PRODUCTS,
   MOCK_PURCHASES,
   MOCK_SALES,
   MOCK_SALE_ITEMS,
@@ -14,9 +13,6 @@ import {
 import {
   orders,
   customers,
-  products,
-  inventory,
-  inventoryMovements,
   sales,
   financialTransactions,
   cashClosures,
@@ -25,6 +21,12 @@ import {
   purchases,
   orderItems,
   saleItems,
+  units,
+  unitEvents,
+  repairs,
+  returns,
+  generatedCodes,
+  warranties,
 } from "../../drizzle/schema";
 import { desc, eq, and, gte, lte, lt, sql, ne } from "drizzle-orm";
 
@@ -61,11 +63,7 @@ export const reportsRouter = router({
         with: {
           customer: true,
           deliveryPerson: true,
-          items: {
-            with: {
-              product: true,
-            },
-          },
+          items: true,
           payments: true,
         },
         orderBy: [desc(orders.createdAt)],
@@ -79,7 +77,7 @@ export const reportsRouter = router({
     .input(z.object({
       startDate: z.string().optional(),
       endDate: z.string().optional(),
-      paymentMethod: z.string().optional(),
+      soldBy: z.number().optional(),
     }).optional())
     .query(async ({ input }) => {
       const db = await getDb();
@@ -93,19 +91,16 @@ export const reportsRouter = router({
       if (input?.endDate) {
         conditions.push(lte(sales.createdAt, new Date(input.endDate + " 23:59:59")));
       }
-      if (input?.paymentMethod) {
-        conditions.push(eq(sales.paymentMethod, input.paymentMethod as any));
+      if (input?.soldBy) {
+        conditions.push(eq(sales.soldBy, input.soldBy));
       }
 
       const result = await db.query.sales.findMany({
         where: conditions.length > 0 ? and(...conditions) : undefined,
         with: {
           customer: true,
-          items: {
-            with: {
-              product: true,
-            },
-          },
+          seller: true,
+          items: true,
         },
         orderBy: [desc(sales.createdAt)],
       });
@@ -113,685 +108,437 @@ export const reportsRouter = router({
       return result;
     }),
 
-  // Reporte de Inventario (productos con stock)
-  inventoryReport: protectedProcedure
-    .input(z.object({
-      category: z.string().optional(),
-    }).optional())
-    .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { products: [], inventory: [] };
-
-      let productConditions: any[] = [];
-      if (input?.category) {
-        productConditions.push(eq(products.category, input.category as any));
-      }
-
-      const allProducts = await db.query.products.findMany({
-        where: productConditions.length > 0 ? and(...productConditions) : undefined,
-      });
-
-      const allInventory = await db.query.inventory.findMany();
-
+  // KPIs específicos para Electrónica Reacondicionada y Reparaciones
+  electronicsKpis: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) {
       return {
-        products: allProducts,
-        inventory: allInventory,
+        unitMargins: [],
+        marginByBrand: [],
+        avgInventoryDays: 0,
+        avgRepairHours: 0,
+        returnRatePercentage: 0,
+        totalWarrantyCostCents: 0,
+        codesStats: { generated: 0, assigned: 0, unassigned: 0 },
       };
-    }),
+    }
 
-  // Reporte de Movimientos de Inventario
+    // 1. Unidades vendidas (márgenes)
+    const soldUnits = await db
+      .select({
+        id: units.id,
+        code: units.code,
+        brand: units.brand,
+        model: units.model,
+        purchasePrice: units.purchasePrice,
+        salePrice: units.salePrice,
+        supplierId: units.supplierId,
+        createdAt: units.createdAt,
+      })
+      .from(units)
+      .where(eq(units.status, "sold"));
+
+    const unitMargins = soldUnits.map((u: any) => {
+      const pPrice = u.purchasePrice || 0;
+      const sPrice = u.salePrice || 0;
+      const marginCents = sPrice - pPrice;
+      const marginPct = pPrice > 0 ? Math.round((marginCents / pPrice) * 100) : 0;
+      return {
+        id: u.id,
+        code: u.code,
+        brand: u.brand,
+        model: u.model,
+        purchasePrice: pPrice,
+        salePrice: sPrice,
+        marginCents,
+        marginPct,
+      };
+    });
+
+    // Agrupado por marca
+    const brandMap = new Map<string, { totalRevenue: number; totalCost: number; count: number }>();
+    soldUnits.forEach((u: any) => {
+      const b = u.brand || "Sin marca";
+      const curr = brandMap.get(b) || { totalRevenue: 0, totalCost: 0, count: 0 };
+      curr.totalRevenue += u.salePrice || 0;
+      curr.totalCost += u.purchasePrice || 0;
+      curr.count += 1;
+      brandMap.set(b, curr);
+    });
+
+    const marginByBrand = Array.from(brandMap.entries()).map(([brand, data]) => ({
+      brand,
+      count: data.count,
+      marginCents: data.totalRevenue - data.totalCost,
+      marginPct: data.totalCost > 0 ? Math.round(((data.totalRevenue - data.totalCost) / data.totalCost) * 100) : 0,
+    }));
+
+    // 2. Rotación de inventario (días promedio)
+    const soldEvents = await db
+      .select({
+        unitId: unitEvents.unitId,
+        soldAt: unitEvents.createdAt,
+      })
+      .from(unitEvents)
+      .where(eq(unitEvents.toStatus, "sold"));
+
+    let totalDaysSum = 0;
+    let rotationCount = 0;
+
+    soldEvents.forEach((ev: any) => {
+      const matchedUnit = soldUnits.find((u: any) => u.id === ev.unitId);
+      if (matchedUnit && matchedUnit.createdAt && ev.soldAt) {
+        const diffMs = new Date(ev.soldAt).getTime() - new Date(matchedUnit.createdAt).getTime();
+        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+        totalDaysSum += diffDays;
+        rotationCount++;
+      }
+    });
+
+    const avgInventoryDays = rotationCount > 0 ? Math.round(totalDaysSum / rotationCount) : 0;
+
+    // 3. Tiempo promedio en taller
+    const completedRepairs = await db
+      .select()
+      .from(repairs)
+      .where(eq(repairs.status, "completed"));
+
+    let totalRepairHoursSum = 0;
+    let repairCount = 0;
+    let totalWarrantyCostCents = 0;
+
+    completedRepairs.forEach((rep: any) => {
+      totalWarrantyCostCents += (rep.laborCost || 0) + (rep.partsCost || 0);
+      if (rep.startDate && rep.endDate) {
+        const diffMs = new Date(rep.endDate).getTime() - new Date(rep.startDate).getTime();
+        const hours = Math.max(0, diffMs / (1000 * 60 * 60));
+        totalRepairHoursSum += hours;
+        repairCount++;
+      }
+    });
+
+    const avgRepairHours = repairCount > 0 ? Math.round(totalRepairHoursSum / repairCount) : 0;
+
+    // 4. Tasa de devolución
+    const totalReturnsCount = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(returns);
+
+    const returnsNum = Number(totalReturnsCount[0]?.count || 0);
+    const soldNum = soldUnits.length;
+    const returnRatePercentage = soldNum > 0 ? Number(((returnsNum / soldNum) * 100).toFixed(1)) : 0;
+
+    // 5. Estadísticas de Códigos (generados vs asignados)
+    const codeCounts = await db
+      .select({
+        status: generatedCodes.status,
+        count: sql<number>`count(*)`,
+      })
+      .from(generatedCodes)
+      .groupBy(generatedCodes.status);
+
+    let assigned = 0;
+    let unassigned = 0;
+    codeCounts.forEach((c: any) => {
+      if (c.status === "assigned") assigned = Number(c.count);
+      if (c.status === "unassigned") unassigned = Number(c.count);
+    });
+
+    return {
+      unitMargins,
+      marginByBrand,
+      avgInventoryDays,
+      avgRepairHours,
+      returnRatePercentage,
+      totalWarrantyCostCents,
+      codesStats: {
+        generated: assigned + unassigned,
+        assigned,
+        unassigned,
+      },
+    };
+  }),
+
+  inventoryReport: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    return await db.select().from(units);
+  }),
+
   inventoryMovementsReport: protectedProcedure
     .input(z.object({
       startDate: z.string().optional(),
       endDate: z.string().optional(),
-      productId: z.number().optional(),
-      type: z.string().optional(),
     }).optional())
-    .query(async ({ input }) => {
+    .query(async () => {
       const db = await getDb();
-      if (!db) return { movements: [], products: [] };
-
-      let conditions: any[] = [];
-
-      if (input?.startDate) {
-        conditions.push(gte(inventoryMovements.createdAt, new Date(input.startDate)));
-      }
-      if (input?.endDate) {
-        conditions.push(lte(inventoryMovements.createdAt, new Date(input.endDate + " 23:59:59")));
-      }
-      if (input?.productId) {
-        conditions.push(eq(inventoryMovements.productId, input.productId));
-      }
-      if (input?.type) {
-        conditions.push(eq(inventoryMovements.type, input.type as any));
-      }
-
-      const result = await db.query.inventoryMovements.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
-        with: {
-          user: true,
-        },
-        orderBy: [desc(inventoryMovements.createdAt)],
-      });
-
-      const allProducts = await db.query.products.findMany();
-
-      return {
-        movements: result,
-        products: allProducts,
-      };
+      if (!db) return [];
+      return await db.select().from(unitEvents);
     }),
 
-  // Reporte Financiero
   financeReport: protectedProcedure
     .input(z.object({
       startDate: z.string().optional(),
       endDate: z.string().optional(),
-      type: z.string().optional(),
     }).optional())
-    .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { transactions: [], closures: [] };
-
-      let conditions: any[] = [];
-
-      if (input?.startDate) {
-        conditions.push(gte(financialTransactions.createdAt, new Date(input.startDate)));
-      }
-      if (input?.endDate) {
-        conditions.push(lte(financialTransactions.createdAt, new Date(input.endDate + " 23:59:59")));
-      }
-      if (input?.type) {
-        conditions.push(eq(financialTransactions.type, input.type as any));
-      }
-
-      const transactions = await db.query.financialTransactions.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
-        with: {
-          user: true,
-        },
-        orderBy: [desc(financialTransactions.createdAt)],
-      });
-
-      const closures = await db.query.cashClosures.findMany({
-        orderBy: [desc(cashClosures.createdAt)],
-        limit: 30,
-      });
-
-      return {
-        transactions,
-        closures,
-      };
-    }),
-
-  // Reporte de Clientes
-  customersReport: protectedProcedure
-    .input(z.object({
-      zone: z.string().optional(),
-    }).optional())
-    .query(async ({ input }) => {
+    .query(async () => {
       const db = await getDb();
       if (!db) return [];
-
-      let conditions: any[] = [];
-
-      if (input?.zone) {
-        conditions.push(eq(customers.zone, input.zone));
-      }
-
-      const result = await db.query.customers.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
-        orderBy: [desc(customers.createdAt)],
-      });
-
-      return result;
+      return await db.select().from(financialTransactions);
     }),
 
-  // Resumen para dashboard
-  summary: protectedProcedure
-    .input(z.object({
-      startDate: z.string().optional(),
-      endDate: z.string().optional(),
-    }).optional())
-    .query(async ({ input }) => {
+  customersReport: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    return await db.select().from(customers);
+  }),
+});
+
+
+// ══════════════════════════════════════════════════════════════════
+// EXPORTACIONES EXCEL (usando xlsx ya instalado)
+// Devuelven base64 de un workbook .xlsx para descarga en el cliente
+// ══════════════════════════════════════════════════════════════════
+
+import * as XLSX from "xlsx";
+import {
+  MOCK_FINANCIAL_TRANSACTIONS,
+  MOCK_UNITS, MOCK_REPAIRS, MOCK_RETURNS, MOCK_WARRANTIES,
+} from "../db";
+import { TRPCError } from "@trpc/server";
+
+const excelDateInput = z.object({
+  from: z.string(), // YYYY-MM-DD
+  to:   z.string(), // YYYY-MM-DD
+}).optional().default({ from: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0], to: new Date().toISOString().split("T")[0] });
+
+// ─── helper: construir y serializar workbook ─────────────────────
+function buildXlsx(sheets: { name: string; data: any[][] }[]): string {
+  const wb = XLSX.utils.book_new();
+  for (const { name, data } of sheets) {
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
+  }
+  return XLSX.write(wb, { type: "base64", bookType: "xlsx" });
+}
+
+function fmtCents(c: number): number { return Math.round(c) / 100; }
+
+function dateHeader(from: string, to: string): string { return `Período: ${from} al ${to}`; }
+
+export const reportsExcelRouter = router({
+
+  /**
+   * Reporte Financiero Mensual
+   * Hoja 1: Ingresos y egresos por categoría y método de pago
+   * Hoja 2: Utilidad neta del período
+   */
+  financialExcel: protectedProcedure
+    .input(z.object({ from: z.string(), to: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
+      const fromDate = new Date(input.from + "T00:00:00");
+      const toDate   = new Date(input.to   + "T23:59:59");
+
+      let txList: any[] = [];
+      let opList: any[] = [];
+
       if (!db) {
-        return {
-          totalOrders: 0,
-          ordersByStatus: [],
-          salesTotal: 0,
-          salesCount: 0,
-          salesByPayment: [],
-          lowStockProducts: 0,
-          newCustomers: 0,
-        };
-      }
-
-      let dateFilter: any = undefined;
-      if (input?.startDate && input?.endDate) {
-        dateFilter = and(
-          gte(orders.createdAt, new Date(input.startDate)),
-          lte(orders.createdAt, new Date(input.endDate + " 23:59:59"))
-        );
-      }
-
-      // Total pedidos
-      const totalOrdersResult = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(orders)
-        .where(dateFilter);
-      const totalOrders = totalOrdersResult[0]?.count || 0;
-
-      // Pedidos por estado
-      const ordersByStatus = await db
-        .select({
-          status: orders.status,
-          count: sql<number>`count(*)`.mapWith(Number),
-        })
-        .from(orders)
-        .where(dateFilter)
-        .groupBy(orders.status);
-
-      // Ventas del período
-      const salesStartDate = input?.startDate || new Date(new Date().setDate(1)).toISOString();
-      const salesEndDate = input?.endDate || new Date().toISOString();
-      const dateFilterSales = and(
-        gte(sales.createdAt, new Date(salesStartDate)),
-        lte(sales.createdAt, new Date(salesEndDate + " 23:59:59"))
-      );
-
-      const totalSales = await db
-        .select({
-          total: sql<number>`coalesce(sum(${sales.total}), 0)`.mapWith(Number),
-          count: sql<number>`count(*)`.mapWith(Number),
-        })
-        .from(sales)
-        .where(and(eq(sales.status, "completed"), dateFilterSales));
-
-      // Ventas por método de pago
-      const salesByPayment = await db
-        .select({
-          method: sales.paymentMethod,
-          total: sql<number>`coalesce(sum(${sales.total}), 0)`.mapWith(Number),
-          count: sql<number>`count(*)`.mapWith(Number),
-        })
-        .from(sales)
-        .where(and(eq(sales.status, "completed"), dateFilterSales))
-        .groupBy(sales.paymentMethod);
-
-      // Productos con stock bajo
-      const lowStockProducts = await db
-        .select({
-          product: products,
-          inventory: inventory,
-        })
-        .from(inventory)
-        .innerJoin(products, eq(inventory.productId, products.id))
-        .where(sql`${inventory.quantity} <= ${inventory.minStock}`);
-
-      // Nuevos clientes
-      const newCustomersResult = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(customers)
-        .where(dateFilter);
-      const newCustomers = newCustomersResult[0]?.count || 0;
-
-      return {
-        totalOrders,
-        ordersByStatus,
-        salesTotal: totalSales[0]?.total || 0,
-        salesCount: totalSales[0]?.count || 0,
-        salesByPayment,
-        lowStockProducts: lowStockProducts.length,
-        newCustomers,
-      };
-    }),
-
-  // Análisis de Negocio
-  getBusinessAnalysis: protectedProcedure
-    .input(
-      z.object({
-        startDate: z.string().optional(),
-        endDate: z.string().optional(),
-      }).optional()
-    )
-    .query(async ({ input }) => {
-      const db = await getDb();
-
-      let dateFilterOrders = undefined;
-      let dateFilterSales = undefined;
-      let dateFilterPurchases = undefined;
-      
-      let start: Date;
-      let end: Date;
-
-      if (input?.startDate && input?.endDate) {
-        start = new Date(input.startDate);
-        end = new Date(input.endDate + " 23:59:59");
-      } else {
-        // Default to last 30 days if no dates provided
-        end = new Date();
-        start = new Date();
-        start.setDate(end.getDate() - 30);
-      }
-
-      dateFilterOrders = and(gte(orders.createdAt, start), lte(orders.createdAt, end));
-      dateFilterSales = and(gte(sales.createdAt, start), lte(sales.createdAt, end));
-      dateFilterPurchases = and(gte(purchases.orderDate, start), lte(purchases.orderDate, end));
-
-      // 0. Calcular periodo previo para tendencias
-      const duration = end.getTime() - start.getTime();
-      const prevEnd = new Date(start.getTime() - 1);
-      const prevStart = new Date(start.getTime() - duration);
-
-      const prevDateFilterOrders = and(gte(orders.createdAt, prevStart), lte(orders.createdAt, prevEnd));
-      const prevDateFilterSales = and(gte(sales.createdAt, prevStart), lte(sales.createdAt, prevEnd));
-
-      const inRange = (value: any, from: Date, to: Date) => {
-        const date = new Date(value);
-        return !Number.isNaN(date.getTime()) && date >= from && date <= to;
-      };
-
-      const attachOrderRelations = (order: any) => ({
-        ...order,
-        customer: MOCK_CUSTOMERS.find((customer: any) => customer.id === order.customerId) || null,
-        items: MOCK_ORDER_ITEMS
-          .filter((item: any) => item.orderId === order.id)
-          .map((item: any) => ({
-            ...item,
-            product: MOCK_PRODUCTS.find((product: any) => product.id === item.productId) || { id: item.productId, name: "Producto sin ficha", price: 0 },
-          })),
-      });
-
-      const attachSaleRelations = (sale: any) => ({
-        ...sale,
-        customer: MOCK_CUSTOMERS.find((customer: any) => customer.id === sale.customerId) || null,
-        items: MOCK_SALE_ITEMS
-          .filter((item: any) => item.saleId === sale.id)
-          .map((item: any) => ({
-            ...item,
-            product: MOCK_PRODUCTS.find((product: any) => product.id === item.productId) || { id: item.productId, name: "Producto sin ficha", price: 0 },
-          })),
-      });
-
-      let deliveredOrders: any[] = [];
-      let completedSales: any[] = [];
-      let purchasesData: any[] = [];
-      let prevDeliveredOrders: any[] = [];
-      let prevCompletedSales: any[] = [];
-      let expensesData: any[] = [];
-
-      if (db) {
-        // 1. Obtener datos del periodo actual
-        deliveredOrders = await db.query.orders.findMany({
-          where: and(eq(orders.status, "delivered"), dateFilterOrders),
-          with: { items: { with: { product: true } }, customer: true }
+        txList = (MOCK_FINANCIAL_TRANSACTIONS as any[]).filter((t: any) => {
+          const d = new Date(t.createdAt);
+          return d >= fromDate && d <= toDate;
         });
-
-        completedSales = await db.query.sales.findMany({
-          where: and(eq(sales.status, "completed"), dateFilterSales),
-          with: { items: { with: { product: true } }, customer: true }
-        });
-
-        purchasesData = await db
-          .select()
-          .from(purchases)
-          .where(and(ne(purchases.status, "cancelled"), dateFilterPurchases));
-
-        // 2. Obtener datos del periodo previo para tendencias
-        prevDeliveredOrders = await db.query.orders.findMany({
-          where: and(eq(orders.status, "delivered"), prevDateFilterOrders),
-          with: { items: { with: { product: true } } }
-        });
-
-        prevCompletedSales = await db.query.sales.findMany({
-          where: and(eq(sales.status, "completed"), prevDateFilterSales),
-          with: { items: { with: { product: true } } }
-        });
-
-        const dateFilterExpenses = and(gte(operationalExpenses.expenseDate, start), lte(operationalExpenses.expenseDate, end));
-        expensesData = await db.query.operationalExpenses.findMany({
-          where: and(eq(operationalExpenses.status, "paid"), dateFilterExpenses)
+        opList = (MOCK_OPERATIONAL_EXPENSES as any[]).filter((e: any) => {
+          const d = new Date(e.createdAt);
+          return d >= fromDate && d <= toDate && e.status === "paid";
         });
       } else {
-        deliveredOrders = MOCK_ORDERS
-          .filter((order: any) => order.status === "delivered" && inRange(order.createdAt, start, end))
-          .map(attachOrderRelations);
-
-        completedSales = MOCK_SALES
-          .filter((sale: any) => sale.status !== "cancelled" && inRange(sale.createdAt, start, end))
-          .map(attachSaleRelations);
-
-        purchasesData = MOCK_PURCHASES
-          .filter((purchase: any) => purchase.status !== "cancelled" && inRange(purchase.orderDate || purchase.createdAt, start, end));
-
-        prevDeliveredOrders = MOCK_ORDERS
-          .filter((order: any) => order.status === "delivered" && inRange(order.createdAt, prevStart, prevEnd))
-          .map(attachOrderRelations);
-
-        prevCompletedSales = MOCK_SALES
-          .filter((sale: any) => sale.status !== "cancelled" && inRange(sale.createdAt, prevStart, prevEnd))
-          .map(attachSaleRelations);
-
-        expensesData = MOCK_OPERATIONAL_EXPENSES
-          .filter((expense: any) => expense.status === "paid" && inRange(expense.expenseDate || expense.createdAt, start, end));
+        [txList, opList] = await Promise.all([
+          db.select().from(financialTransactions)
+            .where(and(gte(financialTransactions.createdAt, fromDate), lte(financialTransactions.createdAt, toDate))),
+          db.select().from(operationalExpenses)
+            .where(and(eq(operationalExpenses.status, "paid"), gte(operationalExpenses.createdAt, fromDate), lte(operationalExpenses.createdAt, toDate))),
+        ]);
       }
 
-      // Evitar duplicados de IDs de órdenes procesadas en ventas
-      const processedOrderIds = new Set(completedSales.map((s: any) => s.orderId).filter(Boolean));
-      const prevProcessedOrderIds = new Set(prevCompletedSales.map((s: any) => s.orderId).filter(Boolean));
-      
-      // Métricas y Contadores
-      const deliveriesByDay: Record<string, number> = {};
-      const productStats: Record<number, { 
-        name: string, 
-        units: number, 
-        revenue: number, 
-        cost: number, 
-        prevUnits: number,
-        prevRevenue: number 
-      }> = {};
-      const retailStats: any = {};
-      const wholesaleStats: any = {};
-      
-      const channelCounts: Record<string, number> = { facebook: 0, tiktok: 0, marketplace: 0, referral: 0, other: 0, local: 0 };
-      const segmentedChannels: Record<string, Record<string, number>> = {
-        retail: { facebook: 0, tiktok: 0, marketplace: 0, referral: 0, other: 0, local: 0 },
-        wholesale: { facebook: 0, tiktok: 0, marketplace: 0, referral: 0, other: 0, local: 0 }
-      };
+      // Hoja 1: Transacciones
+      const txHeaders = ["Fecha", "Tipo", "Categoría", "Método Pago", "Monto (Bs)", "Notas"];
+      const txRows = txList.map((t: any) => [
+        new Date(t.createdAt).toLocaleDateString("es-BO"),
+        t.type === "income" ? "Ingreso" : "Egreso",
+        t.category,
+        t.paymentMethod || "cash",
+        fmtCents(t.amount),
+        t.notes || "",
+      ]);
 
-      const zoneCounts: Record<string, number> = {};
-      const genderCounts: Record<string, number> = { male: 0, female: 0, other: 0 };
-      const paymentCounts: Record<string, number> = { cash: 0, qr: 0, transfer: 0 };
-      const customerSales: Record<string, { name: string, value: number, count: number, type: string }> = {};
-      const expenseCounts: Record<string, number> = {};
-      
-      const segmentMetrics = {
-        retail: { revenue: 0, transactions: 0, units: 0 },
-        wholesale: { revenue: 0, transactions: 0, units: 0 }
-      };
+      const income = txList.filter((t:any)=>t.type==="income").reduce((s:number,t:any)=>s+t.amount,0);
+      const expense = txList.filter((t:any)=>t.type==="expense").reduce((s:number,t:any)=>s+t.amount,0);
+      const opTotal = opList.reduce((s:number,e:any)=>s+e.amount,0);
 
-      let totalExpenses = 0;
-      let totalPurchases = 0;
-      let purchaseCount = 0;
-      let totalRevenue = 0;
-      let totalTransactions = 0;
-
-      // Gastos
-      expensesData.forEach((exp: any) => {
-        totalExpenses += exp.amount;
-        expenseCounts[exp.category] = (expenseCounts[exp.category] || 0) + exp.amount;
-      });
-
-      purchasesData.forEach((purchase: any) => {
-        const amount = Number(purchase.totalAmount || 0);
-        totalPurchases += amount;
-        totalExpenses += amount;
-        purchaseCount++;
-      });
-
-      if (totalPurchases > 0) {
-        expenseCounts.purchases = (expenseCounts.purchases || 0) + totalPurchases;
-      }
-
-      // Función helper para procesar productos
-      const processItems = (items: any[], isCurrent: boolean, segment?: string) => {
-        items.forEach(item => {
-          const pId = item.product.id;
-          if (!productStats[pId]) {
-            productStats[pId] = { 
-              name: item.product.name, 
-              units: 0, 
-              revenue: 0, 
-              cost: 0, 
-              prevUnits: 0, 
-              prevRevenue: 0 
-            };
-          }
-          const qty = item.quantity;
-          const rev = (item.price || item.finalUnitPrice || 0) * qty;
-          const cost = (item.product.price || 0) * qty;
-
-          if (isCurrent) {
-            productStats[pId].units += qty;
-            productStats[pId].revenue += rev;
-            productStats[pId].cost += cost;
-            if (segment) {
-              (segmentMetrics as any)[segment].units += qty;
-              const segStats = segment === "retail" ? retailStats : wholesaleStats;
-              if (!segStats[pId]) {
-                segStats[pId] = { name: item.product.name, units: 0, revenue: 0, cost: 0, prevUnits: 0, prevRevenue: 0 };
-              }
-              segStats[pId].units += qty;
-              segStats[pId].revenue += rev;
-              segStats[pId].cost += cost;
-            }
-          } else {
-            productStats[pId].prevUnits += qty;
-            productStats[pId].prevRevenue += rev;
-          }
-        });
-      };
-
-      // Procesar Periodo Actual
-      completedSales.forEach((sale: any) => {
-        const segment = sale.customer?.customerType || "retail";
-        totalRevenue += sale.total;
-        totalTransactions++;
-        segmentMetrics[segment as "retail" | "wholesale"].revenue += sale.total;
-        segmentMetrics[segment as "retail" | "wholesale"].transactions++;
-
-        const date = new Date(sale.createdAt).toISOString().split('T')[0];
-        deliveriesByDay[date] = (deliveriesByDay[date] || 0) + 1;
-        paymentCounts[sale.paymentMethod || "cash"] = (paymentCounts[sale.paymentMethod || "cash"] || 0) + sale.total;
-        processItems(sale.items, true, segment);
-
-        if (sale.customer) {
-          const cId = sale.customer.id.toString();
-          if (!customerSales[cId]) customerSales[cId] = { name: sale.customer.name, value: 0, count: 0, type: segment };
-          customerSales[cId].value += sale.total;
-          customerSales[cId].count += 1;
-          
-          const channel = sale.customer.sourceChannel || "other";
-          channelCounts[channel]++;
-          segmentedChannels[segment as "retail" | "wholesale"][channel]++;
-          
-          if (sale.customer.zone) zoneCounts[sale.customer.zone] = (zoneCounts[sale.customer.zone] || 0) + 1;
-          const g = (sale.customer.gender || "").toLowerCase();
-          if (g.includes("m") || g.includes("v") || g.includes("h")) genderCounts.male++;
-          else if (g.includes("f") || g.includes("w")) genderCounts.female++;
-          else genderCounts.other++;
-        } else {
-          channelCounts.local++;
-          segmentedChannels.retail.local++;
-        }
-      });
-
-      deliveredOrders.forEach((order: any) => {
-        if (processedOrderIds.has(order.id)) return;
-        const segment = order.customer?.customerType || "retail";
-        totalTransactions++;
-        segmentMetrics[segment as "retail" | "wholesale"].transactions++;
-
-        const amount = order.items.reduce((sum: any, i: any) => sum + (i.price * i.quantity), 0);
-        totalRevenue += amount;
-        segmentMetrics[segment as "retail" | "wholesale"].revenue += amount;
-
-        const date = new Date(order.createdAt).toISOString().split('T')[0];
-        deliveriesByDay[date] = (deliveriesByDay[date] || 0) + 1;
-        processItems(order.items, true, segment);
-        
-        if (order.customer) {
-          const cId = order.customer.id.toString();
-          if (!customerSales[cId]) customerSales[cId] = { name: order.customer.name, value: 0, count: 0, type: segment };
-          customerSales[cId].value += amount;
-          customerSales[cId].count += 1;
-          
-          const channel = order.customer.sourceChannel || "other";
-          channelCounts[channel]++;
-          segmentedChannels[segment as "retail" | "wholesale"][channel]++;
-
-          if (order.customer.zone) zoneCounts[order.customer.zone] = (zoneCounts[order.customer.zone] || 0) + 1;
-          const g = (order.customer.gender || "").toLowerCase();
-          if (g.includes("m") || g.includes("v") || g.includes("h")) genderCounts.male++;
-          else if (g.includes("f") || g.includes("w")) genderCounts.female++;
-          else genderCounts.other++;
-        }
-      });
-
-      // Procesar Periodo Previo (solo para tendencias de productos)
-      prevCompletedSales.forEach((sale: any) => processItems(sale.items, false));
-      prevDeliveredOrders.forEach((order: any) => {
-        if (!prevProcessedOrderIds.has(order.id)) processItems(order.items, false);
-      });
-
-      // Retención
-      const customerTransactionCount: Record<number, number> = {};
-      completedSales.forEach((s: any) => s.customer?.id && (customerTransactionCount[s.customer.id] = (customerTransactionCount[s.customer.id] || 0) + 1));
-      deliveredOrders.forEach((o: any) => o.customer?.id && (customerTransactionCount[o.customer.id] = (customerTransactionCount[o.customer.id] || 0) + 1));
-      const customerIdsInPeriod = new Set<number>(Object.keys(customerTransactionCount).map(Number));
-      let newCustomers = 0;
-      let returningCustomers = 0;
-
-      for (const customerId of Array.from(customerIdsInPeriod)) {
-        if (customerTransactionCount[customerId] >= 2) {
-          returningCustomers++;
-          continue;
-        }
-        const priorOrder = await db.query.orders.findFirst({
-          where: and(eq(orders.customerId, customerId), lt(orders.createdAt, start))
-        });
-        const priorSale = !priorOrder ? await db.query.sales.findFirst({
-          where: and(eq(sales.customerId, customerId), lt(sales.createdAt, start))
-        }) : null;
-        if (priorOrder || priorSale) returningCustomers++;
-        else newCustomers++;
-      }
-
-      // Ranking de Productos Mejorado (Segmentado)
-      const getRankingFromStats = (stats: any) => {
-        return Object.entries(stats)
-          .map(([id, s]: [any, any]) => {
-            const revenue = s.revenue / 100;
-            const prevRevenue = s.prevRevenue / 100;
-            const cost = s.cost / 100;
-            const margin = revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0;
-            const trend = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : revenue > 0 ? 100 : 0;
-
-            return {
-              id: Number(id),
-              name: s.name,
-              units: s.units,
-              revenue,
-              margin: Math.round(margin),
-              trend: Math.round(trend),
-              prevUnits: s.prevUnits
-            };
-          })
-          .sort((a: any, b: any) => b.revenue - a.revenue);
-      };
-
-      const productRanking = getRankingFromStats(productStats);
-      const retailRanking = getRankingFromStats(retailStats);
-      const wholesaleRanking = getRankingFromStats(wholesaleStats);
-
-      // Formatear para Recharts
-      const deliveriesData = Object.entries(deliveriesByDay)
-        .map(([date, count]) => ({ date, count }))
-        .sort((a, b) => a.date.localeCompare(b.date));
-
-      const topFlavors = productRanking.slice(0, 10).map(p => ({ name: p.name, quantity: p.units }));
-
-      const customerDemographics = [
-        { name: "Varones", value: genderCounts.male },
-        { name: "Mujeres", value: genderCounts.female },
-        { name: "Otros", value: genderCounts.other },
-      ].filter(v => v.value > 0);
-
-      const channelsData = Object.entries(channelCounts)
-        .map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value }))
-        .filter(v => v.value > 0);
-
-      const zonesData = Object.entries(zoneCounts)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 8);
-
-      const paymentMethods = Object.entries(paymentCounts)
-        .map(([name, value]) => ({ 
-          name: name === "cash" ? "Efectivo" : name === "qr" ? "QR" : "Transferencia", 
-          value: value / 100 
-        }))
-        .filter(v => v.value > 0);
-
-      const topCustomers = Object.values(customerSales)
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 10)
-        .map(c => ({ name: c.name, value: c.value / 100, count: c.count, type: c.type }));
-
-      const expensesByCategory = Object.entries(expenseCounts)
-        .map(([name, value]) => ({ 
-          name: name.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '), 
-          value: value / 100 
-        }))
-        .sort((a, b) => b.value - a.value);
-
-      const customerRetention = [
-        { name: "Clientes Nuevos", value: newCustomers },
-        { name: "Clientes Recurrentes", value: returningCustomers },
-      ].filter(v => v.value > 0);
-
-      // Datos para la Matriz BCG
-      const bcgMatrix = productRanking.map(p => ({
-        name: p.name,
-        units: p.units,
-        trend: p.trend,
-        revenue: p.revenue,
-        quadrant: p.units > (productRanking[0]?.units / 3) 
-          ? (p.trend > 0 ? "Estrella" : "Vaca")
-          : (p.trend > 0 ? "Interrogante" : "Perro")
-      }));
-
-      // Comparativa por Segmento
-      const segmentComparison = [
-        { segment: "Minoristas", revenue: segmentMetrics.retail.revenue / 100, transactions: segmentMetrics.retail.transactions, units: segmentMetrics.retail.units },
-        { segment: "Mayoristas", revenue: segmentMetrics.wholesale.revenue / 100, transactions: segmentMetrics.wholesale.transactions, units: segmentMetrics.wholesale.units }
+      // Hoja 2: Resumen
+      const summary = [
+        [dateHeader(input.from, input.to)],
+        [],
+        ["RESUMEN FINANCIERO"],
+        ["Total Ingresos (Bs)", fmtCents(income)],
+        ["Total Egresos (Bs)", fmtCents(expense)],
+        ["Flujo Neto (Bs)", fmtCents(income - expense)],
+        [],
+        ["Gastos Operativos (Bs)", fmtCents(opTotal)],
+        ["Utilidad Neta Est. (Bs)", fmtCents(income - expense - opTotal)],
       ];
 
-      return {
-        deliveriesData,
-        topFlavors,
-        productRanking,
-        retailRanking,
-        wholesaleRanking,
-        bcgMatrix,
-        customerDemographics,
-        channelsData,
-        segmentedChannels,
-        zonesData,
-        paymentMethods,
-        topCustomers,
-        expensesByCategory,
-        customerRetention,
-        segmentComparison,
-        summary: {
-          totalTransactions,
-          totalDeliveries: deliveredOrders.length,
-          totalSales: completedSales.length,
-          totalRevenue, 
-          totalExpenses,
-          totalPurchases,
-          purchaseCount,
-          netIncome: totalRevenue - totalExpenses,
-          avgOrderValue: totalTransactions > 0 ? totalRevenue / totalTransactions : 0,
-          activeZones: zonesData.length,
-          totalCustomers: customerIdsInPeriod.size,
-          newCustomers,
-          returningCustomers,
-          retentionRate: customerIdsInPeriod.size > 0 ? Math.round((returningCustomers / customerIdsInPeriod.size) * 100) : 0,
-          retailRevenue: segmentMetrics.retail.revenue,
-          wholesaleRevenue: segmentMetrics.wholesale.revenue,
-        }
-      };
+      // Hoja 3: Gastos operativos por categoría
+      const opByCat = new Map<string, number>();
+      for (const e of opList as any[]) opByCat.set(e.category, (opByCat.get(e.category)||0)+e.amount);
+      const opRows = [["Categoría", "Total (Bs)"], ...Array.from(opByCat.entries()).map(([cat,amt])=>[cat, fmtCents(amt)])];
+
+      const base64 = buildXlsx([
+        { name: "Transacciones", data: [txHeaders, ...txRows] },
+        { name: "Resumen", data: summary },
+        { name: "Gastos por Categoría", data: opRows },
+      ]);
+
+      return { base64, filename: `Reporte_Financiero_${input.from}_${input.to}.xlsx` };
+    }),
+
+  /**
+   * Reporte de Inventario a fecha de corte
+   * Unidades disponibles, costo acumulado, antigüedad
+   */
+  inventoryExcel: protectedProcedure
+    .input(z.object({ cutoffDate: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const cutoff = input.cutoffDate ? new Date(input.cutoffDate + "T23:59:59") : new Date();
+
+      let unitList: any[] = [];
+      let repairList: any[] = [];
+
+      if (!db) {
+        unitList = (MOCK_UNITS as any[]).filter((u: any) => u.status !== "sold" && new Date(u.createdAt) <= cutoff);
+        repairList = (MOCK_REPAIRS as any[]).filter((r: any) => r.status === "completed");
+      } else {
+        [unitList, repairList] = await Promise.all([
+          db.select().from(units).where(and(ne(units.status, "sold"), lte(units.createdAt, cutoff))),
+          db.select({ unitId: repairs.unitId, laborCost: repairs.laborCost, partsCost: repairs.partsCost })
+            .from(repairs).where(eq(repairs.status, "completed")),
+        ]);
+      }
+
+      const repMap = new Map<number, number>();
+      for (const r of repairList as any[]) repMap.set(r.unitId, (repMap.get(r.unitId)||0)+(r.laborCost||0)+(r.partsCost||0));
+
+      const today = cutoff.getTime();
+      const headers = ["Código", "Marca", "Modelo", "Tipo", "Estado", "Cond.", "P. Compra (Bs)", "Costo Reparación (Bs)", "Costo Total (Bs)", "P. Venta (Bs)", "Días en Inventario", "Fecha Registro"];
+      const rows = (unitList as any[]).map((u: any) => {
+        const repCost = repMap.get(u.id) || 0;
+        const days = Math.max(0, Math.round((today - new Date(u.createdAt).getTime()) / 86400000));
+        return [
+          u.code, u.brand, u.model, u.type, u.status, u.condition || "—",
+          fmtCents(u.purchasePrice || 0), fmtCents(repCost),
+          fmtCents((u.purchasePrice||0) + repCost),
+          fmtCents(u.salePrice || 0), days,
+          new Date(u.createdAt).toLocaleDateString("es-BO"),
+        ];
+      });
+
+      const totalCost = (unitList as any[]).reduce((s:number,u:any)=>s+(u.purchasePrice||0)+(repMap.get(u.id)||0),0);
+      const totalSalePotential = (unitList as any[]).reduce((s:number,u:any)=>s+(u.salePrice||0),0);
+      const summary = [
+        [`Inventario al ${cutoff.toLocaleDateString("es-BO")}`],
+        [],
+        ["Total unidades", unitList.length],
+        ["Costo total inventario (Bs)", fmtCents(totalCost)],
+        ["Potencial de venta (Bs)", fmtCents(totalSalePotential)],
+        ["Margen potencial (Bs)", fmtCents(totalSalePotential - totalCost)],
+      ];
+
+      const base64 = buildXlsx([
+        { name: "Inventario", data: [headers, ...rows] },
+        { name: "Resumen", data: summary },
+      ]);
+
+      return { base64, filename: `Inventario_${cutoff.toISOString().split("T")[0]}.xlsx` };
+    }),
+
+  /**
+   * Reporte de Garantías y Devoluciones del período
+   */
+  warrantyReturnsExcel: protectedProcedure
+    .input(z.object({ from: z.string(), to: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const fromDate = new Date(input.from + "T00:00:00");
+      const toDate   = new Date(input.to   + "T23:59:59");
+
+      let retList: any[] = [];
+      let warList: any[] = [];
+
+      if (!db) {
+        retList = (MOCK_RETURNS as any[]).filter((r: any) => {
+          const d = new Date(r.returnDate || r.createdAt);
+          return d >= fromDate && d <= toDate;
+        });
+        warList = (MOCK_WARRANTIES as any[]);
+      } else {
+        [retList, warList] = await Promise.all([
+          db.select({
+            id: returns.id, unitId: returns.unitId, returnDate: returns.returnDate,
+            reason: returns.reason, resolution: returns.resolution,
+            reenteredRepair: returns.reenteredRepair, refundAmount: returns.refundAmount,
+            unitCode: units.code, unitBrand: units.brand, unitModel: units.model,
+          }).from(returns)
+            .leftJoin(units, eq(returns.unitId, units.id))
+            .where(and(gte(returns.returnDate, fromDate), lte(returns.returnDate, toDate))),
+          db.select({
+            unitId: warranties.unitId, status: warranties.status,
+            days: warranties.days, startDate: warranties.startDate, endDate: warranties.endDate,
+            unitCode: units.code, unitBrand: units.brand, unitModel: units.model,
+          }).from(warranties)
+            .leftJoin(units, eq(warranties.unitId, units.id))
+            .where(and(gte(warranties.startDate, fromDate), lte(warranties.startDate, toDate))),
+        ]);
+      }
+
+      const retHeaders = ["ID", "Código", "Marca", "Modelo", "Fecha Devolución", "Motivo", "Resolución", "Ingresó Taller", "Reembolso (Bs)"];
+      const retRows = (retList as any[]).map((r: any) => [
+        r.id, r.unitCode||r.unitId, r.unitBrand||"—", r.unitModel||"—",
+        new Date(r.returnDate||r.createdAt).toLocaleDateString("es-BO"),
+        r.reason, r.resolution||"—",
+        r.reenteredRepair ? "Sí" : "No",
+        r.refundAmount ? fmtCents(r.refundAmount) : 0,
+      ]);
+
+      const warHeaders = ["Código", "Marca", "Modelo", "Estado", "Días", "Inicio", "Vencimiento"];
+      const warRows = (warList as any[]).map((w: any) => [
+        w.unitCode||w.unitId, w.unitBrand||"—", w.unitModel||"—",
+        w.status, w.days,
+        new Date(w.startDate).toLocaleDateString("es-BO"),
+        new Date(w.endDate).toLocaleDateString("es-BO"),
+      ]);
+
+      const totalRefund = (retList as any[]).reduce((s:number,r:any)=>s+(r.refundAmount||0),0);
+      const summary = [
+        [dateHeader(input.from, input.to)],
+        [],
+        ["Devoluciones del período", retList.length],
+        ["Total reembolsado (Bs)", fmtCents(totalRefund)],
+        ["Garantías emitidas en el período", warList.length],
+        ["Garantías activas", (warList as any[]).filter((w:any)=>w.status==="active").length],
+        ["Garantías reclamadas", (warList as any[]).filter((w:any)=>w.status==="claimed").length],
+      ];
+
+      const base64 = buildXlsx([
+        { name: "Devoluciones", data: [retHeaders, ...retRows] },
+        { name: "Garantías", data: [warHeaders, ...warRows] },
+        { name: "Resumen", data: summary },
+      ]);
+
+      return { base64, filename: `Garantias_Devoluciones_${input.from}_${input.to}.xlsx` };
     }),
 });

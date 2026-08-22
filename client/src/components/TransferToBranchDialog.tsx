@@ -143,8 +143,8 @@ export function TransferToBranchDialog({
   const sourceBranchName = branches.find((b) => b.id === activeBranchId)?.name || `Sucursal #${activeBranchId}`;
   const destBranchName = branches.find((b) => b.id === Number(destinationBranchId))?.name;
 
-  const transferMutation = trpc.inventory.createBranchTransfer.useMutation({
-    onSuccess: (data) => {
+  const transferMutation = (trpc.inventory as any).createBranchTransfer.useMutation({
+    onSuccess: (data: any) => {
       const destName = branches.find((b) => b.id === Number(destinationBranchId))?.name || `Sucursal #${destinationBranchId}`;
       toast.success(`Traspaso ${data.transferNumber} creado exitosamente`);
 
@@ -167,7 +167,7 @@ export function TransferToBranchDialog({
       setDestinationBranchId("");
       onSuccess();
     },
-    onError: (err) => {
+    onError: (err: any) => {
       toast.error(err.message || "Error al realizar el traspaso");
     },
   });
@@ -178,8 +178,10 @@ export function TransferToBranchDialog({
     let phone = destBranch?.phone;
     
     // Clean phone number (remove spaces, plus sign, etc)
-    if (phone) {
+    if (phone && typeof phone === 'string') {
       phone = phone.replace(/\D/g, '');
+    } else if (phone) {
+      phone = String(phone).replace(/\D/g, '');
     }
 
     if (!phone) {

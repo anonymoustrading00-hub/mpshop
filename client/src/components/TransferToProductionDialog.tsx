@@ -62,10 +62,10 @@ const getKefirPresentationVolumeMl = (
     .match(/(\d+(?:[.,]\d+)?)\s*(ml|l|lt|lts|litro|litros)\b/);
   if (!match) return 0;
 
-  const value = Number(match[1].replace(",", "."));
+  const value = match && match[1] ? Number(String(match[1]).replace(",", ".")) : 0;
   if (!Number.isFinite(value) || value <= 0) return 0;
 
-  return match[2] === "ml" ? value : value * 1000;
+  return match && match[2] === "ml" ? value : value * 1000;
 };
 
 const getKefirProductionRole = (item: KefirInventoryItem, itemName: string) => {
@@ -186,8 +186,8 @@ export function TransferToProductionDialog({
   const [notes, setNotes] = useState("");
 
   const utils = trpc.useContext();
-  const transferMutation = trpc.inventory.transferToProduction.useMutation({
-    onSuccess: data => {
+  const transferMutation = (trpc.inventory as any).transferToProduction.useMutation({
+    onSuccess: (data: any) => {
       try {
         const kInvStr = localStorage.getItem("kefir_inventory_v3");
         let parsedInventory: unknown = [];
@@ -322,7 +322,7 @@ export function TransferToProductionDialog({
 
             if (!existingItem) {
               existingItem = {
-                id: `inv-${normName.replace(/\s+/g, "-")}`,
+                id: `inv-${String(normName || "").replace(/\s+/g, "-")}`,
                 name: productName,
                 category: pCategory,
                 unit: getKefirText(item.unit) || "uds",
@@ -531,7 +531,7 @@ export function TransferToProductionDialog({
 
           if (!existingItem) {
             existingItem = {
-              id: `inv-${normName.replace(/\s+/g, "-")}`,
+              id: `inv-${String(normName || "").replace(/\s+/g, "-")}`,
               name: productName,
               category: pCategory,
               unit: getKefirText(item.unit) || "uds",

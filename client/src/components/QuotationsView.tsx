@@ -55,7 +55,7 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
   const isMobile = useIsMobile();
   const utils = trpc.useUtils();
 
-  const { data: products } = trpc.inventory.getProductsWithStock.useQuery();
+  const { data: productsData } = trpc.units.list.useQuery({ status: "available", limit: 200 } as any);
   const { data: customers } = trpc.customers.list.useQuery();
   const { data: quotationsList, isLoading } = trpc.quotations.list.useQuery();
   const { data: nextQuotationData } = trpc.quotations.getNextNumber.useQuery();
@@ -117,11 +117,23 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
     setCartItems([]);
   };
 
+  const products = useMemo(() => {
+    const items = (productsData as any)?.items ?? [];
+    return items.map((u: any) => ({
+      id: u.id,
+      name: [u.brand, u.model].filter(Boolean).join(" ").trim() || u.code || `Unidad #${u.id}`,
+      code: u.code,
+      salePrice: u.salePrice ?? u.price ?? 0,
+      discountPrice: u.discountPrice ?? null,
+      wholesalePrice: u.wholesalePrice ?? null,
+      stock: 1,
+    }));
+  }, [productsData]);
+
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     const search = productSearch.trim().toLowerCase();
     return (products as any[])
-      .filter((product: any) => product.category === "finished_product" && product.status === "active")
       .filter((product: any) => !search || product.name.toLowerCase().includes(search) || product.code.toLowerCase().includes(search))
       .slice(0, 12);
   }, [products, productSearch]);
@@ -572,9 +584,9 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
                           <div className="min-w-0">
                             <p className="font-semibold text-sm leading-tight text-slate-900">{item.productName}</p>
                             <div className="flex gap-1 mt-1">
-                              <Badge variant={item.pricingType === "unit" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "unit", basePrice: products?.find(p => p.id === item.productId)?.salePrice || item.basePrice })}>U</Badge>
-                              <Badge variant={item.pricingType === "discount" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "discount", basePrice: products?.find(p => p.id === item.productId)?.discountPrice || item.basePrice })}>D</Badge>
-                              <Badge variant={item.pricingType === "wholesale" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "wholesale", basePrice: products?.find(p => p.id === item.productId)?.wholesalePrice || item.basePrice })}>M</Badge>
+                              <Badge variant={item.pricingType === "unit" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "unit", basePrice: (products as any)?.find((p: any) => p.id === item.productId)?.salePrice || item.basePrice })}>U</Badge>
+                              <Badge variant={item.pricingType === "discount" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "discount", basePrice: (products as any)?.find((p: any) => p.id === item.productId)?.discountPrice || item.basePrice })}>D</Badge>
+                              <Badge variant={item.pricingType === "wholesale" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "wholesale", basePrice: (products as any)?.find((p: any) => p.id === item.productId)?.wholesalePrice || item.basePrice })}>M</Badge>
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">{formatCurrency(item.basePrice)} c/u</p>
                           </div>
@@ -749,11 +761,66 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
               </div>
               
               {/* VISIBLE PREVIEW */}
-              <div className="border rounded-md p-4 bg-slate-50">
-                <p><strong>Cliente:</strong> {detailQuery.data.quotation.customerDisplayName}</p>
-                <p><strong>Total:</strong> {formatCurrency(detailQuery.data.quotation.total)}</p>
-                <p><strong>Estado:</strong> {detailQuery.data.quotation.status}</p>
-                <p className="mt-2 text-sm text-muted-foreground">Nota: Para ver el documento completo, presiona PDF.</p>
+              <div className="border rounded-md p-4 bg-slate-50 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Cliente</p>
+                    <p className="font-semibold">{detailQuery.data.quotation.customerDisplayName}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Total</p>
+                    <p className="font-semibold">{formatCurrency(detailQuery.data.quotation.total)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Estado</p>
+                    <Badge variant={detailQuery.data.quotation.status === 'accepted' ? 'default' : detailQuery.data.quotation.status === 'rejected' ? 'destructive' : 'secondary'}>
+                      {detailQuery.data.quotation.status === 'accepted' ? 'Aceptada' : detailQuery.data.quotation.status === 'rejected' ? 'Rechazada' : 'Pendiente'}
+                    </Badge>
+                  </div>
+                </div>
+
+                {detailQuery.data.items.length > 0 && (
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Productos</p>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Descripción</TableHead>
+                          <TableHead className="text-center">Cant.</TableHead>
+                          <TableHead className="text-right">P. Unit.</TableHead>
+                          <TableHead className="text-right">Subtotal</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {detailQuery.data.items.map((item: any) => (
+                          <TableRow key={item.id}>
+                            <TableCell>
+                              <div className="font-medium">{item.productName}</div>
+                              <div className="text-xs text-muted-foreground">{item.productCode}</div>
+                            </TableCell>
+                            <TableCell className="text-center">{item.quantity}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.finalUnitPrice || item.basePrice)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(item.subtotal)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+
+                {detailQuery.data.quotation.notes && (
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Notas</p>
+                    <p className="text-sm whitespace-pre-wrap">{detailQuery.data.quotation.notes}</p>
+                  </div>
+                )}
+
+                {detailQuery.data.quotation.termsAndConditions && (
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Términos y Condiciones</p>
+                    <p className="text-sm whitespace-pre-wrap text-muted-foreground">{detailQuery.data.quotation.termsAndConditions}</p>
+                  </div>
+                )}
               </div>
 
             </div>

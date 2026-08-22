@@ -134,7 +134,7 @@ export default function Reports() {
       icon: Package,
       description: "Estado actual del inventario",
       onDownload: downloadInventoryReport,
-      dataCount: inventoryQuery.data?.products.length || 0,
+      dataCount: inventoryQuery.data?.products?.length || 0,
     },
     {
       id: "movements",
@@ -142,7 +142,7 @@ export default function Reports() {
       icon: Activity,
       description: "Historial de movimientos",
       onDownload: downloadMovementsReport,
-      dataCount: movementsQuery.data?.movements.length || 0,
+      dataCount: movementsQuery.data?.movements?.length || 0,
     },
     {
       id: "finance",
@@ -150,7 +150,7 @@ export default function Reports() {
       icon: Calendar,
       description: "Transacciones y cierres de caja",
       onDownload: downloadFinanceReport,
-      dataCount: financeQuery.data?.transactions.length || 0,
+      dataCount: financeQuery.data?.transactions?.length || 0,
     },
     {
       id: "customers",
@@ -290,6 +290,118 @@ export default function Reports() {
           </div>
         </div>
       )}
+
+      {/* ─── EXPORTACIONES EXCEL ─────────────────────────────────────────── */}
+      <ExcelExportSection from={dateRange.startDate} to={dateRange.endDate} />
+
+    </div>
+  );
+}
+
+// ─── Excel Export Section ──────────────────────────────────────────────────
+
+function downloadBase64Excel(base64: string, filename: string) {
+  const byteCharacters = atob(base64);
+  const byteNumbers = Array.from(byteCharacters, (c) => c.charCodeAt(0));
+  const byteArray = new Uint8Array(byteNumbers);
+  const blob = new Blob([byteArray], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function ExcelExportSection({ from, to }: { from: string; to: string }) {
+  const [cutoff, setCutoff] = useState(format(new Date(), "yyyy-MM-dd"));
+
+  const financialMut = (trpc.reportsExcel as any).financialExcel.useMutation({
+    onSuccess: (data: any) => downloadBase64Excel(data.base64, data.filename),
+    onError: (e: any) => alert("Error: " + e.message),
+  });
+  const inventoryMut = (trpc.reportsExcel as any).inventoryExcel.useMutation({
+    onSuccess: (data: any) => downloadBase64Excel(data.base64, data.filename),
+    onError: (e: any) => alert("Error: " + e.message),
+  });
+  const warrantyMut = (trpc.reportsExcel as any).warrantyReturnsExcel.useMutation({
+    onSuccess: (data: any) => downloadBase64Excel(data.base64, data.filename),
+    onError: (e: any) => alert("Error: " + e.message),
+  });
+
+  const excelReports = [
+    {
+      name: "Reporte Financiero Excel",
+      description: `Ingresos, egresos por categoría, utilidad neta del período ${from} → ${to}`,
+      icon: DollarSign,
+      loading: financialMut.isPending,
+      onClick: () => financialMut.mutate({ from, to }),
+    },
+    {
+      name: "Inventario a Fecha de Corte",
+      description: `Unidades activas, costo acumulado, antigüedad al ${cutoff}`,
+      icon: Package,
+      loading: inventoryMut.isPending,
+      onClick: () => inventoryMut.mutate({ cutoffDate: cutoff }),
+      extra: (
+        <div className="mt-2">
+          <label className="text-xs text-gray-500 block mb-1">Fecha de corte:</label>
+          <input
+            type="date"
+            value={cutoff}
+            onChange={(e) => setCutoff(e.target.value)}
+            className="border rounded px-2 py-1 text-xs w-full"
+          />
+        </div>
+      ),
+    },
+    {
+      name: "Garantías y Devoluciones Excel",
+      description: `Devoluciones y garantías del período ${from} → ${to}`,
+      icon: Activity,
+      loading: warrantyMut.isPending,
+      onClick: () => warrantyMut.mutate({ from, to }),
+    },
+  ];
+
+  return (
+    <div className="mt-8">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="h-8 w-8 rounded-xl bg-emerald-100 flex items-center justify-center">
+          <FileText size={16} className="text-emerald-600" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-gray-800">Exportar a Excel</h2>
+          <p className="text-sm text-gray-500">Reportes de período cerrado exportables a .xlsx</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {excelReports.map((rep) => (
+          <div key={rep.name} className="bg-white rounded-lg border border-gray-200 p-5 hover:border-emerald-300 transition-all">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
+                <rep.icon size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-gray-800 text-sm leading-snug">{rep.name}</h3>
+                <p className="text-xs text-gray-500 mt-0.5">{rep.description}</p>
+              </div>
+            </div>
+            {rep.extra}
+            <button
+              onClick={rep.onClick}
+              disabled={rep.loading}
+              className="mt-3 w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg text-sm font-semibold transition-colors"
+            >
+              <Download size={14} />
+              {rep.loading ? "Generando..." : "Descargar Excel"}
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

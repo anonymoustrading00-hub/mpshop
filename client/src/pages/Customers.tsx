@@ -878,14 +878,8 @@ export default function Customers() {
                       age: newCustomer.age ? parseInt(newCustomer.age, 10) : undefined,
                       gender: newCustomer.gender.trim() || undefined,
                       socioeconomicLevel: newCustomer.socioeconomicLevel.trim() || undefined,
-                      interestHealthFitness: newCustomer.interestHealthFitness,
-                      interestNaturalFood: newCustomer.interestNaturalFood,
-                      interestDigestiveIssues: newCustomer.interestDigestiveIssues,
-                      lifestyleGym: newCustomer.lifestyleGym,
-                      lifestyleVegan: newCustomer.lifestyleVegan,
-                      lifestyleBiohacking: newCustomer.lifestyleBiohacking,
                       customerType: newCustomer.customerType,
-                    });
+                    } as any);
                   }}
                 >
                   {createCustomerMutation.isPending ? "Guardando..." : "Guardar cliente"}

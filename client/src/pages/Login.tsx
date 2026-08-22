@@ -14,6 +14,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const utils = trpc.useUtils();
+  const { data: companyConfig } = trpc.settings.getCompanyConfig.useQuery();
 
   const loginMutation = trpc.auth.loginTraditional.useMutation({
     onSuccess: async () => {
@@ -48,11 +49,19 @@ export default function Login() {
         <Card className="overflow-hidden border-none shadow-[0_32px_64px_-16px_rgba(15,23,42,0.15)] bg-white/90 backdrop-blur-xl rounded-[2.5rem]">
           <CardHeader className="space-y-6 border-b border-slate-100 bg-gradient-to-b from-slate-50/50 to-white p-8 sm:p-10 text-center">
               <div className="mx-auto transform transition-transform hover:scale-105 duration-300">
-                <img src="/logo.png" alt="Vitalia Logo" className="mx-auto h-36 w-auto object-contain drop-shadow-sm" />
+                <img
+                  src={companyConfig?.logo || "/logo.png"}
+                  alt={companyConfig?.name || "Logo Empresa"}
+                  className="mx-auto h-32 w-auto max-w-[240px] object-contain drop-shadow-sm"
+                />
               </div>
               <div className="space-y-1.5">
-                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Bienvenido</h2>
-                <p className="text-sm text-slate-500 font-medium">Inicia sesion para continuar con tu jornada diaria.</p>
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+                  {companyConfig?.name || "Bienvenido"}
+                </h2>
+                <p className="text-xs text-slate-500 font-medium">
+                  {companyConfig?.slogan || "Inicia sesión para continuar con tu jornada diaria."}
+                </p>
               </div>
             </CardHeader>
  

@@ -3,25 +3,21 @@ import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-or
 
 /**
  * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
  */
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. Nullable para usuarios tradicionales. */
   openId: varchar("openId", { length: 64 }).unique().notNull().default(""),
-  /** Username para login tradicional */
   username: varchar("username", { length: 100 }).unique(),
-  /** Password hasheada con bcrypt */
   passwordHash: text("passwordHash"),
   name: text("name"),
   email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 50 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: mysqlEnum("role", ["admin", "technician", "seller", "cashier", "user"]).default("seller").notNull(),
+  status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(),
+  allowedModules: text("allowedModules"), // JSON array of module keys or null for full access
+  specialPermissions: text("specialPermissions"), // JSON object of special booleans
+  assignedBranchIds: text("assignedBranchIds"), // JSON array of branch IDs or ["all"]
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -61,11 +57,22 @@ export const userBranches = mysqlTable("userBranches", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id),
   branchId: int("branchId").notNull().references(() => branches.id),
-  isDefault: int("isDefault").default(0).notNull(), // 1 para la sucursal por defecto del usuario
+  isDefault: int("isDefault").default(0).notNull(),
 });
 
 export type UserBranch = typeof userBranches.$inferSelect;
 export type InsertUserBranch = typeof userBranches.$inferInsert;
+
+// Configuración global del sistema
+export const systemSettings = mysqlTable("systemSettings", {
+  id: int("id").autoincrement().primaryKey(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SystemSetting = typeof systemSettings.$inferSelect;
+export type InsertSystemSetting = typeof systemSettings.$inferInsert;
 
 // Tabla de clientes
 export const customers = mysqlTable("customers", {
@@ -83,15 +90,10 @@ export const customers = mysqlTable("customers", {
   socioeconomicLevel: varchar("socioeconomicLevel", { length: 50 }),
   sourceChannel: mysqlEnum("sourceChannel", ["facebook", "tiktok", "marketplace", "referral", "other"]).default("other"),
   customerType: mysqlEnum("customerType", ["retail", "wholesale"]).default("retail").notNull(),
-  interestHealthFitness: int("interestHealthFitness").notNull().default(0),
-  interestNaturalFood: int("interestNaturalFood").notNull().default(0),
-  interestDigestiveIssues: int("interestDigestiveIssues").notNull().default(0),
-  lifestyleGym: int("lifestyleGym").notNull().default(0),
-  lifestyleVegan: int("lifestyleVegan").notNull().default(0),
   taxId: varchar("taxId", { length: 50 }), // NIT o CI
-  creditLimit: int("creditLimit").notNull().default(0), // Limite de credito en centavos (ej: 500000 = Bs 5000)
-  creditDays: int("creditDays").notNull().default(30), // Dias de credito permitidos
-  allowCredit: int("allowCredit").notNull().default(1), // 1 permite venta a credito, 0 prohibido
+  creditLimit: int("creditLimit").notNull().default(0), // Limite en centavos
+  creditDays: int("creditDays").notNull().default(30),
+  allowCredit: int("allowCredit").notNull().default(1),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -99,80 +101,192 @@ export const customers = mysqlTable("customers", {
 export type Customer = typeof customers.$inferSelect;
 export type InsertCustomer = typeof customers.$inferInsert;
 
-// Tabla de productos
-export const products = mysqlTable("products", {
+// Lotes de códigos pre-generados
+export const generatedCodeBatches = mysqlTable("generatedCodeBatches", {
   id: int("id").autoincrement().primaryKey(),
-  code: varchar("code", { length: 50 }).notNull().unique(), // Código personalizado del producto
+  quantity: int("quantity").notNull(),
+  type: mysqlEnum("type", ["qr", "barcode"]).notNull(),
+  createdBy: int("createdBy").notNull().references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type GeneratedCodeBatch = typeof generatedCodeBatches.$inferSelect;
+export type InsertGeneratedCodeBatch = typeof generatedCodeBatches.$inferInsert;
+
+// Códigos individuales generados
+export const generatedCodes = mysqlTable("generatedCodes", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 100 }).notNull().unique(),
+  type: mysqlEnum("type", ["qr", "barcode"]).notNull(),
+  status: mysqlEnum("status", ["unassigned", "assigned"]).default("unassigned").notNull(),
+  batchId: int("batchId").notNull().references(() => generatedCodeBatches.id),
+  assignedUnitId: int("assignedUnitId"), // FK logica a units.id
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  assignedAt: timestamp("assignedAt"),
+});
+
+export type GeneratedCode = typeof generatedCodes.$inferSelect;
+export type InsertGeneratedCode = typeof generatedCodes.$inferInsert;
+
+// Tabla de Proveedores
+export const suppliers = mysqlTable("suppliers", {
+  id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
-  category: mysqlEnum("category", ["finished_product", "raw_material", "supplies", "insumo"]).notNull().default("finished_product"), // Producto terminado, Materia prima, Suministro, Insumo
-  price: int("price").notNull(), // Precio de Compra en centavos
-  salePrice: int("salePrice").notNull().default(0), // Precio de Venta Unitario en centavos
-  wholesalePrice: int("wholesalePrice").notNull().default(0), // Precio de Venta por Mayor en centavos
-  discountPrice: int("discountPrice").notNull().default(0), // Precio de Venta con Descuento en centavos
-  wholesaleDiscountType: mysqlEnum("wholesaleDiscountType", ["percentage", "fixed"]).default("percentage"), // Tipo de descuento por mayor
-  wholesaleDiscountValue: int("wholesaleDiscountValue").notNull().default(0), // Valor del descuento por mayor (% o centavos)
-  unit: varchar("unit", { length: 20 }).notNull().default("unidad"), // Unidad operativa: L, ml, kg, g, unidad
-  presentationQuantity: int("presentationQuantity").notNull().default(1), // Cantidad por presentacion en la unidad operativa
-  presentationUnit: varchar("presentationUnit", { length: 20 }).notNull().default("unidad"), // Unidad de compra/presentacion
-  presentationVolumeMl: int("presentationVolumeMl").notNull().default(0), // Volumen por envase/bolsa para balance de masa
-  presentationWeightGr: int("presentationWeightGr").notNull().default(0), // Peso por envase/paquete para balance de masa
-  productionRole: mysqlEnum("productionRole", ["none", "milk", "sugar", "culture", "bottle", "cap", "label", "packaging", "finished_good", "other"]).notNull().default("none"),
-  storageLocation: varchar("storageLocation", { length: 100 }),
-  supplierName: varchar("supplierName", { length: 255 }),
-  productionNotes: text("productionNotes"),
-  status: mysqlEnum("status", ["active", "inactive"]).notNull().default("active"),
-  imageUrl: varchar("imageUrl", { length: 500 }),
+  contactName: varchar("contactName", { length: 255 }),
+  phone: varchar("phone", { length: 20 }),
+  taxId: varchar("taxId", { length: 50 }),
+  address: text("address"),
+  creditDays: int("creditDays").notNull().default(30),
+  creditLimit: int("creditLimit").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-export type Product = typeof products.$inferSelect;
-export type InsertProduct = typeof products.$inferInsert;
+export type Supplier = typeof suppliers.$inferSelect;
+export type InsertSupplier = typeof suppliers.$inferInsert;
 
-// Tabla de inventario
-export const inventory = mysqlTable("inventory", {
+// Tabla de Compras a Proveedores
+export const purchases = mysqlTable("purchases", {
   id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull().references(() => products.id),
-  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
-  batchNumber: varchar("batchNumber", { length: 50 }), // Nuevo: Número de lote
-  quantity: int("quantity").notNull().default(0),
-  minStock: int("minStock").notNull().default(10),
-  expiryDate: varchar("expiryDate", { length: 10 }), // Formato: YYYY-MM-DD
-  lastUpdated: timestamp("lastUpdated").defaultNow().onUpdateNow().notNull(),
+  supplierId: int("supplierId").notNull().references(() => suppliers.id),
+  purchaseNumber: varchar("purchaseNumber", { length: 50 }).notNull().unique(),
+  orderDate: timestamp("orderDate").defaultNow().notNull(),
+  totalAmount: int("totalAmount").notNull(), // Centavos
+  status: mysqlEnum("status", ["pending", "received", "cancelled"]).default("pending").notNull(),
+  paymentStatus: mysqlEnum("paymentStatus", ["pending", "paid"]).default("pending").notNull(),
+  paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer"]).default("cash"),
+  isCredit: int("isCredit").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-// Tabla de movimientos de inventario
-export const inventoryMovements = mysqlTable("inventoryMovements", {
+export type Purchase = typeof purchases.$inferSelect;
+export type InsertPurchase = typeof purchases.$inferInsert;
+
+// Tabla principal de Unidades (Laptops, Tablets, Celulares, Monitores, Cargadores, Accesorios, Otros)
+export const units = mysqlTable("units", {
   id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull().references(() => products.id),
-  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
-  type: mysqlEnum("type", ["entry", "exit", "adjustment"]).notNull(), // Entrada, Salida, Ajuste
-  quantity: int("quantity").notNull(),
-  reason: varchar("reason", { length: 255 }), // Razón del movimiento
+  code: varchar("code", { length: 50 }).notNull().unique(), // "LT-0001", "TB-0001", etc.
+  // RMA permanente del equipo — se asigna la primera vez que entra al taller y nunca cambia
+  rmaNumber: varchar("rmaNumber", { length: 30 }).unique(),
+  codeId: int("codeId").references(() => generatedCodes.id),
+  type: mysqlEnum("type", ["laptop", "tablet", "phone", "monitor", "charger", "accessory", "other"]).notNull(),
+  brand: varchar("brand", { length: 100 }).notNull(),
+  model: varchar("model", { length: 100 }).notNull(),
+  serialNumber: varchar("serialNumber", { length: 100 }), // IMEI para phones/tablets, S/N para laptops
+  specs: text("specs"), // JSON libre: cpu, ram, storage, gpu, screenSize, resolution, batteryDuration, etc.
+  condition: int("condition"), // 1-10 (nullable para accesorios/cargadores)
+  batteryHealth: mysqlEnum("batteryHealth", ["good", "fair", "bad_plugged_only", "n_a"]).default("n_a").notNull(),
+  damageChecklist: text("damageChecklist"), // JSON: ver checklist por tipo en /client/src/pages/RegisterUnit.tsx
+  damageNotes: text("damageNotes"),
+  functionalTestPassed: int("functionalTestPassed").default(1), // 1=true, 0=false (para accesorios)
+  status: mysqlEnum("status", ["in_diagnosis", "in_repair", "available", "sold", "returned"]).default("in_diagnosis").notNull(),
+  purchaseId: int("purchaseId").references(() => purchases.id),
+  purchasePrice: int("purchasePrice").notNull(), // centavos
+  salePrice: int("salePrice"), // centavos - Precio Venta Unit
+  discountPrice: int("discountPrice"), // centavos - Precio Descuento
+  wholesalePrice: int("wholesalePrice"), // centavos - Precio Mayor
+  supplierId: int("supplierId").references(() => suppliers.id),
+  purchaseDate: varchar("purchaseDate", { length: 10 }), // YYYY-MM-DD
+  photos: text("photos"), // JSON array of base64 image strings
+  tiktokUrl: varchar("tiktokUrl", { length: 500 }), // Enlace a video de TikTok
+  branchId: int("branchId").notNull().default(1).references(() => branches.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Unit = typeof units.$inferSelect;
+export type InsertUnit = typeof units.$inferInsert;
+
+// Historial de eventos / estados de cada unidad
+export const unitEvents = mysqlTable("unitEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  unitId: int("unitId").notNull().references(() => units.id),
+  eventType: varchar("eventType", { length: 50 }).notNull(), // "created", "status_change", "repair_start", "sold", "returned"
+  fromStatus: varchar("fromStatus", { length: 50 }),
+  toStatus: varchar("toStatus", { length: 50 }),
+  userId: int("userId").references(() => users.id),
   notes: text("notes"),
-  userId: int("userId").references(() => users.id), // Nuevo: Usuario que realizó el movimiento
-  orderId: int("orderId").references(() => orders.id), // Nuevo: Pedido vinculado
-  saleId: int("saleId").references(() => sales.id), // Nuevo: Venta vinculada
-  batchNumber: varchar("batchNumber", { length: 50 }), // Nuevo: Lote asociado al movimiento
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-export type InventoryMovement = typeof inventoryMovements.$inferSelect;
-export type InsertInventoryMovement = typeof inventoryMovements.$inferInsert;
+export type UnitEvent = typeof unitEvents.$inferSelect;
+export type InsertUnitEvent = typeof unitEvents.$inferInsert;
 
-export type Inventory = typeof inventory.$inferSelect;
-export type InsertInventory = typeof inventory.$inferInsert;
+// Tabla de Taller / Reparaciones
+export const repairs = mysqlTable("repairs", {
+  id: int("id").autoincrement().primaryKey(),
+  // rmaNumber: referencia al RMA permanente de la unidad (units.rmaNumber) — solo para display rápido
+  rmaNumber: varchar("rmaNumber", { length: 30 }).unique(),
+  // otNumber: número de Orden de Trabajo — nuevo por cada entrada al taller
+  otNumber: varchar("otNumber", { length: 30 }).unique(),
+  unitId: int("unitId").notNull().references(() => units.id),
+  technicianId: int("technicianId").references(() => users.id),
+  startDate: timestamp("startDate").defaultNow().notNull(),
+  endDate: timestamp("endDate"),
+  partsUsed: text("partsUsed"), // JSON
+  laborCost: int("laborCost").default(0).notNull(), // centavos
+  partsCost: int("partsCost").default(0).notNull(), // centavos
+  status: mysqlEnum("status", ["in_progress", "completed", "cancelled"]).default("in_progress").notNull(),
+  resolutionType: mysqlEnum("resolutionType", ["return_to_customer", "return_to_inventory"]),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
 
-// Tabla de pedidos
+export type Repair = typeof repairs.$inferSelect;
+export type InsertRepair = typeof repairs.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tabla de Empleados
+// ─────────────────────────────────────────────────────────────────────────────
+export const employees = mysqlTable("employees", {
+  id:           int("id").autoincrement().primaryKey(),
+  // Identificación
+  fullName:     varchar("fullName", { length: 255 }).notNull(),
+  ci:           varchar("ci", { length: 20 }),                     // Cédula de Identidad
+  // Rol laboral en el negocio
+  role: mysqlEnum("role", [
+    "repartidor",   // delivery
+    "ventas",       // sales
+    "almacen",      // warehouse
+    "tecnico",      // technician
+    "administracion",
+    "otro",
+  ]).notNull().default("otro"),
+  // Vínculo opcional con usuario del sistema (técnicos, repartidores ya registrados)
+  userId:       int("userId").references(() => users.id),
+  // Datos de pago
+  baseSalary:   int("baseSalary").notNull().default(0),     // centavos Bs.
+  // Descuentos fijos mensuales (AFP, seguro, etc.) — JSON: [{name, amount}]
+  fixedDeductions: text("fixedDeductions"),
+  // Datos de contacto
+  phone:        varchar("phone", { length: 20 }),
+  address:      varchar("address", { length: 255 }),
+  // Fechas
+  startDate:    varchar("startDate", { length: 10 }),       // YYYY-MM-DD
+  birthDate:    varchar("birthDate", { length: 10 }),       // YYYY-MM-DD
+  // Estado
+  status: mysqlEnum("status", ["active", "inactive"]).notNull().default("active"),
+  // Notas adicionales
+  notes:        text("notes"),
+  branchId:     int("branchId").notNull().default(1).references(() => branches.id),
+  createdAt:    timestamp("createdAt").defaultNow().notNull(),
+  updatedAt:    timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Employee    = typeof employees.$inferSelect;
+export type InsertEmployee = typeof employees.$inferInsert;
 export const orders = mysqlTable("orders", {
   id: int("id").autoincrement().primaryKey(),
   orderNumber: varchar("orderNumber", { length: 50 }).notNull().unique(),
-  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
+  branchId: int("branchId").notNull().default(1).references(() => branches.id),
   customerId: int("customerId").notNull().references(() => customers.id),
   deliveryPersonId: int("deliveryPersonId").references(() => users.id),
   zone: varchar("zone", { length: 100 }),
   status: mysqlEnum("status", ["pending", "assigned", "in_transit", "delivered", "cancelled", "rescheduled"]).default("pending").notNull(),
-  totalPrice: int("totalPrice").notNull(), // Precio total en centavos
+  totalPrice: int("totalPrice").notNull(), // centavos
   paymentMethod: mysqlEnum("paymentMethod", ["qr", "cash", "transfer"]),
   paymentStatus: mysqlEnum("paymentStatus", ["pending", "completed", "failed"]).default("pending").notNull(),
   notes: text("notes"),
@@ -180,12 +294,12 @@ export const orders = mysqlTable("orders", {
   cancelledBy: mysqlEnum("cancelledBy", ["client", "company", "system"]),
   cancelReason: text("cancelReason"),
   rescheduleReason: text("rescheduleReason"),
-  deliveryDate: varchar("deliveryDate", { length: 10 }), // Formato: YYYY-MM-DD
-  deliveryTime: varchar("deliveryTime", { length: 5 }), // Formato: HH:MM
-  rescheduleRequested: int("rescheduleRequested").default(0), // 1 si se solicitó reprogramación
+  deliveryDate: varchar("deliveryDate", { length: 10 }),
+  deliveryTime: varchar("deliveryTime", { length: 5 }),
+  rescheduleRequested: int("rescheduleRequested").default(0),
   requestedDate: varchar("requestedDate", { length: 10 }),
   requestedTime: varchar("requestedTime", { length: 5 }),
-  cancellationRequested: int("cancellationRequested").default(0), // 1 si se solicitó baja
+  cancellationRequested: int("cancellationRequested").default(0),
   cancellationReason: text("cancellationReason"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -195,95 +309,128 @@ export const orders = mysqlTable("orders", {
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = typeof orders.$inferInsert;
 
-// Tabla de items del pedido
+// Items del pedido (referenciando unidad única)
 export const orderItems = mysqlTable("orderItems", {
   id: int("id").autoincrement().primaryKey(),
   orderId: int("orderId").notNull().references(() => orders.id),
-  productId: int("productId").notNull().references(() => products.id),
-  pricingType: mysqlEnum("pricingType", ["unit", "wholesale", "discount"]).notNull().default("unit"),
-  quantity: int("quantity").notNull(),
-  price: int("price").notNull(), // Precio unitario en centavos
+  unitId: int("unitId").notNull().references(() => units.id),
+  quantity: int("quantity").notNull().default(1),
+  price: int("price").notNull(), // Precio venta unitario en centavos
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertOrderItem = typeof orderItems.$inferInsert;
 
-// Tabla de pagos
-export const payments = mysqlTable("payments", {
+// Tabla de Ventas Presenciales/Directas
+export const sales = mysqlTable("sales", {
   id: int("id").autoincrement().primaryKey(),
-  orderId: int("orderId").notNull().references(() => orders.id),
-  amount: int("amount").notNull(), // Monto en centavos
-  method: mysqlEnum("method", ["qr", "cash", "transfer"]).notNull(),
-  status: mysqlEnum("status", ["pending", "completed", "failed"]).default("pending").notNull(),
-  reference: varchar("reference", { length: 255 }), // Referencia de transferencia o QR
+  saleNumber: varchar("saleNumber", { length: 50 }).notNull().unique(),
+  branchId: int("branchId").notNull().default(1).references(() => branches.id),
+  customerId: int("customerId").references(() => customers.id),
+  customerName: varchar("customerName", { length: 255 }),
+  saleChannel: mysqlEnum("saleChannel", ["local", "delivery"]).notNull().default("local"),
+  status: mysqlEnum("status", ["completed", "cancelled"]).notNull().default("completed"),
+  orderId: int("orderId").references(() => orders.id),
+  soldBy: int("soldBy").notNull().references(() => users.id),
+  subtotal: int("subtotal").notNull(),
+  discountType: mysqlEnum("discountType", ["none", "percentage", "fixed"]).notNull().default("none"),
+  discountValue: int("discountValue").notNull().default(0),
+  discountAmount: int("discountAmount").notNull().default(0),
+  total: int("total").notNull(),
+  paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer", "credit"]).notNull(),
+  paymentStatus: mysqlEnum("paymentStatus", ["pending", "completed"]).default("completed").notNull(),
+  dueDate: varchar("dueDate", { length: 10 }),
+  warrantyDays: int("warrantyDays").default(30).notNull(),
+  adminOverrideUserId: int("adminOverrideUserId").references(() => users.id),
   notes: text("notes"),
+  cancelReason: text("cancelReason"),
+  cancelledAt: timestamp("cancelledAt"),
+  cancelledBy: int("cancelledBy").references(() => users.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-export type Payment = typeof payments.$inferSelect;
-export type InsertPayment = typeof payments.$inferInsert;
+export type Sale = typeof sales.$inferSelect;
+export type InsertSale = typeof sales.$inferInsert;
 
-// Tabla de proveedores
-export const suppliers = mysqlTable("suppliers", {
+// Items de la venta
+export const saleItems = mysqlTable("saleItems", {
   id: int("id").autoincrement().primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
-  contactName: varchar("contactName", { length: 255 }),
-  phone: varchar("phone", { length: 20 }),
-  taxId: varchar("taxId", { length: 50 }), // NIT o CI
-  address: text("address"),
-  creditDays: int("creditDays").notNull().default(30), // Dias de credito del proveedor
-  creditLimit: int("creditLimit").notNull().default(0), // Limite de credito en centavos
+  saleId: int("saleId").notNull().references(() => sales.id),
+  unitId: int("unitId").notNull().references(() => units.id),
+  quantity: int("quantity").notNull().default(1),
+  basePrice: int("basePrice").notNull(),
+  discountType: mysqlEnum("discountType", ["none", "percentage", "fixed"]).notNull().default("none"),
+  discountValue: int("discountValue").notNull().default(0),
+  discountAmount: int("discountAmount").notNull().default(0),
+  finalUnitPrice: int("finalUnitPrice").notNull().default(0),
+  subtotal: int("subtotal").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-export type Supplier = typeof suppliers.$inferSelect;
-export type InsertSupplier = typeof suppliers.$inferInsert;
+export type SaleItem = typeof saleItems.$inferSelect;
+export type InsertSaleItem = typeof saleItems.$inferInsert;
 
-// Tabla de compras
-export const purchases = mysqlTable("purchases", {
+// Tabla de Garantías
+export const warranties = mysqlTable("warranties", {
   id: int("id").autoincrement().primaryKey(),
-  supplierId: int("supplierId").notNull().references(() => suppliers.id),
-  purchaseNumber: varchar("purchaseNumber", { length: 50 }).notNull().unique(),
-  orderDate: timestamp("orderDate").defaultNow().notNull(),
-  totalAmount: int("totalAmount").notNull(),
-  status: mysqlEnum("status", ["pending", "received", "cancelled"]).default("pending").notNull(),
-  paymentStatus: mysqlEnum("paymentStatus", ["pending", "paid"]).default("pending").notNull(),
-  paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer"]).default("cash"),
-  isCredit: int("isCredit").default(0), // 1 para crédito, 0 para contado
+  saleId: int("saleId").references(() => sales.id),
+  orderId: int("orderId").references(() => orders.id),
+  unitId: int("unitId").notNull().references(() => units.id),
+  days: int("days").notNull(), // Días de garantía (ej: 30, 90, 180)
+  startDate: timestamp("startDate").defaultNow().notNull(),
+  endDate: timestamp("endDate").notNull(),
+  status: mysqlEnum("status", ["active", "expired", "claimed"]).default("active").notNull(),
+  pausedAt: timestamp("pausedAt"),
+  remainingDaysAtPause: int("remainingDaysAtPause"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-export type Purchase = typeof purchases.$inferSelect;
-export type InsertPurchase = typeof purchases.$inferInsert;
+export type Warranty = typeof warranties.$inferSelect;
+export type InsertWarranty = typeof warranties.$inferInsert;
 
-// Tabla de items de compra
+// Tabla de Devoluciones (RMA)
+export const returns = mysqlTable("returns", {
+  id: int("id").autoincrement().primaryKey(),
+  warrantyId: int("warrantyId").references(() => warranties.id),
+  unitId: int("unitId").notNull().references(() => units.id),
+  // Si hay venta asociada (para poder anularla o registrar el reembolso)
+  saleId: int("saleId").references(() => sales.id),
+  returnDate: timestamp("returnDate").defaultNow().notNull(),
+  reason: text("reason").notNull(),
+  resolution: text("resolution"),
+  reenteredRepair: int("reenteredRepair").default(0).notNull(),
+  // Devolución de dinero: monto en centavos y método de caja por donde sale
+  refundAmount: int("refundAmount"),
+  refundPaymentMethod: varchar("refundPaymentMethod", { length: 20 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ReturnRma = typeof returns.$inferSelect;
+export type InsertReturnRma = typeof returns.$inferInsert;
+
+// Items de compra
 export const purchaseItems = mysqlTable("purchaseItems", {
   id: int("id").autoincrement().primaryKey(),
   purchaseId: int("purchaseId").notNull().references(() => purchases.id),
-  productId: int("productId").notNull().references(() => products.id),
-  quantity: int("quantity").notNull(),
+  unitId: int("unitId").notNull().references(() => units.id),
+  quantity: int("quantity").notNull().default(1),
   price: int("price").notNull(),
-  batchNumber: varchar("batchNumber", { length: 50 }), // Nuevo: Lote
-  expiryDate: varchar("expiryDate", { length: 10 }), // Lote con fecha de vencimiento
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type PurchaseItem = typeof purchaseItems.$inferSelect;
 export type InsertPurchaseItem = typeof purchaseItems.$inferInsert;
 
-// Tabla de cuentas por pagar (CXP)
+// Cuentas por Pagar (CXP)
 export const accountsPayable = mysqlTable("accountsPayable", {
   id: int("id").autoincrement().primaryKey(),
   purchaseId: int("purchaseId").notNull().references(() => purchases.id),
   supplierId: int("supplierId").notNull().references(() => suppliers.id),
-  totalAmount: int("totalAmount").notNull(), // Monto total en centavos
-  paidAmount: int("paidAmount").notNull().default(0), // Monto pagado hasta la fecha
-  balance: int("balance").notNull(), // Saldo pendiente en centavos
-  dueDate: varchar("dueDate", { length: 10 }), // YYYY-MM-DD
+  totalAmount: int("totalAmount").notNull(),
+  paidAmount: int("paidAmount").notNull().default(0),
+  balance: int("balance").notNull(),
+  dueDate: varchar("dueDate", { length: 10 }),
   status: mysqlEnum("status", ["unpaid", "partially_paid", "paid", "overdue"]).default("unpaid").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -292,15 +439,15 @@ export const accountsPayable = mysqlTable("accountsPayable", {
 export type AccountsPayable = typeof accountsPayable.$inferSelect;
 export type InsertAccountsPayable = typeof accountsPayable.$inferInsert;
 
-// Tabla de cuentas por cobrar (CXC)
+// Cuentas por Cobrar (CXC)
 export const accountsReceivable = mysqlTable("accountsReceivable", {
   id: int("id").autoincrement().primaryKey(),
   saleId: int("saleId").notNull().references(() => sales.id),
   customerId: int("customerId").notNull().references(() => customers.id),
-  totalAmount: int("totalAmount").notNull(), // Monto total en centavos
-  paidAmount: int("paidAmount").notNull().default(0), // Monto abonado
-  balance: int("balance").notNull(), // Saldo pendiente en centavos
-  dueDate: varchar("dueDate", { length: 10 }), // YYYY-MM-DD
+  totalAmount: int("totalAmount").notNull(),
+  paidAmount: int("paidAmount").notNull().default(0),
+  balance: int("balance").notNull(),
+  dueDate: varchar("dueDate", { length: 10 }),
   status: mysqlEnum("status", ["unpaid", "partially_paid", "paid", "overdue"]).default("unpaid").notNull(),
   adminOverrideUserId: int("adminOverrideUserId").references(() => users.id),
   adminOverrideReason: text("adminOverrideReason"),
@@ -311,19 +458,19 @@ export const accountsReceivable = mysqlTable("accountsReceivable", {
 export type AccountsReceivable = typeof accountsReceivable.$inferSelect;
 export type InsertAccountsReceivable = typeof accountsReceivable.$inferInsert;
 
-// Tabla de historial de abonos / pagos a deudas (CXC y CXP)
+// Historial de Pagos / Abonos
 export const creditPayments = mysqlTable("creditPayments", {
   id: int("id").autoincrement().primaryKey(),
-  type: mysqlEnum("type", ["receivable", "payable"]).notNull(), // receivable (CXC) o payable (CXP)
+  type: mysqlEnum("type", ["receivable", "payable"]).notNull(),
   accountsReceivableId: int("accountsReceivableId").references(() => accountsReceivable.id),
   accountsPayableId: int("accountsPayableId").references(() => accountsPayable.id),
   customerId: int("customerId").references(() => customers.id),
   supplierId: int("supplierId").references(() => suppliers.id),
-  amount: int("amount").notNull(), // Monto abonado en centavos
+  amount: int("amount").notNull(),
   paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer"]).notNull().default("cash"),
-  reference: varchar("reference", { length: 255 }), // Numero de recibo o comprobante de pago
+  reference: varchar("reference", { length: 255 }),
   notes: text("notes"),
-  userId: int("userId").notNull().references(() => users.id), // Quien cobró o pagó
+  userId: int("userId").notNull().references(() => users.id),
   receiptNumber: varchar("receiptNumber", { length: 50 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -331,7 +478,7 @@ export const creditPayments = mysqlTable("creditPayments", {
 export type CreditPayment = typeof creditPayments.$inferSelect;
 export type InsertCreditPayment = typeof creditPayments.$inferInsert;
 
-// Tabla de gastos de repartidor
+// Gastos de repartidor
 export const deliveryExpenses = mysqlTable("deliveryExpenses", {
   id: int("id").autoincrement().primaryKey(),
   deliveryPersonId: int("deliveryPersonId").notNull().references(() => users.id),
@@ -345,10 +492,10 @@ export const deliveryExpenses = mysqlTable("deliveryExpenses", {
 export type DeliveryExpense = typeof deliveryExpenses.$inferSelect;
 export type InsertDeliveryExpense = typeof deliveryExpenses.$inferInsert;
 
-// Tabla de gastos operativos (servicios, publicidad, alquiler, etc.)
+// Gastos operacionales
 export const operationalExpenses = mysqlTable("operationalExpenses", {
   id: int("id").autoincrement().primaryKey(),
-  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
+  branchId: int("branchId").notNull().default(1).references(() => branches.id),
   description: varchar("description", { length: 255 }).notNull(),
   category: mysqlEnum("category", [
     "facebook_ads",
@@ -364,17 +511,29 @@ export const operationalExpenses = mysqlTable("operationalExpenses", {
     "taxes",
     "insurance",
     "bank_fees",
+    // Costos directos del negocio (se crean automáticamente)
+    "repair_cost",
+    "warranty_repair_cost",
+    "warranty_replacement_cost",
+    "cogs",
     "other"
   ]).notNull(),
-  amount: int("amount").notNull(), // Monto en centavos
+  // Clasificación de alto nivel: "direct_cost" | "repair_cost" | "warranty_cost" | "operational_expense" | "admin_expense"
+  costType: varchar("costType", { length: 50 }),
+  // Referencia al origen del costo (repair, sale, warranty, return)
+  referenceType: varchar("referenceType", { length: 50 }),
+  referenceId: int("referenceId"),
+  // 1 = generado automáticamente por el sistema, 0 = ingresado manualmente
+  isAutomatic: int("isAutomatic").notNull().default(0),
+  amount: int("amount").notNull(),
   paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer"]).notNull(),
-  expenseDate: timestamp("expenseDate").defaultNow().notNull(), // Fecha del gasto
-  dueDate: timestamp("dueDate"), // Fecha de vencimiento (para gastos pendientes)
+  expenseDate: timestamp("expenseDate").defaultNow().notNull(),
+  dueDate: timestamp("dueDate"),
   status: mysqlEnum("status", ["pending", "paid"]).default("pending").notNull(),
-  supplierName: varchar("supplierName", { length: 255 }), // Empresa/proveedor del servicio
-  invoiceNumber: varchar("invoiceNumber", { length: 100 }), // Número de factura/comprobante
+  supplierName: varchar("supplierName", { length: 255 }),
+  invoiceNumber: varchar("invoiceNumber", { length: 100 }),
   notes: text("notes"),
-  userId: int("userId").references(() => users.id), // Usuario que registró
+  userId: int("userId").references(() => users.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -382,16 +541,18 @@ export const operationalExpenses = mysqlTable("operationalExpenses", {
 export type OperationalExpense = typeof operationalExpenses.$inferSelect;
 export type InsertOperationalExpense = typeof operationalExpenses.$inferInsert;
 
-// Tabla de transacciones financieras (Libro Diario)
+// Transacciones financieras (Libro Diario)
 export const financialTransactions = mysqlTable("financialTransactions", {
   id: int("id").autoincrement().primaryKey(),
-  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
+  branchId: int("branchId").notNull().default(1).references(() => branches.id),
   type: mysqlEnum("type", ["income", "expense"]).notNull(),
-  category: varchar("category", { length: 100 }).notNull(), // sale, purchase, salary, fuel, etc.
+  category: varchar("category", { length: 100 }).notNull(),
   paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer"]).default("cash"),
   amount: int("amount").notNull(),
-  userId: int("userId").references(() => users.id), // Usuario que generó la transacción
-  referenceId: int("referenceId"), // ID del pedido o compra
+  // Para COGS: costo de adquisición de la unidad vendida (centavos)
+  unitCost: int("unitCost"),
+  userId: int("userId").references(() => users.id),
+  referenceId: int("referenceId"),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -399,27 +560,27 @@ export const financialTransactions = mysqlTable("financialTransactions", {
 export type FinancialTransaction = typeof financialTransactions.$inferSelect;
 export type InsertFinancialTransaction = typeof financialTransactions.$inferInsert;
 
-// Tabla de rastreo GPS
+// GPS Tracking
 export const gpsTracking = mysqlTable("gpsTracking", {
   id: int("id").autoincrement().primaryKey(),
   orderId: int("orderId").notNull().references(() => orders.id),
   deliveryPersonId: int("deliveryPersonId").notNull().references(() => users.id),
   latitude: varchar("latitude", { length: 50 }).notNull(),
   longitude: varchar("longitude", { length: 50 }).notNull(),
-  accuracy: int("accuracy"), // Precisión en metros
+  accuracy: int("accuracy"),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 
 export type GPSTracking = typeof gpsTracking.$inferSelect;
 export type InsertGPSTracking = typeof gpsTracking.$inferInsert;
 
-// Tabla de cierres de caja (NUEVO)
+// Cierres de Caja
 export const cashClosures = mysqlTable("cash_closures", {
   id: int("id").autoincrement().primaryKey(),
-  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
+  branchId: int("branchId").notNull().default(1).references(() => branches.id),
   userId: int("userId").notNull().references(() => users.id),
-  date: varchar("date", { length: 10 }).notNull(), // Formato YYYY-MM-DD
-  initialCash: int("initialCash").default(0), // Monto asignado
+  date: varchar("date", { length: 10 }).notNull(),
+  initialCash: int("initialCash").default(0),
   reportedCash: int("reportedCash").default(0),
   reportedQr: int("reportedQr").default(0),
   reportedTransfer: int("reportedTransfer").default(0),
@@ -427,7 +588,7 @@ export const cashClosures = mysqlTable("cash_closures", {
   expectedQr: int("expectedQr").default(0),
   expectedTransfer: int("expectedTransfer").default(0),
   expenses: int("expenses").default(0),
-  pendingOrders: int("pendingOrders").default(0), // Monto pendiente de órdenes sin entregar
+  pendingOrders: int("pendingOrders").default(0),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   adminNotes: text("adminNotes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -436,11 +597,10 @@ export const cashClosures = mysqlTable("cash_closures", {
 export type CashClosure = typeof cashClosures.$inferSelect;
 export type InsertCashClosure = typeof cashClosures.$inferInsert;
 
-// Tabla de aperturas de caja
+// Aperturas de Caja
 export const cashOpenings = mysqlTable("cash_openings", {
   id: int("id").autoincrement().primaryKey(),
-  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
-  openingDate: varchar("openingDate", { length: 10 }).notNull(), // Formato YYYY-MM-DD
+  openingDate: varchar("openingDate", { length: 10 }).notNull(),
   openingAmount: int("openingAmount").notNull().default(0),
   paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer"]).default("cash"),
   responsibleUserId: int("responsibleUserId").notNull().references(() => users.id),
@@ -453,73 +613,16 @@ export const cashOpenings = mysqlTable("cash_openings", {
 export type CashOpening = typeof cashOpenings.$inferSelect;
 export type InsertCashOpening = typeof cashOpenings.$inferInsert;
 
-// Tabla de Ventas
-export const sales = mysqlTable("sales", {
-  id: int("id").autoincrement().primaryKey(),
-  saleNumber: varchar("saleNumber", { length: 50 }).notNull().unique(),
-  branchId: int("branchId").notNull().default(1).references(() => branches.id), // Nuevo: Sucursal
-  customerId: int("customerId").references(() => customers.id), // Nulo = venta anónima
-  customerName: varchar("customerName", { length: 255 }), // Para ventas anónimas
-  saleChannel: mysqlEnum("saleChannel", ["local", "delivery"]).notNull().default("local"),
-  status: mysqlEnum("status", ["completed", "cancelled"]).notNull().default("completed"),
-  orderId: int("orderId").references(() => orders.id), // Vinculado a pedido si es entrega
-  soldBy: int("soldBy").notNull().references(() => users.id),
-  subtotal: int("subtotal").notNull(), // Suma de items antes de descuento global
-  discountType: mysqlEnum("discountType", ["none", "percentage", "fixed"]).notNull().default("none"),
-  discountValue: int("discountValue").notNull().default(0), // Porcentaje entero o monto fijo en centavos
-  discountAmount: int("discountAmount").notNull().default(0), // Descuento global adicional
-  total: int("total").notNull(), // Total final en centavos
-  paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer", "credit"]).notNull(),
-  paymentStatus: mysqlEnum("paymentStatus", ["pending", "completed"]).default("completed").notNull(),
-  dueDate: varchar("dueDate", { length: 10 }), // YYYY-MM-DD para ventas a credito
-  adminOverrideUserId: int("adminOverrideUserId").references(() => users.id), // Admin que autorizó excepcion
-  notes: text("notes"),
-  cancelReason: text("cancelReason"),
-  cancelledAt: timestamp("cancelledAt"),
-  cancelledBy: int("cancelledBy").references(() => users.id),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-
-export type Sale = typeof sales.$inferSelect;
-export type InsertSale = typeof sales.$inferInsert;
-
-// Tabla de items de Ventas
-export const saleItems = mysqlTable("saleItems", {
-  id: int("id").autoincrement().primaryKey(),
-  saleId: int("saleId").notNull().references(() => sales.id),
-  productId: int("productId").notNull().references(() => products.id),
-  pricingType: mysqlEnum("pricingType", ["unit", "wholesale", "discount"]).notNull().default("unit"),
-  quantity: int("quantity").notNull(),
-  basePrice: int("basePrice").notNull(), // Precio base (salePrice o wholesalePrice del producto)
-  discountType: mysqlEnum("discountType", ["none", "percentage", "fixed"]).notNull().default("none"),
-  discountValue: int("discountValue").notNull().default(0), // Porcentaje entero o monto fijo en centavos por unidad
-  discountAmount: int("discountAmount").notNull().default(0), // Descuento total aplicado a la línea
-  finalUnitPrice: int("finalUnitPrice").notNull().default(0),
-  subtotal: int("subtotal").notNull(), // (basePrice - discountValue) * quantity
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-
-export type SaleItem = typeof saleItems.$inferSelect;
-export type InsertSaleItem = typeof saleItems.$inferInsert;
-
-// Tabla de Auditoría (Historial de Cambidos)
+// Audit Log
 export const auditLog = mysqlTable("auditLog", {
   id: int("id").autoincrement().primaryKey(),
-  /** Entidad afectada (orders, customers, products, inventory, etc.) */
   entityType: varchar("entityType", { length: 100 }).notNull(),
-  /** ID de la entidad afectada */
   entityId: int("entityId").notNull(),
-  /** Tipo de acción: CREATE, UPDATE, DELETE */
   action: mysqlEnum("action", ["CREATE", "UPDATE", "DELETE"]).notNull(),
-  /** ID del usuario que realizó el cambio */
   userId: int("userId").references(() => users.id),
-  /** JSON con los valores anteriores (para UPDATE/DELETE) */
   oldValues: text("oldValues"),
-  /** JSON con los valores nuevos (para CREATE/UPDATE) */
   newValues: text("newValues"),
-  /** Descripción legible del cambio */
   description: text("description"),
-  /** IP del usuario */
   ipAddress: varchar("ipAddress", { length: 45 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -527,12 +630,12 @@ export const auditLog = mysqlTable("auditLog", {
 export type AuditLog = typeof auditLog.$inferSelect;
 export type InsertAuditLog = typeof auditLog.$inferInsert;
 
-// Tabla de Cotizaciones (Quotations)
+// Cotizaciones
 export const quotations = mysqlTable("quotations", {
   id: int("id").autoincrement().primaryKey(),
   quotationNumber: varchar("quotationNumber", { length: 50 }).notNull().unique(),
-  customerId: int("customerId").references(() => customers.id), // Nulo = cotización anónima
-  customerName: varchar("customerName", { length: 255 }), // Para clientes no registrados
+  customerId: int("customerId").references(() => customers.id),
+  customerName: varchar("customerName", { length: 255 }),
   status: mysqlEnum("status", ["pending", "accepted", "rejected"]).notNull().default("pending"),
   subtotal: int("subtotal").notNull(),
   discountType: mysqlEnum("discountType", ["none", "percentage", "fixed"]).notNull().default("none"),
@@ -550,13 +653,12 @@ export const quotations = mysqlTable("quotations", {
 export type Quotation = typeof quotations.$inferSelect;
 export type InsertQuotation = typeof quotations.$inferInsert;
 
-// Tabla de items de Cotizaciones
+// Items de Cotización
 export const quotationItems = mysqlTable("quotationItems", {
   id: int("id").autoincrement().primaryKey(),
   quotationId: int("quotationId").notNull().references(() => quotations.id),
-  productId: int("productId").notNull().references(() => products.id),
-  pricingType: mysqlEnum("pricingType", ["unit", "wholesale", "discount"]).notNull().default("unit"),
-  quantity: int("quantity").notNull(),
+  unitId: int("unitId").notNull().references(() => units.id),
+  quantity: int("quantity").notNull().default(1),
   basePrice: int("basePrice").notNull(),
   discountType: mysqlEnum("discountType", ["none", "percentage", "fixed"]).notNull().default("none"),
   discountValue: int("discountValue").notNull().default(0),
@@ -569,77 +671,125 @@ export const quotationItems = mysqlTable("quotationItems", {
 export type QuotationItem = typeof quotationItems.$inferSelect;
 export type InsertQuotationItem = typeof quotationItems.$inferInsert;
 
-// Tabla de Carga Extra de Repartidor (Muestras, Venta Libre, etc.)
-export const deliveryExtraLoad = mysqlTable("delivery_extra_load", {
+// Traspasos entre Sucursales
+export const inventoryTransfers = mysqlTable("inventory_transfers", {
   id: int("id").autoincrement().primaryKey(),
-  deliveryPersonId: int("deliveryPersonId").notNull().references(() => users.id),
-  productId: int("productId").notNull().references(() => products.id),
-  quantity: int("quantity").notNull(),
-  type: mysqlEnum("type", ["sale", "sample"]).default("sale").notNull(), // sale = Venta Libre, sample = Degustación
-  status: mysqlEnum("status", ["loaded", "sold", "used", "returned"]).default("loaded").notNull(),
-  date: varchar("date", { length: 10 }).notNull(), // Formato YYYY-MM-DD
+  transferNumber: varchar("transferNumber", { length: 50 }).notNull().unique(),
+  direction: mysqlEnum("direction", ["branch_transfer"]).notNull().default("branch_transfer"),
+  sourceBranchId: int("sourceBranchId").notNull().default(1).references(() => branches.id),
+  destinationBranchId: int("destinationBranchId").notNull().default(1).references(() => branches.id),
+  status: mysqlEnum("status", ["pending", "in_transit", "completed", "cancelled"]).default("pending").notNull(),
+  userId: int("userId").notNull().references(() => users.id),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-export type DeliveryExtraLoad = typeof deliveryExtraLoad.$inferSelect;
-export type InsertDeliveryExtraLoad = typeof deliveryExtraLoad.$inferInsert;
+export type InventoryTransfer = typeof inventoryTransfers.$inferSelect;
+export type InsertInventoryTransfer = typeof inventoryTransfers.$inferInsert;
 
-// Tabla de Lotes de Producción (Planta)
-export const productionBatches = mysqlTable("production_batches", {
+export const inventoryTransferItems = mysqlTable("inventory_transfer_items", {
   id: int("id").autoincrement().primaryKey(),
-  batchNumber: varchar("batchNumber", { length: 50 }).notNull().unique(),
-  type: mysqlEnum("type", ["kefir_production", "nodule_washing", "maintenance"]).notNull(),
-  status: mysqlEnum("status", ["in_progress", "completed", "cancelled"]).default("in_progress").notNull(),
-  startDate: timestamp("startDate").defaultNow().notNull(),
-  endDate: timestamp("endDate"), // Cuando se completa el lote
-  registeredBy: int("registeredBy").notNull().references(() => users.id),
-  notes: text("notes"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
-
-export type ProductionBatch = typeof productionBatches.$inferSelect;
-export type InsertProductionBatch = typeof productionBatches.$inferInsert;
-
-// Tabla de Resultados de Producción (Subproductos y Producto Principal)
-export const productionOutputs = mysqlTable("production_outputs", {
-  id: int("id").autoincrement().primaryKey(),
-  batchId: int("batchId").notNull().references(() => productionBatches.id),
-  productId: int("productId").notNull().references(() => products.id),
-  quantity: int("quantity").notNull(), // Cantidad en la unidad base del producto
-  expectedQuantity: int("expectedQuantity"), // Opcional, para medir rendimiento
+  transferId: int("transferId").notNull().references(() => inventoryTransfers.id),
+  unitId: int("unitId").notNull().references(() => units.id),
+  quantity: int("quantity").notNull().default(1),
+  unitCode: varchar("unitCode", { length: 50 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-export type ProductionOutput = typeof productionOutputs.$inferSelect;
-export type InsertProductionOutput = typeof productionOutputs.$inferInsert;
+export type InventoryTransferItem = typeof inventoryTransferItems.$inferSelect;
+export type InsertInventoryTransferItem = typeof inventoryTransferItems.$inferInsert;
 
-// Tabla de Insumos Consumidos en Producción
-export const productionInputs = mysqlTable("production_inputs", {
-  id: int("id").autoincrement().primaryKey(),
-  batchId: int("batchId").notNull().references(() => productionBatches.id),
-  productId: int("productId").notNull().references(() => products.id),
-  quantity: int("quantity").notNull(), // Cantidad de materia prima consumida
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+// Relaciones Drizzle API
+export const unitsRelations = relations(units, ({ one, many }) => ({
+  branch: one(branches, {
+    fields: [units.branchId],
+    references: [branches.id],
+  }),
+  supplier: one(suppliers, {
+    fields: [units.supplierId],
+    references: [suppliers.id],
+  }),
+  purchase: one(purchases, {
+    fields: [units.purchaseId],
+    references: [purchases.id],
+  }),
+  generatedCode: one(generatedCodes, {
+    fields: [units.codeId],
+    references: [generatedCodes.id],
+  }),
+  events: many(unitEvents),
+  repairs: many(repairs),
+  warranties: many(warranties),
+}));
 
-export type ProductionInput = typeof productionInputs.$inferSelect;
-export type InsertProductionInput = typeof productionInputs.$inferInsert;
+export const unitEventsRelations = relations(unitEvents, ({ one }) => ({
+  unit: one(units, {
+    fields: [unitEvents.unitId],
+    references: [units.id],
+  }),
+  user: one(users, {
+    fields: [unitEvents.userId],
+    references: [users.id],
+  }),
+}));
 
-// Tabla de Inventario en Planta (Almacén de Producción)
-export const productionInventory = mysqlTable("production_inventory", {
-  id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull().references(() => products.id),
-  quantity: int("quantity").notNull().default(0),
-  lastUpdated: timestamp("lastUpdated").defaultNow().onUpdateNow().notNull(),
-});
+export const repairsRelations = relations(repairs, ({ one }) => ({
+  unit: one(units, {
+    fields: [repairs.unitId],
+    references: [units.id],
+  }),
+  technician: one(users, {
+    fields: [repairs.technicianId],
+    references: [users.id],
+  }),
+}));
 
-export type ProductionInventory = typeof productionInventory.$inferSelect;
-export type InsertProductionInventory = typeof productionInventory.$inferInsert;
+export const warrantiesRelations = relations(warranties, ({ one, many }) => ({
+  unit: one(units, {
+    fields: [warranties.unitId],
+    references: [units.id],
+  }),
+  sale: one(sales, {
+    fields: [warranties.saleId],
+    references: [sales.id],
+  }),
+  order: one(orders, {
+    fields: [warranties.orderId],
+    references: [orders.id],
+  }),
+  returns: many(returns),
+}));
 
-// Definición de Relaciones (Drizzle Relational API)
+export const returnsRelations = relations(returns, ({ one }) => ({
+  warranty: one(warranties, {
+    fields: [returns.warrantyId],
+    references: [warranties.id],
+  }),
+  unit: one(units, {
+    fields: [returns.unitId],
+    references: [units.id],
+  }),
+}));
+
+export const generatedCodesRelations = relations(generatedCodes, ({ one }) => ({
+  batch: one(generatedCodeBatches, {
+    fields: [generatedCodes.batchId],
+    references: [generatedCodeBatches.id],
+  }),
+  assignedUnit: one(units, {
+    fields: [generatedCodes.assignedUnitId],
+    references: [units.id],
+  }),
+}));
+
+export const generatedCodeBatchesRelations = relations(generatedCodeBatches, ({ one, many }) => ({
+  creator: one(users, {
+    fields: [generatedCodeBatches.createdBy],
+    references: [users.id],
+  }),
+  codes: many(generatedCodes),
+}));
+
 export const ordersRelations = relations(orders, ({ one, many }) => ({
   customer: one(customers, {
     fields: [orders.customerId],
@@ -657,9 +807,9 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
     fields: [orderItems.orderId],
     references: [orders.id],
   }),
-  product: one(products, {
-    fields: [orderItems.productId],
-    references: [products.id],
+  unit: one(units, {
+    fields: [orderItems.unitId],
+    references: [units.id],
   }),
 }));
 
@@ -677,6 +827,7 @@ export const salesRelations = relations(sales, ({ one, many }) => ({
     fields: [sales.soldBy],
     references: [users.id],
   }),
+  warranties: many(warranties),
 }));
 
 export const saleItemsRelations = relations(saleItems, ({ one }) => ({
@@ -684,9 +835,9 @@ export const saleItemsRelations = relations(saleItems, ({ one }) => ({
     fields: [saleItems.saleId],
     references: [sales.id],
   }),
-  product: one(products, {
-    fields: [saleItems.productId],
-    references: [products.id],
+  unit: one(units, {
+    fields: [saleItems.unitId],
+    references: [units.id],
   }),
 }));
 
@@ -695,78 +846,11 @@ export const customersRelations = relations(customers, ({ many }) => ({
   sales: many(sales),
 }));
 
-export const productsRelations = relations(products, ({ many }) => ({
-  orderItems: many(orderItems),
-  saleItems: many(saleItems),
-  inventory: many(inventory),
-  inventoryTransferItems: many(inventoryTransferItems),
-}));
-
-// Tabla de Traspasos de Inventario (Sucursal <-> Sucursal y Producción)
-export const inventoryTransfers = mysqlTable("inventory_transfers", {
-  id: int("id").autoincrement().primaryKey(),
-  transferNumber: varchar("transferNumber", { length: 50 }).notNull().unique(),
-  direction: mysqlEnum("direction", ["to_production", "to_general", "branch_transfer"]).notNull().default("branch_transfer"),
-  sourceBranchId: int("sourceBranchId").notNull().default(1).references(() => branches.id),
-  destinationBranchId: int("destinationBranchId").notNull().default(1).references(() => branches.id),
-  status: mysqlEnum("status", ["pending", "in_transit", "completed", "cancelled"]).default("pending").notNull(),
-  userId: int("userId").notNull().references(() => users.id),
-  notes: text("notes"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-
-export type InventoryTransfer = typeof inventoryTransfers.$inferSelect;
-export type InsertInventoryTransfer = typeof inventoryTransfers.$inferInsert;
-
-export const inventoryTransferItems = mysqlTable("inventory_transfer_items", {
-  id: int("id").autoincrement().primaryKey(),
-  transferId: int("transferId").notNull().references(() => inventoryTransfers.id),
-  productId: int("productId").notNull().references(() => products.id),
-  quantity: int("quantity").notNull(),
-  productName: varchar("productName", { length: 255 }),
-  productUnit: varchar("productUnit", { length: 20 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-
-export type InventoryTransferItem = typeof inventoryTransferItems.$inferSelect;
-export type InsertInventoryTransferItem = typeof inventoryTransferItems.$inferInsert;
-
-export const inventoryTransfersRelations = relations(inventoryTransfers, ({ one, many }) => ({
-  user: one(users, {
-    fields: [inventoryTransfers.userId],
-    references: [users.id],
-  }),
-  sourceBranch: one(branches, {
-    fields: [inventoryTransfers.sourceBranchId],
-    references: [branches.id],
-    relationName: "sourceTransfers",
-  }),
-  destinationBranch: one(branches, {
-    fields: [inventoryTransfers.destinationBranchId],
-    references: [branches.id],
-    relationName: "destinationTransfers",
-  }),
-  items: many(inventoryTransferItems),
-}));
-
-export const inventoryTransferItemsRelations = relations(inventoryTransferItems, ({ one }) => ({
-  transfer: one(inventoryTransfers, {
-    fields: [inventoryTransferItems.transferId],
-    references: [inventoryTransfers.id],
-  }),
-  product: one(products, {
-    fields: [inventoryTransferItems.productId],
-    references: [products.id],
-  }),
-}));
-
 export const branchesRelations = relations(branches, ({ many }) => ({
   users: many(userBranches),
-  inventory: many(inventory),
+  units: many(units),
   sales: many(sales),
   orders: many(orders),
-  transfersFrom: many(inventoryTransfers, { relationName: "sourceTransfers" }),
-  transfersTo: many(inventoryTransfers, { relationName: "destinationTransfers" }),
 }));
 
 export const userBranchesRelations = relations(userBranches, ({ one }) => ({

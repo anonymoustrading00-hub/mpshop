@@ -51,7 +51,7 @@ export function AddProductDialog({ onProductAdded }: AddProductDialogProps) {
   const [imagePreview, setImagePreview] = useState<string>("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const createProductMutation = trpc.inventory.createProduct.useMutation({
+  const createProductMutation = (trpc.inventory as any).createProduct.useMutation({
     onSuccess: () => {
       toast.success("Producto creado exitosamente");
       setIsOpen(false);

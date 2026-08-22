@@ -296,7 +296,7 @@ export default function Branches() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {branches.map((branch) => (
+            {branches.map((branch: any) => (
               <TableRow key={branch.id} className={activeBranchId === branch.id ? "bg-blue-50/50" : ""}>
                 <TableCell className="font-medium text-slate-500">#{branch.id}</TableCell>
                 <TableCell>

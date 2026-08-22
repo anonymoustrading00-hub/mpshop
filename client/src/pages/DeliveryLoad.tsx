@@ -248,7 +248,7 @@ export default function DeliveryLoad() {
 
   const { data: user } = trpc.auth.me.useQuery();
   const { data: closureStatus } = trpc.finance.hasPendingClosure.useQuery();
-  const isLocked = user?.role === "repartidor" && closureStatus?.hasPending;
+  const isLocked = user?.role === "user" && closureStatus?.hasPending;
 
   if (isLocked) {
     return (
@@ -422,7 +422,7 @@ export default function DeliveryLoad() {
                                   size="sm" 
                                   className="h-7 px-2 text-[10px] font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50 gap-1"
                                   onClick={() => {
-                                     const cleaned = tel.replace(/\D/g, "");
+                                     const cleaned = String(tel || "").replace(/\D/g, "");
                                      let formatted = cleaned;
                                      if (cleaned.length === 8) formatted = "591" + cleaned;
                                      else if (cleaned.startsWith("0") && cleaned.length === 9) formatted = "591" + cleaned.slice(1);

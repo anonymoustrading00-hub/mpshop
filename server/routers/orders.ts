@@ -309,22 +309,20 @@ export const ordersRouter = router({
       }
 
       // Verificar que todos los productos existen en la BD real
+      // Verificar que todas las unidades existen en la BD real
       const db = await import("../db").then(m => m.getDb());
       if (db) {
-        const { products } = await import("../../drizzle/schema");
+        const { units } = await import("../../drizzle/schema");
         const { inArray } = await import("drizzle-orm");
-        const productIds = input.items.map(item => item.productId);
-        const existingProducts = await db.select({ id: products.id }).from(products).where(inArray(products.id, productIds));
-        const existingIds = existingProducts.map(p => p.id);
+        const unitIds = input.items.map(item => (item as any).unitId || (item as any).productId);
+        const existingUnits = await db.select({ id: units.id }).from(units).where(inArray(units.id, unitIds));
+        const existingIds = existingUnits.map((u: any) => u.id);
         
-        for (const id of productIds) {
+        for (const id of unitIds) {
           if (!existingIds.includes(id)) {
-            // Log for debugging
-            const allDbProducts = await db.select({ id: products.id, name: products.name }).from(products);
-            console.error(`Product ID ${id} not found in DB! Available products:`, allDbProducts);
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: `El producto con ID ${id} no existe en la base de datos. Por favor, recarga la página.`,
+              message: `La unidad con ID ${id} no existe en la base de datos.`,
             });
           }
         }
@@ -332,25 +330,24 @@ export const ordersRouter = router({
 
       // Crear items del pedido
       for (const item of input.items) {
+        const unitIdVal = (item as any).unitId || (item as any).productId;
         try {
           await createOrderItem({
             orderId: newOrder.id,
-            productId: item.productId,
-            pricingType: item.pricingType,
-            quantity: item.quantity,
+            unitId: unitIdVal,
+            quantity: 1,
             price: item.price,
           });
         } catch (error: any) {
           console.error("Error inserting order item:", error);
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: `Error MySQL al insertar item (Order: ${newOrder.id}, Product: ${item.productId}): ${error.sqlMessage || error.message || String(error)}`,
+            message: `Error MySQL al insertar item (Order: ${newOrder.id}, Unit: ${unitIdVal}): ${error.sqlMessage || error.message || String(error)}`,
           });
         }
       }
 
-      // Descontar stock del inventario y registrar en historial
-      await deductInventoryForOrder(newOrder.id, finalOrderNumber, input.items.map(i => ({ ...i, orderId: newOrder.id })));
+      await deductInventoryForOrder(newOrder.id, finalOrderNumber, input.items.map(i => ({ unitId: (i as any).unitId || (i as any).productId, price: i.price, orderId: newOrder.id })));
 
       return newOrder;
     }),
@@ -369,8 +366,9 @@ export const ordersRouter = router({
         deliveryTime: z.string().optional(),
         items: z.array(
           z.object({
-            productId: z.number(),
-            quantity: z.number(),
+            unitId: z.number().optional(),
+            productId: z.number().optional(),
+            quantity: z.number().default(1),
             price: z.number(),
             pricingType: z.enum(["unit", "wholesale", "discount"]).default("unit"),
           })
@@ -388,17 +386,14 @@ export const ordersRouter = router({
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
-      // Obtener el pedido actual para revertir inventario
       const currentOrder = await getOrderById(input.id);
       if (!currentOrder) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
       }
 
-      // 1. Revertir inventario de los items actuales antes de borrarlos
       const currentItems = await getOrderItems(input.id);
       await restoreInventoryForOrder(input.id, currentOrder.orderNumber || "", currentItems as any);
 
-      // 2. Asegurar registro del cliente
       const customer = await ensureCustomerRecord({
         clientNumber: input.clientNumber,
         clientName: input.clientName,
@@ -414,7 +409,6 @@ export const ordersRouter = router({
         });
       }
 
-      // 3. Actualizar el pedido
       await updateOrder(input.id, {
         orderNumber: input.orderNumber,
         customerId: customer.id,
@@ -430,20 +424,18 @@ export const ordersRouter = router({
         updatedAt: new Date(),
       });
 
-      // 4. Actualizar items (borrar y crear de nuevo)
       await deleteOrderItems(input.id);
       for (const item of input.items) {
+        const uId = item.unitId || item.productId || 0;
         await createOrderItem({
           orderId: input.id,
-          productId: item.productId,
-          pricingType: item.pricingType,
-          quantity: item.quantity,
+          unitId: uId,
+          quantity: 1,
           price: item.price,
         });
       }
 
-      // 5. Descontar stock del nuevo inventario
-      await deductInventoryForOrder(input.id, input.orderNumber, input.items.map(i => ({ ...i, orderId: input.id })));
+      await deductInventoryForOrder(input.id, input.orderNumber, input.items.map(i => ({ unitId: i.unitId || i.productId || 0, price: i.price, orderId: input.id })));
 
       return { success: true };
     }),
@@ -488,27 +480,6 @@ export const ordersRouter = router({
       // Permisos: Admin o el repartidor asignado
       if (ctx.user?.role !== "admin" && order.deliveryPersonId !== ctx.user?.id) {
         throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
-      // Registrar pago
-      const existingPayment = await getPaymentByOrderId(input.orderId);
-      if (existingPayment) {
-        await updatePayment(existingPayment.id, {
-          amount: input.amount,
-          method: input.method,
-          status: "completed",
-          reference: input.reference,
-          notes: input.notes,
-        });
-      } else {
-        await createPayment({
-          orderId: input.orderId,
-          amount: input.amount,
-          method: input.method,
-          status: "completed",
-          reference: input.reference,
-          notes: input.notes,
-        });
       }
 
       // Marcar entrega automática y procesar impacto (Stock + Finanzas)
@@ -664,6 +635,29 @@ export const ordersRouter = router({
   }),
 
   // Actualización masiva de estados
+  assignDelivery: protectedProcedure
+    .input(z.object({
+      orderId: z.number(),
+      deliveryPersonId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user?.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const order = await getOrderById(input.orderId);
+      if (!order) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      await updateOrder(input.orderId, {
+        deliveryPersonId: input.deliveryPersonId,
+        status: "assigned",
+      });
+
+      return { success: true };
+    }),
+
   bulkUpdateStatus: protectedProcedure
     .input(z.object({
       orderIds: z.array(z.number()),

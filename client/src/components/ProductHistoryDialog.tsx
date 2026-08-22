@@ -151,7 +151,7 @@ export function ProductHistoryDialog({
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const { data, isLoading } = trpc.inventory.getProductHistory.useQuery(
+  const { data, isLoading } = (trpc.inventory as any).getProductHistory.useQuery(
     { productId, startDate, endDate },
     { enabled: isOpen }
   );

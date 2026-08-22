@@ -18,7 +18,7 @@ const paymentStatusSchema = z.enum(["pending", "completed"]);
 
 function getLinePricing(basePrice: number, quantity: number, discountType: "none" | "percentage" | "fixed", discountValue: number) {
   const safeBasePrice = Math.max(0, Math.round(basePrice));
-  const safeQuantity = Math.max(1, Math.trunc(quantity));
+  const safeQuantity = 1; // 1 unidad por item
   const safeDiscountValue = Math.max(0, Math.round(discountValue));
 
   let finalUnitPrice = safeBasePrice;
@@ -66,7 +66,7 @@ export const salesRouter = router({
   }),
 
   list: protectedProcedure.query(async ({ ctx }) => {
-    const allSales = await getAllSales(ctx.branchId);
+    const allSales = await getAllSales(ctx.user?.role === "admin" ? undefined : ctx.branchId);
     if (ctx.user?.role === "admin") {
       return allSales;
     }
@@ -98,6 +98,7 @@ export const salesRouter = router({
         customerPhone: z.string().optional(),
         customerTaxId: z.string().optional(),
         creditDays: z.number().default(30),
+        warrantyDays: z.number().default(30),
         saleChannel: z.enum(["local", "delivery"]).default("local"),
         orderId: z.number().optional(),
         paymentMethod: paymentMethodSchema,
@@ -109,25 +110,25 @@ export const salesRouter = router({
         adminOverrideReason: z.string().optional(),
         items: z.array(
           z.object({
-            productId: z.number(),
+            unitId: z.number(),
             pricingType: z.enum(["unit", "wholesale", "discount"]).default("unit"),
-            quantity: z.number(),
+            quantity: z.number().default(1),
             basePrice: z.number(),
             discountType: discountTypeSchema.default("none"),
             discountValue: z.number().default(0),
           })
-        ).min(1, "Debes agregar al menos un producto"),
+        ).min(1, "Debes agregar al menos una unidad"),
         customerType: z.enum(["retail", "wholesale"]).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const normalizedItems = input.items.map((item) => {
-        const pricing = getLinePricing(item.basePrice, item.quantity, item.discountType, item.discountValue);
+        const pricing = getLinePricing(item.basePrice, 1, item.discountType, item.discountValue);
 
         return {
-          productId: item.productId,
+          unitId: item.unitId,
           pricingType: item.pricingType,
-          quantity: pricing.quantity,
+          quantity: 1,
           basePrice: pricing.basePrice,
           discountType: item.discountType,
           discountValue: pricing.discountValue,
@@ -144,7 +145,6 @@ export const salesRouter = router({
 
       let customerId = input.customerId;
 
-      // Si no hay ID pero hay nombre y teléfono, intentamos asegurar el registro
       if (!customerId && input.customerName && input.customerPhone) {
         const customer = await ensureCustomerRecord({
           clientNumber: input.customerPhone,
@@ -177,6 +177,7 @@ export const salesRouter = router({
           paymentMethod: input.paymentMethod,
           paymentStatus: input.paymentMethod === "credit" ? "pending" : input.paymentStatus,
           creditDays: input.creditDays,
+          warrantyDays: input.warrantyDays,
           adminOverrideUserId: input.adminOverrideUserId,
           adminOverrideReason: input.adminOverrideReason,
           notes: input.notes,

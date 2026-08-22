@@ -58,7 +58,7 @@ export const exportInventoryToPDF = (items: any[], title: string) => {
   doc.setFontSize(12);
   doc.text(`VALUACIÓN TOTAL (COSTO): ${formatCurrency(totalCost)}`, 14, finalY + 22);
 
-  doc.save(`Inventario_${title.replace(/\s+/g, '_')}_${now.getTime()}.pdf`);
+  doc.save(`Inventario_${String(title || "General").replace(/\s+/g, '_')}_${now.getTime()}.pdf`);
 };
 
 export const exportInventoryToExcel = (items: any[], title: string) => {
@@ -80,6 +80,6 @@ export const exportInventoryToExcel = (items: any[], title: string) => {
   XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario");
 
   // Add formatting hint (optional but nice)
-  const filename = `Inventario_${title.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
+  const filename = `Inventario_${String(title || "General").replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
   XLSX.writeFile(workbook, filename);
 };

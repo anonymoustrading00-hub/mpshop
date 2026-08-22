@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 
 export function InventoryTransfersDialog() {
   const [isOpen, setIsOpen] = useState(false);
-  const { data: transfers = [], isLoading } = trpc.inventory.getTransfers.useQuery(undefined, {
+  const { data: transfers = [], isLoading } = (trpc.inventory as any).getTransfers.useQuery(undefined, {
     enabled: isOpen
   });
 

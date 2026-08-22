@@ -18,9 +18,17 @@ import { auditRouter } from "./routers/audit";
 import { reportsRouter } from "./routers/reports";
 import { expensesRouter } from "./routers/expenses";
 import { quotationsRouter } from "./routers/quotations";
-import { productionRouter } from "./routers/production";
 import { branchesRouter } from "./routers/branches";
 import { creditRouter } from "./routers/credit";
+import { unitsRouter } from "./routers/units";
+import { repairsRouter } from "./routers/repairs";
+import { warrantiesRouter } from "./routers/warranties";
+import { returnsRouter } from "./routers/returns";
+import { codesRouter } from "./routers/codes";
+import { dashboardRouter } from "./routers/dashboard";
+import { analyticsRouter } from "./routers/analytics";
+import { reportsExcelRouter } from "./routers/reports";
+import { settingsRouter } from "./routers/settings";
 import { authenticateUser, createSession } from "./auth";
 
 export const appRouter = router({
@@ -85,9 +93,17 @@ export const appRouter = router({
   quotations: quotationsRouter,
   audit: auditRouter,
   reports: reportsRouter,
-  production: productionRouter,
   branches: branchesRouter,
   credit: creditRouter,
+  units: unitsRouter,
+  repairs: repairsRouter,
+  warranties: warrantiesRouter,
+  returns: returnsRouter,
+  codes: codesRouter,
+  dashboard: dashboardRouter,
+  analytics: analyticsRouter,
+  reportsExcel: reportsExcelRouter,
+  settings: settingsRouter,
 });
 
 export type AppRouter = typeof appRouter;

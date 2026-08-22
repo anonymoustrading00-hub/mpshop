@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
 import MobileMenu from "./MobileMenu";
 import { Link, useLocation } from "wouter";
 import {
@@ -19,13 +20,19 @@ import {
   Search,
   CreditCard,
   Landmark,
+  BookOpen,
+  ScanLine,
+  Settings,
 } from "lucide-react";
+import { useState } from "react";
+import { GlobalScanner } from "./GlobalScanner";
 
 /* ─── nav item type ─────────────────────────────────────────────── */
 type NavItem = {
   href: string;
   label: string;
   icon: React.ElementType;
+  moduleKey?: string;
 };
 
 import { useBranch } from "@/contexts/BranchContext";
@@ -38,33 +45,41 @@ import {
 import { Button } from "@/components/ui/button";
 import { Store } from "lucide-react";
 
-/* ─── shared nav data ───────────────────────────────────────────── */
-export const ADMIN_NAV: NavItem[] = [
-  { href: "/orders",           label: "Pedidos",      icon: ShoppingCart },
-  { href: "/sales",            label: "Ventas",       icon: ShoppingBag },
-  { href: "/dashboard",        label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/analysis",         label: "Análisis",     icon: TrendingUp },
-  { href: "/inventory",        label: "Inventario",   icon: Package },
-  { href: "/branches",         label: "Sucursales",   icon: Store },
-  { href: "/production",       label: "Producción",   icon: Package },
-  { href: "/products",         label: "Catálogo",     icon: Tag },
-  { href: "/customers",        label: "Clientes",     icon: Users },
-  { href: "/suppliers",        label: "Proveedores",  icon: Users },
-  { href: "/purchases",        label: "Compras",      icon: ShoppingCart },
-  { href: "/finance",          label: "Finanzas",     icon: DollarSign },
-  { href: "/accounts-receivable", label: "C. por Cobrar", icon: CreditCard },
-  { href: "/accounts-payable", label: "C. por Pagar", icon: Landmark },
-  { href: "/expenses",         label: "Gastos",       icon: Receipt },
-  { href: "/delivery-persons", label: "Repartidores", icon: Truck },
-  { href: "/reports",          label: "Reportes",     icon: BarChart3 },
+/* ─── shared nav data — ROW 1: Operativo | ROW 2: Gestión ───────── */
+export const ADMIN_NAV_ROW1: NavItem[] = [
+  { href: "/sales",            label: "Ventas",       icon: ShoppingBag, moduleKey: "sales" },
+  { href: "/catalog",          label: "Catálogo",     icon: BookOpen,    moduleKey: "catalog" },
+  { href: "/units",            label: "Unidades",     icon: Tag,         moduleKey: "units" },
+  { href: "/repairs",          label: "Taller",       icon: Package,     moduleKey: "repairs" },
+  { href: "/warranties",       label: "Garantías",    icon: Tag,         moduleKey: "warranties" },
+  { href: "/returns",          label: "Devoluciones", icon: Package,     moduleKey: "returns" },
+  { href: "/orders",           label: "Pedidos",      icon: ShoppingCart, moduleKey: "orders" },
+  { href: "/delivery-load",    label: "Mi Carga",    icon: Package,      moduleKey: "delivery-load" },
+  { href: "/generate-codes",   label: "Códigos QR",   icon: Tag,         moduleKey: "generate-codes" },
+  { href: "/customers",        label: "Clientes",     icon: Users,       moduleKey: "customers" },
+  { href: "/suppliers",        label: "Proveedores",  icon: Users,       moduleKey: "suppliers" },
+  { href: "/purchases",        label: "Compras",      icon: ShoppingCart, moduleKey: "purchases" },
 ];
 
-export const DELIVERY_NAV: NavItem[] = [
-  { href: "/orders",             label: "Mis Pedidos", icon: ShoppingCart },
-  { href: "/delivery-load",      label: "Mi Carga",    icon: Package },
-  { href: "/sales",              label: "Ventas",      icon: ShoppingBag },
-  { href: "/repartidor/finance", label: "Caja",        icon: DollarSign },
+export const ADMIN_NAV_ROW2: NavItem[] = [
+  { href: "/dashboard-kpis",      label: "📊 KPIs",        icon: BarChart3,        moduleKey: "dashboard-kpis" },
+  { href: "/reports",             label: "📈 Reportes",    icon: BarChart3,        moduleKey: "reports" },
+  { href: "/dashboard",           label: "Dashboard",      icon: LayoutDashboard,  moduleKey: "dashboard" },
+  { href: "/analytics",           label: "Analítica",      icon: TrendingUp,       moduleKey: "analytics" },
+  { href: "/rentabilidad",        label: "💰 Rentabilidad",icon: TrendingUp,       moduleKey: "finance" },
+  { href: "/finance",             label: "Finanzas",       icon: DollarSign,       moduleKey: "finance" },
+  { href: "/repartidor/finance",  label: "Caja Reparto",   icon: DollarSign,       moduleKey: "repartidor-finance" },
+  { href: "/accounts-receivable", label: "C. por Cobrar",  icon: CreditCard,       moduleKey: "accounts-receivable" },
+  { href: "/accounts-payable",    label: "C. por Pagar",   icon: Landmark,         moduleKey: "accounts-payable" },
+  { href: "/expenses",            label: "Gastos",         icon: Receipt,          moduleKey: "expenses" },
+  { href: "/branches",            label: "Sucursales",     icon: Store,            moduleKey: "branches" },
+  { href: "/users",               label: "👥 Usuarios",    icon: Users,            moduleKey: "users" },
+  { href: "/delivery-persons",    label: "Repartidores",   icon: Truck,            moduleKey: "delivery-persons" },
+  { href: "/settings",            label: "⚙️ Config.",     icon: Settings,         moduleKey: "settings-admin" },
 ];
+
+// Flat list for mobile / command menu
+export const ADMIN_NAV: NavItem[] = [...ADMIN_NAV_ROW1, ...ADMIN_NAV_ROW2];
 
 /* ─── Tab Link Component ────────────────────────────────────────── */
 function TabLink({ item, active }: { item: NavItem; active: boolean }) {
@@ -73,24 +88,21 @@ function TabLink({ item, active }: { item: NavItem; active: boolean }) {
     <Link
       href={item.href}
       className={`
-        group relative flex shrink-0 items-center gap-2
-        h-11 px-1
-        text-[13px] font-semibold tracking-wide whitespace-nowrap
-        transition-colors duration-200 select-none
+        group relative flex shrink-0 items-center gap-1.5
+        h-9 px-2.5 rounded-lg
+        text-[12px] font-semibold tracking-wide whitespace-nowrap
+        transition-all duration-200 select-none
         ${active
-          ? "text-primary"
-          : "text-slate-500 hover:text-slate-900"
+          ? "text-primary bg-primary/8 font-bold"
+          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
         }
       `}
     >
-      <Icon className={`shrink-0 h-4 w-4 transition-transform duration-200 ${active ? "scale-110" : "group-hover:scale-110"}`} />
+      <Icon className={`shrink-0 h-3.5 w-3.5 transition-transform duration-200 ${active ? "scale-110" : "group-hover:scale-110"}`} />
       {item.label}
-      {/* Animated Bottom Border */}
-      <span 
-        className={`absolute bottom-0 left-0 right-0 h-[2.5px] rounded-t-full transition-all duration-300 ${
-          active ? "bg-primary scale-x-100 opacity-100" : "bg-slate-300 scale-x-0 opacity-0 group-hover:scale-x-100 group-hover:opacity-100"
-        }`}
-      />
+      {active && (
+        <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />
+      )}
     </Link>
   );
 }
@@ -100,8 +112,31 @@ export default function AppHeader() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
   const { activeBranchId, setActiveBranchId, branches } = useBranch();
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const { data: companyConfig } = trpc.settings.getCompanyConfig.useQuery();
 
-  const navItems = user?.role === "admin" ? ADMIN_NAV : DELIVERY_NAV;
+  const isAdmin = user?.role === "admin";
+  let allowedModules: string[] = [];
+  try {
+    if (typeof (user as any)?.allowedModules === "string") {
+      allowedModules = JSON.parse((user as any)?.allowedModules);
+    } else if (Array.isArray((user as any)?.allowedModules)) {
+      allowedModules = (user as any)?.allowedModules;
+    }
+  } catch {
+    allowedModules = [];
+  }
+
+  const isModuleAllowed = (moduleKey?: string) => {
+    if (isAdmin || !moduleKey) return true;
+    if (allowedModules.length === 0) return true;
+    return allowedModules.includes(moduleKey);
+  };
+
+  // Cada empleado ve exactamente los módulos que tiene asignados en allowedModules
+  const visibleRow1 = ADMIN_NAV_ROW1.filter(item => isModuleAllowed(item.moduleKey));
+  const visibleRow2 = ADMIN_NAV_ROW2.filter(item => isModuleAllowed(item.moduleKey));
+
   const initial = user?.name?.charAt(0).toUpperCase() ?? "U";
 
   const activeBranch = branches.find(b => b.id === activeBranchId) || branches[0];
@@ -115,16 +150,18 @@ export default function AppHeader() {
         <Link href="/">
           <div className="group flex shrink-0 cursor-pointer items-center gap-3">
             <img
-              src="/logo.png"
-              alt="Vitalia"
-              className="h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+              src={companyConfig?.logo || "/logo.png"}
+              alt={companyConfig?.name || "Vitalia"}
+              className="h-10 w-auto max-w-[120px] object-contain transition-transform duration-300 group-hover:scale-105"
             />
             <div className="flex flex-col min-w-0">
               <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-primary/60 leading-none mb-1">
                 Operación Diaria
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-extrabold text-slate-900 tracking-tight leading-none">Vitalia</span>
+                <span className="text-lg font-extrabold text-slate-900 tracking-tight leading-none">
+                  {companyConfig?.name || "Vitalia"}
+                </span>
                 <span className="bg-slate-100 text-[10px] px-1.5 py-0.5 rounded-md text-slate-600 font-mono border border-slate-200 leading-none">
                   v1.5.0
                 </span>
@@ -159,6 +196,19 @@ export default function AppHeader() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+
+            {/* Scanner button */}
+            {user?.role === "admin" && (
+              <button
+                onClick={() => setScannerOpen(true)}
+                className="hidden lg:flex items-center gap-2 h-9 px-4 rounded-full border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-900/40 hover:shadow-sm transition-all text-sm text-slate-500 hover:text-slate-900 group"
+                title="Escáner QR global (Ctrl+Shift+S)"
+              >
+                <ScanLine className="h-3.5 w-3.5 group-hover:text-slate-900 transition-colors" />
+                <span>Escanear</span>
+                <kbd className="ml-1 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-mono text-slate-400">⇧S</kbd>
+              </button>
+            )}
 
             {/* Ctrl+K Search Trigger */}
             <button
@@ -202,14 +252,27 @@ export default function AppHeader() {
         )}
       </div>
 
-      {/* ══ BOTTOM TIER: Navigation Tabs (Desktop) ═════════════════ */}
+      {/* ══ BOTTOM TIER: Navigation — 2 Rows (Desktop/Tablet) ═══════ */}
       {user && (
-        <div className="hidden md:flex w-full px-6 pt-1 pb-1">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 w-full justify-center lg:justify-start">
-            {navItems.map((item) => (
-              <TabLink key={item.href} item={item} active={location === item.href} />
-            ))}
-          </div>
+        <div className="hidden md:block w-full border-t border-slate-100/80 bg-slate-50/40">
+          {/* Fila 1 — Módulos Operativos */}
+          {visibleRow1.length > 0 && (
+            <div className="flex items-center gap-x-1 w-full px-6 pt-1.5 pb-0 overflow-x-auto scrollbar-none">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mr-2 shrink-0">Operativo</span>
+              {visibleRow1.map((item) => (
+                <TabLink key={item.href} item={item} active={location === item.href} />
+              ))}
+            </div>
+          )}
+          {/* Fila 2 — Gestión & Análisis */}
+          {visibleRow2.length > 0 && (
+            <div className="flex items-center gap-x-1 w-full px-6 pb-1.5 pt-0.5 border-t border-slate-100/60 overflow-x-auto scrollbar-none">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mr-2 shrink-0">Gestión</span>
+              {visibleRow2.map((item) => (
+                <TabLink key={item.href} item={item} active={location === item.href} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -229,8 +292,24 @@ export default function AppHeader() {
             </span>
           </div>
         </Link>
-        <MobileMenu />
+        <div className="flex items-center gap-2">
+          {user?.role === "admin" && (
+            <button
+              onClick={() => setScannerOpen(true)}
+              className="flex items-center justify-center h-9 w-9 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors"
+              title="Escáner QR"
+            >
+              <ScanLine className="h-4 w-4 text-slate-600" />
+            </button>
+          )}
+          <MobileMenu />
+        </div>
       </div>
+
+      {/* GlobalScanner modal */}
+      {user?.role === "admin" && (
+        <GlobalScanner open={scannerOpen} onOpenChange={setScannerOpen} />
+      )}
 
     </header>
   );

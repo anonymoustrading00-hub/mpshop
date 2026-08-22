@@ -137,7 +137,7 @@ function DashboardLayoutContent({
     { icon: Landmark, label: "C. por Pagar (CXP)", path: "/accounts-payable" },
     { icon: Users, label: "Repartidores", path: "/delivery-persons" },
     { icon: FileText, label: "Reportes", path: "/reports" },
-    { icon: TrendingUp, label: "Análisis", path: "/analysis" },
+    { icon: TrendingUp, label: "Rentabilidad", path: "/rentabilidad" },
   ];
 
   const deliveryMenuItems = [

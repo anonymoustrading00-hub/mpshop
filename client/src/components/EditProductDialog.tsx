@@ -86,7 +86,7 @@ export function EditProductDialog({ product, isOpen: externalIsOpen, onOpenChang
     }
   }, [product, isOpen]);
 
-  const updateProductMutation = trpc.inventory.updateProduct.useMutation({
+  const updateProductMutation = (trpc.inventory as any).updateProduct.useMutation({
     onSuccess: () => {
       toast.success("Producto actualizado exitosamente");
       setIsOpen(false);

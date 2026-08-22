@@ -74,7 +74,7 @@ function typeInfo(type: ProductionType | "suero") {
 
 function nextCode(products: KefirCatalogProduct[]): string {
   const nums = products
-    .map((p) => parseInt(p.code.replace("PROD-", ""), 10))
+    .map((p) => parseInt(String(p.code || "").replace("PROD-", ""), 10))
     .filter(Number.isFinite);
   const max = nums.length > 0 ? Math.max(...nums) : 0;
   return `PROD-${String(max + 1).padStart(3, "0")}`;
@@ -426,8 +426,8 @@ export default function ProductionProducts() {
   const products = control.customProducts ?? [];
 
   // tRPC para inventario general
-  const { data: rawProducts, refetch: refetchProducts } = trpc.inventory.listProducts.useQuery();
-  const createProductMutation = trpc.inventory.createProduct.useMutation();
+  const { data: rawProducts, refetch: refetchProducts } = (trpc.inventory as any).listProducts.useQuery();
+  const createProductMutation = (trpc.inventory as any).createProduct.useMutation();
 
   // Packaging items (envases, tapas, etiquetas) from general inventory
   const packagingItems = useMemo(() => {

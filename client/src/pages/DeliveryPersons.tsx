@@ -85,7 +85,7 @@ export default function DeliveryPersons() {
 
   const [sheetDialogOpen, setSheetDialogOpen] = useState(false);
 
-  const { data: products } = trpc.inventory.getProductsWithStock.useQuery();
+  const { data: products } = (trpc.inventory as any).getProductsWithStock.useQuery();
   const { data: currentExtraLoad, refetch: refetchExtraLoad } = trpc.orders.getExtraLoad.useQuery(
     { deliveryPersonId: selectedPerson?.id, date: selectedDate },
     { enabled: !!selectedPerson }
@@ -516,7 +516,7 @@ export default function DeliveryPersons() {
                         <SelectValue placeholder="Seleccionar producto" />
                       </SelectTrigger>
                       <SelectContent>
-                        {products?.map(p => (
+                        {(products as any)?.map((p: any) => (
                           <SelectItem key={p.id} value={p.id.toString()}>
                             {p.name} (Stock: {p.stock})
                           </SelectItem>

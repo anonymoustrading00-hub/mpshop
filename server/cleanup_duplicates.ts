@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
-import { financialTransactions } from "./schema";
+import { financialTransactions } from "../drizzle/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import * as dotenv from "dotenv";
 

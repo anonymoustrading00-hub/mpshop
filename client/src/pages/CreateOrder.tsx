@@ -50,7 +50,7 @@ export default function CreateOrder() {
   const [productSearch, setProductSearch] = useState("");
 
   // Todos los hooks deben estar antes de cualquier condicional o return
-  const { data: products } = trpc.inventory.getProductsWithStock.useQuery();
+  const { data: products } = (trpc.inventory as any).getProductsWithStock.useQuery();
   const { data: nextOrderData } = trpc.orders.getNextOrderNumber.useQuery();
   const { data: deliveryPersons } = trpc.users.listDeliveryPersons.useQuery();
   const createOrderMutation = trpc.orders.create.useMutation({
@@ -255,7 +255,7 @@ export default function CreateOrder() {
                   
                   if (isBecomingWholesale) {
                     newItems = newItems.map(item => {
-                      const prod = products?.find(p => p.id === item.productId);
+                      const prod = (products as any)?.find((p: any) => p.id === item.productId);
                       return {
                         ...item,
                         pricingType: "wholesale",
@@ -264,7 +264,7 @@ export default function CreateOrder() {
                     });
                   } else if (isBecomingRetail) {
                     newItems = newItems.map(item => {
-                      const prod = products?.find(p => p.id === item.productId);
+                      const prod = (products as any)?.find((p: any) => p.id === item.productId);
                       return {
                         ...item,
                         pricingType: "unit",

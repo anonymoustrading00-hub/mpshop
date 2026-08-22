@@ -37,6 +37,7 @@ export default function OrderDetail() {
     { orderId: orderId || 0 },
     { enabled: !!orderId }
   );
+  const { data: companyConfig } = trpc.settings.getCompanyConfig.useQuery();
 
   const utils = trpc.useUtils();
   const recordPaymentMutation = trpc.orders.recordPayment.useMutation();
@@ -52,7 +53,7 @@ export default function OrderDetail() {
       utils.orders.getDetails.invalidate({ orderId: orderId! });
       utils.orders.list.invalidate();
       utils.orders.listForDelivery.invalidate();
-      utils.inventory.listInventory.invalidate();
+      utils.units.list.invalidate();
       setLocation("/orders");
     },
     onError: (err: any) => toast.error(`Error: ${err.message}`),
@@ -90,7 +91,7 @@ export default function OrderDetail() {
 
   const cleanPhone = (phone: string | null | undefined) => {
     if (!phone) return "";
-    const cleaned = phone.replace(/\D/g, "");
+    const cleaned = String(phone || "").replace(/\D/g, "");
     if (cleaned.length === 8) return "591" + cleaned;
     if (cleaned.startsWith("0") && cleaned.length === 9) return "591" + cleaned.slice(1);
     if (cleaned.length > 8 && !cleaned.startsWith("591")) return "591" + cleaned;
@@ -125,7 +126,7 @@ export default function OrderDetail() {
         utils.orders.listForDelivery.invalidate();
         utils.finance.getExpectedDaily.invalidate();
         utils.finance.getMyStatus.invalidate();
-        utils.inventory.listInventory.invalidate();
+        utils.units.list.invalidate();
         utils.finance.getTransactions.invalidate();
       },
       onError: (err: any) => toast.error(err.message || "Error al registrar pago"),
@@ -176,13 +177,36 @@ export default function OrderDetail() {
         {/* Vista de Recibo para Impresión */}
         <div className="hidden print-receipt p-8 border-2 border-gray-100 rounded-xl bg-white text-black">
           <div className="flex justify-between items-start mb-8 border-b pb-6">
-            <div>
-              <h2 className="text-3xl font-black uppercase tracking-tighter text-black">COMPROBANTE DE ENTREGA</h2>
-              <p className="text-sm text-gray-500 mt-1">Order # {order.orderNumber}</p>
+            <div className="flex items-center gap-4">
+              {companyConfig?.logo ? (
+                <img
+                  src={companyConfig.logo}
+                  alt="Logo"
+                  className="h-16 w-auto object-contain"
+                />
+              ) : null}
+              <div>
+                <h2 className="text-2xl font-black uppercase tracking-tighter text-black">
+                  {companyConfig?.name || "COMPROBANTE DE ENTREGA"}
+                </h2>
+                {companyConfig?.subName && (
+                  <p className="text-xs text-gray-500 font-semibold">{companyConfig.subName}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">Pedido # {order.orderNumber}</p>
+                {companyConfig?.taxId && (
+                  <p className="text-xs text-gray-400">NIT / CI: {companyConfig.taxId}</p>
+                )}
+              </div>
             </div>
             <div className="text-right">
-              <p className="font-bold text-lg">VITALIA</p>
-              <p className="text-xs text-gray-400">Fecha: {new Date().toLocaleDateString()}</p>
+              <p className="font-bold text-sm">{companyConfig?.address || "Casa Central"}</p>
+              {companyConfig?.phone && (
+                <p className="text-xs text-gray-500">Tel: {companyConfig.phone}</p>
+              )}
+              {companyConfig?.whatsapp && (
+                <p className="text-xs text-green-600 font-semibold">WhatsApp: {companyConfig.whatsapp}</p>
+              )}
+              <p className="text-xs text-gray-400 mt-1">Fecha: {new Date().toLocaleDateString()}</p>
             </div>
           </div>
 
@@ -270,8 +294,8 @@ export default function OrderDetail() {
             </div>
           </div>
           
-          <div className="mt-20 text-center text-[10px] text-gray-400 uppercase tracking-[0.2em]">
-            Gracias por su preferencia • Documento de Control Interno
+          <div className="mt-14 text-center text-xs text-gray-500 border-t border-gray-200 pt-4">
+            {companyConfig?.receiptFooterNotes || "Gracias por su preferencia • Documento de Control Interno"}
           </div>
         </div>
 

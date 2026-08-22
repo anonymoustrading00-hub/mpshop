@@ -29,12 +29,12 @@ export const createPDF = (title: string) => {
   // Header
   doc.setFontSize(22);
   doc.setTextColor(2, 62, 47); // Color verde oscuro de Vitalia
-  doc.setFont(undefined, "bold");
+  doc.setFont("helvetica", "bold");
   doc.text("VITALIA", pageWidth / 2, 20, { align: "center" });
 
   doc.setFontSize(14);
   doc.setTextColor(100, 100, 100);
-  doc.setFont(undefined, "normal");
+  doc.setFont("helvetica", "normal");
   doc.text(title, pageWidth / 2, 30, { align: "center" });
 
   // Línea separadora
@@ -127,14 +127,14 @@ export const generateOrdersPDF = (orders: any[], filters: any) => {
   const entregados = orders.filter((o) => o.status === "delivered").length;
 
   doc.setFontSize(12);
-  doc.setFont(undefined, "bold");
+  doc.setFont("helvetica", "bold");
   doc.text("RESUMEN", 20, finalY);
-  doc.setFont(undefined, "normal");
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.text(`Total de Pedidos: ${totalPedidos}`, 20, finalY + 7);
   doc.text(`Entregados: ${entregados}`, 20, finalY + 14);
   doc.text(`Pendientes: ${pendientes}`, 20, finalY + 21);
-  doc.setFont(undefined, "bold");
+  doc.setFont("helvetica", "bold");
   doc.text(`Monto Total: ${formatBs(totalMonto)}`, 20, finalY + 28);
 
   return doc;
@@ -192,15 +192,15 @@ export const generateSalesPDF = (sales: any[], filters: any) => {
     .reduce((sum, s) => sum + s.total, 0);
 
   doc.setFontSize(12);
-  doc.setFont(undefined, "bold");
+  doc.setFont("helvetica", "bold");
   doc.text("RESUMEN", 20, finalY);
-  doc.setFont(undefined, "normal");
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.text(`Total de Ventas: ${totalVentas}`, 20, finalY + 7);
   doc.text(`Efectivo: ${formatBs(efectivo)}`, 20, finalY + 14);
   doc.text(`QR: ${formatBs(qr)}`, 20, finalY + 21);
   doc.text(`Transferencia: ${formatBs(transferencia)}`, 20, finalY + 28);
-  doc.setFont(undefined, "bold");
+  doc.setFont("helvetica", "bold");
   doc.text(`Ingresos Totales: ${formatBs(montoTotal)}`, 20, finalY + 35);
 
   return doc;
@@ -254,15 +254,15 @@ export const generateInventoryPDF = (products: any[], inventory: any[]) => {
   }, 0);
 
   doc.setFontSize(12);
-  doc.setFont(undefined, "bold");
+  doc.setFont("helvetica", "bold");
   doc.text("RESUMEN", 20, finalY);
-  doc.setFont(undefined, "normal");
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.text(`Total de Productos: ${totalProducts}`, 20, finalY + 7);
   doc.setTextColor(220, 53, 69);
   doc.text(`Stock Bajo: ${lowStock}`, 20, finalY + 14);
   doc.setTextColor(40, 40, 40);
-  doc.setFont(undefined, "bold");
+  doc.setFont("helvetica", "bold");
   doc.text(`Valor Total en Inventario: ${formatBs(totalValue)}`, 20, finalY + 21);
 
   return doc;
@@ -284,13 +284,13 @@ export const generateFinancePDF = (transactions: any[], cashClosures: any[]) => 
   const balance = ingresos - gastos;
 
   doc.setFontSize(12);
-  doc.setFont(undefined, "bold");
+  doc.setFont("helvetica", "bold");
   doc.text("RESUMEN GENERAL", 20, y);
-  doc.setFont(undefined, "normal");
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.text(`Total Ingresos: ${formatBs(ingresos)}`, 20, y + 7);
   doc.text(`Total Gastos: ${formatBs(gastos)}`, 20, y + 14);
-  doc.setFont(undefined, "bold");
+  doc.setFont("helvetica", "bold");
   if (balance >= 0) {
     doc.setTextColor(76, 175, 80);
   } else {
@@ -327,7 +327,7 @@ export const generateFinancePDF = (transactions: any[], cashClosures: any[]) => 
   // Cierres de caja
   const finalY = (doc as any).lastAutoTable.finalY + 15;
   doc.setFontSize(12);
-  doc.setFont(undefined, "bold");
+  doc.setFont("helvetica", "bold");
   doc.setTextColor(40, 40, 40);
   doc.text("CIERRES DE CAJA", 20, finalY);
 
@@ -492,11 +492,11 @@ export const generateArqueoPDF = (data: any) => {
   let y = 45;
 
   doc.setFontSize(12);
-  doc.setFont(undefined, "bold");
+  doc.setFont("helvetica", "bold");
   doc.text("DETALLES DEL CIERRE", 20, y);
   
   doc.setFontSize(10);
-  doc.setFont(undefined, "normal");
+  doc.setFont("helvetica", "normal");
   doc.text(`Fecha de Cierre: ${data.date}`, 20, y + 7);
   doc.text(`Responsable: ${data.userName || "Administrador"}`, 20, y + 14);
 
@@ -544,15 +544,15 @@ export const generateArqueoPDF = (data: any) => {
   const totalDiff = totalReported - totalExpected;
 
   doc.setFontSize(12);
-  doc.setFont(undefined, "bold");
+  doc.setFont("helvetica", "bold");
   doc.text("TOTALES GLOBALES", 20, finalY);
   
   doc.setFontSize(10);
-  doc.setFont(undefined, "normal");
+  doc.setFont("helvetica", "normal");
   doc.text(`Total Esperado: ${formatBs(totalExpected)}`, 20, finalY + 7);
   doc.text(`Total Reportado: ${formatBs(totalReported)}`, 20, finalY + 14);
   
-  doc.setFont(undefined, "bold");
+  doc.setFont("helvetica", "bold");
   if (totalDiff < 0) {
     doc.setTextColor(220, 53, 69);
     doc.text(`Faltante Total: ${formatBs(Math.abs(totalDiff))}`, 20, finalY + 21);
@@ -571,7 +571,7 @@ export const generateArqueoPDF = (data: any) => {
   doc.line(30, y, 80, y);
   doc.line(130, y, 180, y);
   
-  doc.setFont(undefined, "normal");
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.text("Firma Entregue", 55, y + 5, { align: "center" });
   doc.text("Firma Recibí Conforme", 155, y + 5, { align: "center" });

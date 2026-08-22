@@ -69,7 +69,7 @@ export const auditRouter = router({
       if (!db) return [];
 
       const logs = await db.query.auditLog.findMany({
-        where: (auditLog, { and, eq }) => and(
+        where: (auditLog: any, { and, eq }: any) => and(
           eq(auditLog.entityType, input.entityType),
           eq(auditLog.entityId, input.entityId)
         ),
@@ -137,7 +137,7 @@ export const auditRouter = router({
       return {
         byAction: byActionRaw,
         byEntity: byEntityRaw,
-        byUser: byUserRaw.filter(u => u.userId !== null),
+        byUser: byUserRaw.filter((u: any) => u.userId !== null),
       };
     }),
 

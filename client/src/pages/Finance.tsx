@@ -46,19 +46,25 @@ function paymentMethodLabel(method: string) {
 
 function categoryLabel(cat: string) {
   const labels: Record<string, string> = {
+    // Ingresos
     sale: "Venta",
     sale_local: "Venta Local",
     sale_delivery: "Venta Delivery",
-    purchase: "Compra",
     order_delivery: "Pedido",
     sale_cancellation: "Anulación Venta",
+    donation: "Donación",
+    loan: "Préstamo",
+    gift: "Regalo",
+    other_income: "Otros Ingresos",
+    // Egresos operativos
+    purchase: "Compra Inventario",
     fuel: "Combustible",
     subsistence: "Viáticos",
     transfer: "Traspaso",
     transfer_between_registers: "Traspaso Cajas",
     facebook_ads: "Facebook Ads",
     google_ads: "Google Ads",
-    electricity: "Luz",
+    electricity: "Luz / Electricidad",
     water: "Agua",
     internet: "Internet",
     telephone: "Teléfono",
@@ -70,10 +76,12 @@ function categoryLabel(cat: string) {
     insurance: "Seguro",
     bank_fees: "Comisión Bancaria",
     other: "Otros",
-    donation: "Donación",
-    loan: "Préstamo",
-    gift: "Regalo",
-    other_income: "Otros Ingresos",
+    // Costos directos (nuevos)
+    cogs: "📦 COGS – Costo Mercadería",
+    repair_cost: "🔧 Costo Reparación",
+    warranty_repair_cost: "🛡 Garantía – Reparación",
+    warranty_replacement_cost: "🛡 Garantía – Reemplazo",
+    warranty_refund: "💸 Garantía – Reembolso al Cliente",
   };
   return labels[cat] || cat;
 }
@@ -588,7 +596,7 @@ function BoxHistoryModal({ paymentMethod, title, colorClass, open, onOpenChange 
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${title.replace(/\s+/g, "_")}_${startDate}_${endDate}.csv`;
+    link.download = `${String(title || "Reporte").replace(/\s+/g, "_")}_${startDate}_${endDate}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -1372,7 +1380,7 @@ function AddExpenseDialog() {
                 <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
               ))}</SelectContent></Select></div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label>Monto</Label><Input type="text" inputMode="decimal" onFocus={(e) => e.target.select()} placeholder="0.00" onChange={(e) => setExpense({ ...expense, amount: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Monto</Label><Input type="text" inputMode="decimal" onFocus={(e) => e.target.select()} placeholder="0.00" onChange={(e) => setExpense({ ...expense, amount: e.target.value as any })} /></div>
             <div className="space-y-2"><Label>Categoria</Label>
               <Select onValueChange={(v: any) => setExpense({ ...expense, type: v })}>
                 <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
@@ -1724,7 +1732,7 @@ function BasicTransactionDialog({ transaction, onClose, onPrint }: { transaction
     sale: "Venta",
     sale_local: "Venta Local",
     sale_delivery: "Venta Delivery",
-    purchase: "Compra",
+    purchase: "Compra Inventario",
     order_delivery: "Pedido",
     sale_cancellation: "Anulacion de Venta",
     fuel: "Combustible",
@@ -1735,6 +1743,10 @@ function BasicTransactionDialog({ transaction, onClose, onPrint }: { transaction
     loan: "Préstamo",
     gift: "Regalo",
     other_income: "Otros Ingresos",
+    cogs: "📦 COGS – Costo Mercadería",
+    repair_cost: "🔧 Costo Reparación",
+    warranty_repair_cost: "🛡 Garantía – Reparación",
+    warranty_replacement_cost: "🛡 Garantía – Reemplazo",
   };
   const methodLabels: Record<string, string> = { cash: "Caja Efectivo", qr: "Caja QR", transfer: "Cuenta Bancaria" };
 

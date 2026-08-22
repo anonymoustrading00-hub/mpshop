@@ -278,8 +278,12 @@ class SDKServer {
       if (session) {
         const fetchedUser = await db.getUserById(session.userId);
         if (fetchedUser) {
+          if ((fetchedUser as any).status === "inactive") {
+            console.warn("[Auth] Inactive user blocked:", fetchedUser.id, fetchedUser.username);
+            throw ForbiddenError("User account is inactive");
+          }
           user = fetchedUser;
-          console.log("[Auth] Traditional session verified for user:", user.id, user.username);
+          console.log("[Auth] Traditional session verified for user:", fetchedUser.id, fetchedUser.username);
           // Update last signed in (no throw si falla)
           await db.updateLastSignedInById(session.userId);
           return user as User;

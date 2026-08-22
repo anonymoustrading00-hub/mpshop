@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   BadgeDollarSign,
+  Shield,
   Eye,
   Printer,
   Plus,
@@ -235,10 +236,25 @@ export default function Sales() {
   const [anonymousCustomerPhone, setAnonymousCustomerPhone] = useState("");
   const [anonymousCustomerTaxId, setAnonymousCustomerTaxId] = useState("");
   const [creditDays, setCreditDays] = useState(30);
+  const [warrantyDays, setWarrantyDays] = useState(30);
   const [innerProductSearch, setInnerProductSearch] = useState("");
+  const [currentPricingMode, setCurrentPricingMode] = useState<"unit" | "discount" | "wholesale">("unit");
 
-  const { data: openingStatus } = trpc.finance.hasActiveOpening.useQuery({ paymentMethod });
-  const { data: products } = trpc.inventory.getProductsWithStock.useQuery();
+  const { data: openingStatus } = trpc.finance.hasActiveOpening.useQuery({ paymentMethod: paymentMethod === "credit" ? "cash" : paymentMethod });
+  const { data: unitsList } = trpc.units.list.useQuery({ status: "available" });
+  const products = unitsList?.items?.map((u: any) => ({
+    id: u.id,
+    name: `${u.brand} ${u.model}`,
+    code: u.code,
+    salePrice: u.salePrice || 0,
+    wholesalePrice: u.wholesalePrice || u.salePrice || 0,
+    discountPrice: u.discountPrice || u.salePrice || 0,
+    price: u.salePrice || 0,
+    // Pass through fields needed for filtering
+    status: u.status,           // "available", "in_repair", "sold", etc.
+    category: "unit",           // distinguish from regular products
+    unitType: u.type,           // "laptop", "accessory", etc.
+  })) || [];
   const { data: customers } = trpc.customers.list.useQuery();
 
   const [historySearch, setHistorySearch] = useState("");
@@ -259,8 +275,7 @@ export default function Sales() {
       setShowSuccess(true);
       await Promise.all([
         utils.sales.list.invalidate(),
-        utils.inventory.getProductsWithStock.invalidate(),
-        utils.inventory.listInventory.invalidate(),
+        utils.units.list.invalidate(),
         utils.finance.getTransactions.invalidate(),
         utils.credit.listReceivable.invalidate(),
       ]);
@@ -282,8 +297,7 @@ export default function Sales() {
       await Promise.all([
         utils.sales.list.invalidate(),
         utils.sales.getDetails.invalidate(),
-        utils.inventory.getProductsWithStock.invalidate(),
-        utils.inventory.listInventory.invalidate(),
+        utils.units.list.invalidate(),
         utils.finance.getTransactions.invalidate(),
       ]);
     },
@@ -358,6 +372,7 @@ export default function Sales() {
     setAnonymousCustomerPhone("");
     setAnonymousCustomerTaxId("");
     setCreditDays(30);
+    setWarrantyDays(30);
     setSelectedCustomerType("retail");
   };
 
@@ -367,22 +382,58 @@ export default function Sales() {
     toast.info("Carrito vaciado");
   };
 
+  // All available units/products for sale - full text multi-word filter
   const filteredProducts = useMemo(() => {
-    if (!products) return [];
-    const search = productSearch.trim().toLowerCase();
+    const search = (productSearch || "").trim().toLowerCase();
+    const allItems = unitsList?.items || [];
+    const available = allItems.filter((u: any) => u.status === "available");
 
-    return (products as any[])
-      .filter((product: any) => product.category === "finished_product" && product.status === "active")
-      .filter((product: any) => {
-        if (!search) return true;
-        return product.name.toLowerCase().includes(search) || product.code.toLowerCase().includes(search);
+    if (!search) return available.slice(0, 50);
+
+    const searchWords = search.split(/\s+/).filter(Boolean);
+
+    return available
+      .filter((u: any) => {
+        const fullText = [
+          u.code,
+          u.brand,
+          u.model,
+          u.type,
+          typeof u.specs === "object" ? JSON.stringify(u.specs) : u.specs,
+          typeof u.damageNotes === "string" ? u.damageNotes : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        return searchWords.every((word) => fullText.includes(word));
       })
-      .slice(0, 12);
-  }, [products, productSearch]);
+      .slice(0, 50);
+  }, [unitsList, productSearch]);
+
+  // Map a raw unit item to the product shape used in the cart
+  const toProductShape = (u: any) => ({
+    id: u.id,
+    name: `${u.brand} ${u.model}`,
+    code: u.code,
+    salePrice: u.salePrice || 0,
+    wholesalePrice: u.wholesalePrice || u.salePrice || 0,
+    discountPrice: u.discountPrice || u.salePrice || 0,
+    price: u.salePrice || 0,
+    status: u.status,
+    category: "unit",
+    stock: 1,
+  });
+
+  // Total available units (for empty state messaging)
+  const totalAvailable = useMemo(() => {
+    const allItems = unitsList?.items || [];
+    return allItems.filter((u: any) => u.status === "available").length;
+  }, [unitsList]);
 
   const filteredCustomers = useMemo(() => {
     if (!customers) return [];
-    const search = customerSearch.trim().toLowerCase();
+    const search = (customerSearch || "").trim().toLowerCase();
     if (!search) return [];
 
     return (customers as any[])
@@ -431,16 +482,45 @@ export default function Sales() {
     });
   }, [historyDate, historySearch, historyStatus, salesList]);
 
-  const addProductToCart = (product: any) => {
-    if (product.stock <= 0) {
+  const handlePricingModeChange = (mode: "unit" | "discount" | "wholesale") => {
+    setCurrentPricingMode(mode);
+    setCartItems((current) =>
+      current.map((item) => {
+        const prod = products?.find((p: any) => p.id === item.productId);
+        if (!prod) return item;
+        let basePrice = prod.salePrice || 0;
+        if (mode === "discount") basePrice = prod.discountPrice || prod.salePrice || 0;
+        if (mode === "wholesale") basePrice = prod.wholesalePrice || prod.salePrice || 0;
+        return { ...item, pricingType: mode, basePrice };
+      })
+    );
+  };
+
+  const addProductToCart = (product: any, forcedPricingType?: "unit" | "discount" | "wholesale") => {
+    // Units (laptops/accesorios) don't have a stock field - they are single items
+    const isUnit = product.category === "unit";
+    if (!isUnit && product.stock <= 0) {
       toast.error("Ese producto no tiene stock disponible");
       return;
+    }
+
+    const mode = forcedPricingType || (selectedCustomerType === "wholesale" ? "wholesale" : currentPricingMode);
+    let calculatedBasePrice = product.salePrice;
+    if (mode === "discount") {
+      calculatedBasePrice = product.discountPrice || product.salePrice;
+    } else if (mode === "wholesale") {
+      calculatedBasePrice = product.wholesalePrice || product.salePrice;
     }
 
     setCartItems((current) => {
       const existingIndex = current.findIndex((item) => item.productId === product.id);
 
       if (existingIndex >= 0) {
+        // Units can only be sold once
+        if (isUnit) {
+          toast.error("Este equipo ya está en el carrito");
+          return current;
+        }
         const existing = current[existingIndex];
         if (existing.quantity >= product.stock) {
           toast.error(`Solo hay ${product.stock} unidades disponibles`);
@@ -458,10 +538,10 @@ export default function Sales() {
           productId: product.id,
           productName: product.name,
           productCode: product.code,
-          stock: product.stock,
+          stock: isUnit ? 1 : product.stock,
           quantity: 1,
-          basePrice: selectedCustomerType === "wholesale" ? (product.wholesalePrice || product.salePrice) : product.salePrice,
-          pricingType: selectedCustomerType === "wholesale" ? "wholesale" : "unit",
+          basePrice: calculatedBasePrice,
+          pricingType: mode,
           discountType: "none",
           discountValue: 0,
         },
@@ -508,7 +588,7 @@ export default function Sales() {
   const creditDataComplete = paymentMethod !== "credit" || (
     _selectedCustForValidation
       ? Boolean(_selectedCustForValidation.phone?.trim() && _selectedCustForValidation.taxId?.trim())
-      : Boolean(anonymousCustomerName.trim() && anonymousCustomerPhone.trim() && anonymousCustomerTaxId.trim())
+      : Boolean((anonymousCustomerName || "").trim() && (anonymousCustomerPhone || "").trim() && (anonymousCustomerTaxId || "").trim())
   );
 
   const submitSale = () => {
@@ -528,10 +608,11 @@ export default function Sales() {
 
     createSaleMutation.mutate({
       customerId: selectedCustomerId || undefined,
-      customerName: selectedCustomerId ? undefined : anonymousCustomerName.trim() || undefined,
-      customerPhone: selectedCustomerId ? undefined : anonymousCustomerPhone.trim() || undefined,
-      customerTaxId: selectedCustomerId ? undefined : anonymousCustomerTaxId.trim() || undefined,
+      customerName: selectedCustomerId ? undefined : (anonymousCustomerName || "").trim() || undefined,
+      customerPhone: selectedCustomerId ? undefined : (anonymousCustomerPhone || "").trim() || undefined,
+      customerTaxId: selectedCustomerId ? undefined : (anonymousCustomerTaxId || "").trim() || undefined,
       creditDays,
+      warrantyDays,
       saleChannel,
       paymentMethod,
       paymentStatus: resolvedPaymentStatus,
@@ -540,7 +621,7 @@ export default function Sales() {
       notes,
       customerType: selectedCustomerType,
       items: computedCart.items.map((item) => ({
-        productId: item.productId,
+        unitId: item.productId,
         pricingType: item.pricingType,
         quantity: item.quantity,
         basePrice: item.basePrice,
@@ -553,6 +634,18 @@ export default function Sales() {
   const detail = detailQuery.data;
   const totalSalesAmount = filteredSales.reduce((sum: number, sale: any) => sum + sale.total, 0);
 
+  // Auto-refetch catalog and auto-focus product search when modal opens (for barcode scanner support)
+  useEffect(() => {
+    if (isCreateOpen) {
+      utils.units.list.invalidate();
+      const timer = setTimeout(() => {
+        productSearchRef.current?.focus();
+        productSearchRef.current?.select();
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [isCreateOpen, utils]);
+
   const handleLoadQuotation = (quotation: any, items: any[]) => {
     setActiveTab("sales");
     setIsCreateOpen(true);
@@ -564,7 +657,7 @@ export default function Sales() {
     setNotes(quotation.notes || "");
     
     setCartItems(items.map(item => ({
-      productId: item.productId,
+      productId: item.unitId ?? item.productId,
       productName: item.productName,
       productCode: item.productCode,
       stock: 9999, // Hack to allow loading without failing stock validation immediately
@@ -956,7 +1049,6 @@ export default function Sales() {
                     <div className="relative">
                       <UserRound className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
-                        autoFocus
                         value={customerSearch}
                         onChange={(event) => {
                           setCustomerSearch(event.target.value);
@@ -982,7 +1074,7 @@ export default function Sales() {
                               // Auto-update cart prices if becoming wholesale
                               if (type === "wholesale") {
                                 setCartItems(current => current.map(item => {
-                                  const prod = products?.find(p => p.id === item.productId);
+                                  const prod = products?.find((p: any) => p.id === item.productId);
                                   return {
                                     ...item,
                                     pricingType: "wholesale",
@@ -991,7 +1083,7 @@ export default function Sales() {
                                 }));
                               } else {
                                 setCartItems(current => current.map(item => {
-                                  const prod = products?.find(p => p.id === item.productId);
+                                  const prod = products?.find((p: any) => p.id === item.productId);
                                   return {
                                     ...item,
                                     pricingType: "unit",
@@ -1087,10 +1179,53 @@ export default function Sales() {
 
               <Card className={isMobile ? "" : "border-slate-100 shadow-sm hover:shadow-md transition-shadow"}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Package className="h-4 w-4 text-slate-400" />
-                    Productos
-                  </CardTitle>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Package className="h-4 w-4 text-slate-400" />
+                      Productos
+                    </CardTitle>
+
+                    {/* Selector de Nivel de Precio de Venta */}
+                    <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 gap-1">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight px-1.5 hidden sm:inline">Precio:</span>
+                      <button
+                        type="button"
+                        onClick={() => handlePricingModeChange("unit")}
+                        className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
+                          currentPricingMode === "unit"
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-slate-600 hover:bg-white/80"
+                        }`}
+                        title="Precio de Venta Sugerido (Unitario)"
+                      >
+                        💰 Unit.
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePricingModeChange("discount")}
+                        className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
+                          currentPricingMode === "discount"
+                            ? "bg-amber-600 text-white shadow-sm"
+                            : "text-slate-600 hover:bg-white/80"
+                        }`}
+                        title="Precio con Descuento"
+                      >
+                        🏷️ Desc.
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePricingModeChange("wholesale")}
+                        className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
+                          currentPricingMode === "wholesale"
+                            ? "bg-emerald-600 text-white shadow-sm"
+                            : "text-slate-600 hover:bg-white/80"
+                        }`}
+                        title="Precio por Mayor"
+                      >
+                        📦 Mayor
+                      </button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="relative">
@@ -1100,11 +1235,12 @@ export default function Sales() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-slate-900 transition-colors" />
                         <Input
                           ref={productSearchRef}
+                          autoFocus
                           value={productSearch}
                           onChange={(event) => setProductSearch(event.target.value)}
                           onKeyDown={(event) => {
-                            if (event.key === "Enter" && filteredProducts.length === 1) {
-                              addProductToCart(filteredProducts[0]);
+                            if (event.key === "Enter" && filteredProducts.length > 0) {
+                              addProductToCart(toProductShape(filteredProducts[0]));
                             }
                           }}
                           placeholder="Buscar producto (Ctrl+B)..."
@@ -1127,34 +1263,70 @@ export default function Sales() {
                   </div>
 
                   {filteredProducts.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-slate-200">
-                      {filteredProducts.map((product: any) => (
-                        <button
-                          key={product.id}
-                          type="button"
-                          className="group relative flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-white hover:border-emerald-200 hover:bg-emerald-50/30 transition-all text-left shadow-sm hover:shadow-md"
-                          onClick={() => addProductToCart(product)}
-                        >
-                          <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-                            <Package className="h-5 w-5 text-slate-500 group-hover:text-emerald-600" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-bold text-slate-900 truncate text-sm">{product.name}</div>
-                            <div className="text-[10px] text-slate-500 font-medium uppercase tracking-tight">{product.code}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-black text-slate-900 text-sm">{formatCurrency(product.salePrice)}</div>
-                            <div className={`text-[10px] font-bold ${product.stock > product.minStock ? "text-slate-400" : "text-red-500"}`}>
-                              {product.stock} disp.
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-slate-200">
+                      {filteredProducts.map((u: any) => {
+                        const activePrice = 
+                          currentPricingMode === "discount" ? (u.discountPrice || u.salePrice || 0) :
+                          currentPricingMode === "wholesale" ? (u.wholesalePrice || u.salePrice || 0) :
+                          (u.salePrice || 0);
+
+                        return (
+                          <div
+                            key={u.id}
+                            className="group relative flex flex-col p-3 rounded-2xl border border-slate-100 bg-white hover:border-emerald-200 hover:bg-emerald-50/20 transition-all text-left shadow-sm hover:shadow-md cursor-pointer"
+                            onClick={() => addProductToCart(toProductShape(u))}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center group-hover:bg-emerald-100 transition-colors shrink-0">
+                                <Package className="h-5 w-5 text-slate-500 group-hover:text-emerald-600" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-bold text-slate-900 truncate text-sm">{u.brand} {u.model}</div>
+                                <div className="text-[10px] text-slate-500 font-mono font-bold uppercase tracking-tight">{u.code}</div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <div className="font-black text-slate-900 text-sm">{formatCurrency(activePrice)}</div>
+                                <div className="text-[10px] font-bold text-emerald-600">
+                                  Disponible
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 3 Precios Desglosados */}
+                            <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold">
+                              <span 
+                                onClick={(e) => { e.stopPropagation(); addProductToCart(toProductShape(u), "unit"); }}
+                                className={`px-1.5 py-0.5 rounded ${currentPricingMode === "unit" ? "bg-blue-100 text-blue-800 font-black" : "text-slate-500 hover:bg-slate-100"}`}
+                              >
+                                Unit: {formatCurrency(u.salePrice || 0)}
+                              </span>
+                              <span 
+                                onClick={(e) => { e.stopPropagation(); addProductToCart(toProductShape(u), "discount"); }}
+                                className={`px-1.5 py-0.5 rounded ${currentPricingMode === "discount" ? "bg-amber-100 text-amber-800 font-black" : "text-slate-500 hover:bg-slate-100"}`}
+                              >
+                                Desc: {formatCurrency(u.discountPrice || u.salePrice || 0)}
+                              </span>
+                              <span 
+                                onClick={(e) => { e.stopPropagation(); addProductToCart(toProductShape(u), "wholesale"); }}
+                                className={`px-1.5 py-0.5 rounded ${currentPricingMode === "wholesale" ? "bg-emerald-100 text-emerald-800 font-black" : "text-slate-500 hover:bg-slate-100"}`}
+                              >
+                                Mayor: {formatCurrency(u.wholesalePrice || u.salePrice || 0)}
+                              </span>
                             </div>
                           </div>
-                        </button>
-                      ))}
+                        );
+                      })}
                     </div>
-                  ) : productSearch.length > 2 ? (
+                  ) : productSearch.length > 0 ? (
                     <div className="py-8 text-center rounded-2xl border-2 border-dashed border-slate-100 bg-slate-50/50">
                       <Search className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                      <p className="text-sm text-slate-500 font-medium">No se encontraron productos</p>
+                      <p className="text-sm text-slate-500 font-medium">No se encontraron productos para "{productSearch}"</p>
+                    </div>
+                  ) : totalAvailable === 0 ? (
+                    <div className="py-8 text-center rounded-2xl border-2 border-dashed border-emerald-100 bg-emerald-50/30">
+                      <Package className="h-8 w-8 text-emerald-300 mx-auto mb-2" />
+                      <p className="text-sm text-emerald-700 font-semibold">Sin equipos disponibles</p>
+                      <p className="text-xs text-slate-400 mt-1">Marca unidades como <strong>Disponible</strong> desde el Catálogo</p>
                     </div>
                   ) : null}
 
@@ -1171,9 +1343,9 @@ export default function Sales() {
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium">{item.productName}</p>
                               <div className="flex flex-wrap gap-1 mt-1">
-                                <Badge variant={item.pricingType === "unit" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "unit", basePrice: products?.find(p => p.id === item.productId)?.salePrice || item.basePrice })}>U</Badge>
-                                <Badge variant={item.pricingType === "discount" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "discount", basePrice: products?.find(p => p.id === item.productId)?.discountPrice || item.basePrice })}>D</Badge>
-                                <Badge variant={item.pricingType === "wholesale" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "wholesale", basePrice: products?.find(p => p.id === item.productId)?.wholesalePrice || item.basePrice })}>M</Badge>
+                                 <Badge variant={item.pricingType === "unit" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "unit", basePrice: products?.find((p: any) => p.id === item.productId)?.salePrice || item.basePrice })}>U</Badge>
+                                <Badge variant={item.pricingType === "discount" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "discount", basePrice: products?.find((p: any) => p.id === item.productId)?.discountPrice || item.basePrice })}>D</Badge>
+                                <Badge variant={item.pricingType === "wholesale" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "wholesale", basePrice: products?.find((p: any) => p.id === item.productId)?.wholesalePrice || item.basePrice })}>M</Badge>
                               </div>
                               <p className="text-xs text-muted-foreground mt-1">{formatCurrency(item.basePrice)} c/u</p>
                             </div>
@@ -1243,19 +1415,19 @@ export default function Sales() {
                                 <div className="flex items-center gap-3 mt-1">
                                   <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                                     <button 
-                                      onClick={() => updateCartItem(item.productId, { pricingType: "unit", basePrice: products?.find(p => p.id === item.productId)?.salePrice || 0 })}
+                                      onClick={() => updateCartItem(item.productId, { pricingType: "unit", basePrice: products?.find((p: any) => p.id === item.productId)?.salePrice || 0 })}
                                       className={`px-2 py-0.5 rounded-md text-[9px] font-black transition-all ${item.pricingType === "unit" ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
                                     >
                                       UNIT.
                                     </button>
                                     <button 
-                                      onClick={() => updateCartItem(item.productId, { pricingType: "discount", basePrice: products?.find(p => p.id === item.productId)?.discountPrice || 0 })}
+                                      onClick={() => updateCartItem(item.productId, { pricingType: "discount", basePrice: products?.find((p: any) => p.id === item.productId)?.discountPrice || 0 })}
                                       className={`px-2 py-0.5 rounded-md text-[9px] font-black transition-all ${item.pricingType === "discount" ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
                                     >
                                       DESC.
                                     </button>
                                     <button 
-                                      onClick={() => updateCartItem(item.productId, { pricingType: "wholesale", basePrice: products?.find(p => p.id === item.productId)?.wholesalePrice || 0 })}
+                                      onClick={() => updateCartItem(item.productId, { pricingType: "wholesale", basePrice: products?.find((p: any) => p.id === item.productId)?.wholesalePrice || 0 })}
                                       className={`px-2 py-0.5 rounded-md text-[9px] font-black transition-all ${item.pricingType === "wholesale" ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
                                     >
                                       MAYOR.
@@ -1559,6 +1731,34 @@ export default function Sales() {
                   </CardContent>
                 </Card>
 
+                {/* Garantía */}
+                <Card className="border-blue-200 bg-blue-50/20">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2 text-blue-800 font-bold">
+                      <Shield className="h-5 w-5 text-blue-600" />
+                      Garantía del Equipo
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <Select value={String(warrantyDays)} onValueChange={(val) => setWarrantyDays(parseInt(val))}>
+                      <SelectTrigger className="bg-background text-sm font-semibold border-blue-200">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="15">🛡️ 15 Días de Garantía</SelectItem>
+                        <SelectItem value="30">🛡️ 30 Días de Garantía (Recomendado)</SelectItem>
+                        <SelectItem value="60">🛡️ 60 Días de Garantía</SelectItem>
+                        <SelectItem value="90">🛡️ 90 Días (3 Meses)</SelectItem>
+                        <SelectItem value="180">🛡️ 180 Días (6 Meses)</SelectItem>
+                        <SelectItem value="0">❌ Sin Garantía</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground">
+                      * Se creará automáticamente un registro de garantía activa en el Módulo de Garantías.
+                    </p>
+                  </CardContent>
+                </Card>
+
                 {/* Notas */}
                 <Card>
                   <CardHeader className="pb-2">
@@ -1794,7 +1994,7 @@ export default function Sales() {
                         variant="destructive"
                         className="gap-2"
                         onClick={() => cancelSaleMutation.mutate({ saleId: detail.sale.id, reason: cancelReason })}
-                        disabled={cancelSaleMutation.isPending || cancelReason.trim().length < 3}
+                        disabled={cancelSaleMutation.isPending || (cancelReason || "").trim().length < 3}
                       >
                         <XCircle className="h-4 w-4" />
                         Anular

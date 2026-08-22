@@ -41,6 +41,6 @@ export const exportKardexToExcel = (data: any) => {
   XLSX.utils.book_append_sheet(workbook, wsSummary, "Resumen");
 
   // 4. Descargar
-  const filename = `Kardex_${product.name.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
+  const filename = `Kardex_${String(product?.name || "Producto").replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
   XLSX.writeFile(workbook, filename);
 };

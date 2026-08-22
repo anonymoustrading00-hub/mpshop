@@ -99,7 +99,7 @@ function orderWhatsAppText(order: any) {
 }
 
 export default function ProductionOrders() {
-  const { data: rawProducts } = trpc.inventory.listProducts.useQuery();
+  const { data: rawProducts } = (trpc.inventory as any).listProducts.useQuery();
   const control = useProductionControl(rawProducts as any);
   const [createOpen, setCreateOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);

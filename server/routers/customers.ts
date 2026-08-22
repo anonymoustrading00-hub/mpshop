@@ -274,12 +274,6 @@ export const customersRouter = router({
         age: z.number().int().min(0).max(120).optional(),
         gender: z.string().optional(),
         socioeconomicLevel: z.string().optional(),
-        interestHealthFitness: z.boolean().optional(),
-        interestNaturalFood: z.boolean().optional(),
-        interestDigestiveIssues: z.boolean().optional(),
-        lifestyleGym: z.boolean().optional(),
-        lifestyleVegan: z.boolean().optional(),
-        lifestyleBiohacking: z.boolean().optional(),
         customerType: customerTypeSchema.optional(),
       })
     )
@@ -309,12 +303,6 @@ export const customersRouter = router({
         age: input.age,
         gender: input.gender,
         socioeconomicLevel: input.socioeconomicLevel,
-        interestHealthFitness: input.interestHealthFitness ? 1 : 0,
-        interestNaturalFood: input.interestNaturalFood ? 1 : 0,
-        interestDigestiveIssues: input.interestDigestiveIssues ? 1 : 0,
-        lifestyleGym: input.lifestyleGym ? 1 : 0,
-        lifestyleVegan: input.lifestyleVegan ? 1 : 0,
-        lifestyleBiohacking: input.lifestyleBiohacking ? 1 : 0,
         customerType: input.customerType || "retail",
       });
 
@@ -334,12 +322,6 @@ export const customersRouter = router({
         age: z.number().int().min(0).max(120).optional(),
         gender: z.string().optional(),
         socioeconomicLevel: z.string().optional(),
-        interestHealthFitness: z.boolean().optional(),
-        interestNaturalFood: z.boolean().optional(),
-        interestDigestiveIssues: z.boolean().optional(),
-        lifestyleGym: z.boolean().optional(),
-        lifestyleVegan: z.boolean().optional(),
-        lifestyleBiohacking: z.boolean().optional(),
         customerType: customerTypeSchema.optional(),
       })
     )
@@ -351,12 +333,6 @@ export const customersRouter = router({
       const { customerId, ...data } = input;
       await updateCustomer(customerId, {
         ...data,
-        interestHealthFitness: data.interestHealthFitness === undefined ? undefined : data.interestHealthFitness ? 1 : 0,
-        interestNaturalFood: data.interestNaturalFood === undefined ? undefined : data.interestNaturalFood ? 1 : 0,
-        interestDigestiveIssues: data.interestDigestiveIssues === undefined ? undefined : data.interestDigestiveIssues ? 1 : 0,
-        lifestyleGym: data.lifestyleGym === undefined ? undefined : data.lifestyleGym ? 1 : 0,
-        lifestyleVegan: data.lifestyleVegan === undefined ? undefined : data.lifestyleVegan ? 1 : 0,
-        lifestyleBiohacking: data.lifestyleBiohacking === undefined ? undefined : data.lifestyleBiohacking ? 1 : 0,
         customerType: data.customerType,
       });
       return { success: true };

@@ -24,7 +24,7 @@ const categoryClass = (category: string) => {
 };
 
 export default function ProductionInventory() {
-  const { data: rawProducts } = trpc.inventory.listProducts.useQuery();
+  const { data: rawProducts } = (trpc.inventory as any).listProducts.useQuery();
   const control = useProductionControl(rawProducts as any);
   const [categoryFilter, setCategoryFilter] = useState<InventoryFilter>("todos");
   const [adjustOpen, setAdjustOpen] = useState(false);

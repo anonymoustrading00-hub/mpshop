@@ -637,7 +637,7 @@ function TypeSection({
 // ─── Componente principal ──────────────────────────────────────────────────────
 
 export default function ProductionBatches() {
-  const { data: rawProducts } = trpc.inventory.listProducts.useQuery();
+  const { data: rawProducts } = (trpc.inventory as any).listProducts.useQuery();
   const control = useProductionControl(rawProducts as any);
   
   const leftoverMilkItem = control.inventory.find(item => item.name === "Sobrante de leche");

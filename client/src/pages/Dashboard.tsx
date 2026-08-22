@@ -183,6 +183,40 @@ export default function Dashboard() {
           </Card>
         </div>
 
+        {/* KPIs de Inventario y Ganancia */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <Card className="border-none shadow-sm rounded-2xl bg-white">
+            <CardContent className="p-5">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Equipos Disponibles</p>
+              <p className="text-3xl font-black text-slate-900">{stats?.availableUnitsCount ?? 0}</p>
+              <p className="text-xs text-slate-500 mt-0.5">de {stats?.totalUnits ?? 0} equipos totales</p>
+            </CardContent>
+          </Card>
+          <Card className="border-none shadow-sm rounded-2xl bg-white">
+            <CardContent className="p-5">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Valor Stock (venta)</p>
+              <p className="text-2xl font-black text-blue-700">{formatCurrency(stats?.totalInventoryValue || 0)}</p>
+              <p className="text-xs text-slate-500 mt-0.5">Costo: {formatCurrency(stats?.inventoryPurchaseValue || 0)}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-none shadow-sm rounded-2xl bg-emerald-50">
+            <CardContent className="p-5">
+              <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Ganancia Potencial</p>
+              <p className="text-2xl font-black text-emerald-700">{formatCurrency(stats?.inventoryPotentialProfit || 0)}</p>
+              <p className="text-xs text-emerald-600 mt-0.5">Si vendes todo el stock disponible</p>
+            </CardContent>
+          </Card>
+          <Card className="border-none shadow-sm rounded-2xl bg-white">
+            <CardContent className="p-5">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Margen % Acumulado</p>
+              <p className={`text-2xl font-black ${(stats?.avgMarginPct || 0) >= 15 ? "text-emerald-700" : (stats?.avgMarginPct || 0) >= 5 ? "text-amber-600" : "text-red-600"}`}>
+                {(stats?.avgMarginPct || 0).toFixed(1)}%
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">{stats?.soldUnitsCount ?? 0} equipos vendidos</p>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="mb-8">
           <RepurchaseSuggestions />
         </div>

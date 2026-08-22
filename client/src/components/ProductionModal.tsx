@@ -195,9 +195,9 @@ function SummaryView({ type, kefirProducts, kefirQtys, quesoQty, sueroQty, batch
 
 // ── Modal principal ──
 export function ProductionModal({ isOpen, onClose, type, onSuccess }: ProductionModalProps) {
-  const { data: products = [] } = trpc.inventory.listProducts.useQuery();
-  const createBatchMutation = trpc.production.createBatch.useMutation();
-  const completeBatchMutation = trpc.production.completeBatch.useMutation();
+  const { data: products = [] } = (trpc.inventory as any).listProducts.useQuery();
+  const createBatchMutation = (trpc as any).production.createBatch.useMutation();
+  const completeBatchMutation = (trpc as any).production.completeBatch.useMutation();
 
   // steps: 1 = confirmar inicio | 2 = registrar | 3 = resumen
   const [step, setStep] = useState<1 | 2 | 3>(1);

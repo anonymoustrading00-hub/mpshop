@@ -259,6 +259,7 @@ export interface QualityInput {
   outputLiters?: number;
   rawMaterialStatus?: QualityStatus;
   rawMaterialNotes?: string;
+  inputStatus?: QualityStatus;
   inputNotes?: string;
   approvedBy?: string;
   notes?: string;
@@ -294,13 +295,13 @@ function parsePresentation(name: string, unit?: string | null, volumeMl?: number
   const volumeMatch = normalize(name).match(/(\d+(?:[.,]\d+)?)\s*(ml|l)\b/);
   const weightMatch = normalize(name).match(/(\d+(?:[.,]\d+)?)\s*(g|kg)\b/);
 
-  if (volumeMatch) {
-    const value = Number(volumeMatch[1].replace(",", "."));
+  if (volumeMatch && volumeMatch[1]) {
+    const value = Number(String(volumeMatch[1]).replace(",", "."));
     return { volumeMl: volumeMatch[2] === "l" ? value * 1000 : value, weightGr: 0 };
   }
 
-  if (weightMatch) {
-    const value = Number(weightMatch[1].replace(",", "."));
+  if (weightMatch && weightMatch[1]) {
+    const value = Number(String(weightMatch[1]).replace(",", "."));
     return { volumeMl: 0, weightGr: weightMatch[2] === "kg" ? value * 1000 : value };
   }
 

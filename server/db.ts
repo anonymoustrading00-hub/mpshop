@@ -16,12 +16,9 @@ import {
   InsertUser,
   users,
   customers,
-  products,
-  inventory,
-  inventoryMovements,
+  branches,
   orders,
   orderItems,
-  payments,
   suppliers,
   purchases,
   purchaseItems,
@@ -35,17 +32,14 @@ import {
   cashClosures,
   cashOpenings,
   InsertCustomer,
-  InsertProduct,
-  InsertInventory,
-  InsertInventoryMovement,
   InsertOrder,
   InsertOrderItem,
-  InsertPayment,
   InsertGPSTracking,
   InsertCashClosure,
   InsertCashOpening,
   sales,
   saleItems,
+  InsertSale,
   InsertSaleItem,
   auditLog,
   InsertAuditLog,
@@ -53,8 +47,10 @@ import {
   quotationItems,
   InsertQuotation,
   InsertQuotationItem,
-  deliveryExtraLoad,
-  InsertDeliveryExtraLoad,
+  units,
+  unitEvents,
+  InsertUnit,
+  InsertUnitEvent,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { getSession } from "./auth";
@@ -67,8 +63,42 @@ const MOCK_DATA_FILE = path.join(process.cwd(), "server", "demo_data.json");
 
 // Memoria para modo demo (persistente mientras el servidor corra)
 export const MOCK_USERS: any[] = [
-  { id: 999, username: "admin", passwordHash: "", name: "Administrador (Modo Demo)", role: "admin", openId: "demo_admin", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(), email: "admin@demo.com", loginMethod: "traditional" },
-  { id: 1000, username: "admin_root", passwordHash: "$2b$10$9Sg2Com1gCSFtFhWjxkBbuLzPA9ar0ucdiPLycgbOogdudS60Uwlu", name: "Administrador Principal", role: "admin", openId: "admin_root", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(), email: "root@vitaliapro.com", loginMethod: "traditional" }
+  { 
+    id: 999, 
+    username: "admin", 
+    passwordHash: "", 
+    name: "Administrador (Modo Demo)", 
+    role: "admin", 
+    status: "active",
+    phone: "+591 70000000",
+    openId: "demo_admin", 
+    allowedModules: JSON.stringify(["sales","catalog","units","repairs","warranties","returns","orders","generate-codes","customers","suppliers","purchases","dashboard-kpis","reports","dashboard","analytics","analysis","finance","accounts-receivable","accounts-payable","expenses","branches","users","delivery-persons"]),
+    specialPermissions: JSON.stringify({ canViewPurchaseCost: true, canApplyDiscounts: true, canViewFinancialReports: true, canManageInventory: true, canDeleteRecords: true }),
+    assignedBranchIds: JSON.stringify(["all"]),
+    createdAt: new Date(), 
+    updatedAt: new Date(), 
+    lastSignedIn: new Date(), 
+    email: "admin@demo.com", 
+    loginMethod: "traditional" 
+  },
+  { 
+    id: 1000, 
+    username: "admin_root", 
+    passwordHash: "$2b$10$9Sg2Com1gCSFtFhWjxkBbuLzPA9ar0ucdiPLycgbOogdudS60Uwlu", 
+    name: "Administrador Principal", 
+    role: "admin", 
+    status: "active",
+    phone: "+591 71111111",
+    openId: "admin_root", 
+    allowedModules: JSON.stringify(["sales","catalog","units","repairs","warranties","returns","orders","generate-codes","customers","suppliers","purchases","dashboard-kpis","reports","dashboard","analytics","analysis","finance","accounts-receivable","accounts-payable","expenses","branches","users","delivery-persons"]),
+    specialPermissions: JSON.stringify({ canViewPurchaseCost: true, canApplyDiscounts: true, canViewFinancialReports: true, canManageInventory: true, canDeleteRecords: true }),
+    assignedBranchIds: JSON.stringify(["all"]),
+    createdAt: new Date(), 
+    updatedAt: new Date(), 
+    lastSignedIn: new Date(), 
+    email: "root@vitaliapro.com", 
+    loginMethod: "traditional" 
+  }
 ];
 export const MOCK_CUSTOMERS: any[] = [];
 export const MOCK_PRODUCTS: any[] = [];
@@ -100,6 +130,12 @@ export const MOCK_INVENTORY_TRANSFER_ITEMS: any[] = [];
 export const MOCK_ACCOUNTS_RECEIVABLE: any[] = [];
 export const MOCK_CREDIT_PAYMENTS: any[] = [];
 export const MOCK_BRANCHES: any[] = [];
+export const MOCK_UNITS: any[] = [];
+export const MOCK_UNIT_EVENTS: any[] = [];
+export const MOCK_REPAIRS: any[] = [];
+export const MOCK_WARRANTIES: any[] = [];
+export const MOCK_RETURNS: any[] = [];
+export const MOCK_GENERATED_CODES: any[] = [];
 
 export function syncMocksToDisk() {
   if (process.env.DATABASE_URL) return;
@@ -135,6 +171,12 @@ export function syncMocksToDisk() {
     MOCK_ACCOUNTS_RECEIVABLE,
     MOCK_CREDIT_PAYMENTS,
     MOCK_BRANCHES,
+    MOCK_UNITS,
+    MOCK_UNIT_EVENTS,
+    MOCK_REPAIRS,
+    MOCK_WARRANTIES,
+    MOCK_RETURNS,
+    MOCK_GENERATED_CODES,
   };
   try {
     fs.writeFileSync(MOCK_DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
@@ -160,7 +202,9 @@ function loadMocks() {
       MOCK_PRODUCTION_BATCHES, MOCK_PRODUCTION_OUTPUTS,
       MOCK_PRODUCTION_INPUTS, MOCK_PRODUCTION_INVENTORY,
       MOCK_INVENTORY_TRANSFERS, MOCK_INVENTORY_TRANSFER_ITEMS,
-      MOCK_ACCOUNTS_RECEIVABLE, MOCK_CREDIT_PAYMENTS, MOCK_BRANCHES
+      MOCK_ACCOUNTS_RECEIVABLE, MOCK_CREDIT_PAYMENTS, MOCK_BRANCHES,
+      MOCK_UNITS, MOCK_UNIT_EVENTS, MOCK_REPAIRS,
+      MOCK_WARRANTIES, MOCK_RETURNS, MOCK_GENERATED_CODES
     };
     for (const [key, arr] of Object.entries(arrays)) {
       if (data[key] && Array.isArray(data[key])) {
@@ -184,6 +228,34 @@ function loadMocks() {
     for (const order of MOCK_ORDERS as any[]) {
       if (!order.sourceChannel) order.sourceChannel = "other";
     }
+
+    // Normalizar items de cotización antiguos: usaban "productId" en lugar de "unitId"
+    for (const qItem of MOCK_QUOTATION_ITEMS as any[]) {
+      if (qItem.productId !== undefined && qItem.unitId === undefined) {
+        qItem.unitId = qItem.productId;
+        delete qItem.productId;
+      }
+    }
+
+    // Normalizar items de venta antiguos: idem, "productId" -> "unitId"
+    for (const sItem of MOCK_SALE_ITEMS as any[]) {
+      if (sItem.productId !== undefined && sItem.unitId === undefined) {
+        sItem.unitId = sItem.productId;
+        delete sItem.productId;
+      }
+    }
+    // Auto-heal: Asegurar que unidades con reparación activa 'in_progress' o 'pending' tengan status 'in_repair'
+    const activeRepairs = (MOCK_REPAIRS as any[]).filter((r: any) => r.status === "in_progress" || r.status === "pending");
+    for (const repair of activeRepairs) {
+      if (repair.unitId) {
+        const u = (MOCK_UNITS as any[]).find((unit: any) => unit.id === repair.unitId);
+        if (u && u.status !== "in_repair") {
+          console.log(`[Auto-Heal] Sincronizando unidad #${u.code || u.id} a status 'in_repair' por reparación activa #${repair.otNumber || repair.rmaNumber || repair.id}`);
+          u.status = "in_repair";
+        }
+      }
+    }
+
     console.log("[DB] Demo Mode: Data loaded from disk");
   } catch (err) {
     console.error("Failed to load mocks from disk:", err);
@@ -401,8 +473,18 @@ export async function createUser(data: any) {
   const db = await getDb();
   if (!db) {
     const newId = Math.floor(Math.random() * 1000) + 100;
-    const newUser = { ...data, id: newId, createdAt: new Date(), updatedAt: new Date() };
+    const newUser = { 
+      status: "active",
+      allowedModules: JSON.stringify(["sales","catalog","units","warranties","returns","orders","customers"]),
+      specialPermissions: JSON.stringify({ canViewPurchaseCost: false, canApplyDiscounts: true, canViewFinancialReports: false, canManageInventory: false, canDeleteRecords: false }),
+      assignedBranchIds: JSON.stringify(["all"]),
+      ...data, 
+      id: newId, 
+      createdAt: new Date(), 
+      updatedAt: new Date() 
+    };
     MOCK_USERS.push(newUser);
+    syncMocksToDisk();
     console.log("[DB] Demo Mode: User registered in memory", data.username);
     return { insertId: newId };
   }
@@ -428,6 +510,7 @@ export async function updateUser(id: number, data: any) {
     const index = MOCK_USERS.findIndex(u => u.id === id);
     if (index !== -1) {
       MOCK_USERS[index] = { ...MOCK_USERS[index], ...data, updatedAt: new Date() };
+      syncMocksToDisk();
       console.log("[DB] Demo Mode: User updated in memory", id);
       return { success: true };
     }
@@ -442,6 +525,7 @@ export async function deleteUser(id: number) {
     const index = MOCK_USERS.findIndex(u => u.id === id);
     if (index !== -1) {
       MOCK_USERS.splice(index, 1);
+      syncMocksToDisk();
       console.log("[DB] Demo Mode: User deleted from memory", id);
       return { success: true };
     }
@@ -567,172 +651,171 @@ export async function updateCustomer(customerId: number, data: Partial<InsertCus
   return await db.update(customers).set(data).where(eq(customers.id, customerId));
 }
 
-// Productos
-export async function updateProductPrice(productId: number, price: number) {
+// =============================================
+// UNIDADES (Units) - Reemplaza productos e inventario fungible
+// =============================================
+export async function getAllUnits() {
   const db = await getDb();
-  if (!db) return; // Ignorar en modo demo
-  return await db.update(products).set({ price }).where(eq(products.id, productId));
+  if (!db) return MOCK_UNITS;
+  return await db.select().from(units);
 }
 
-export async function updateProduct(productId: number, data: Partial<InsertProduct>) {
+export async function getUnitById(id: number) {
   const db = await getDb();
-  if (!db) {
-    const index = MOCK_PRODUCTS.findIndex(p => p.id === productId);
-    if (index !== -1) {
-      MOCK_PRODUCTS[index] = { ...MOCK_PRODUCTS[index], ...data, updatedAt: new Date() };
-      syncMocksToDisk();
-    }
-    return;
-  }
-  // Limpiar valores undefined para evitar desajuste de parametros SQL
-  const cleanData: Record<string, any> = {};
-  for (const [key, value] of Object.entries(data)) {
-    if (value !== undefined) {
-      cleanData[key] = value;
-    }
-  }
-
-  return await db.update(products).set(cleanData).where(eq(products.id, productId));
-}
-
-export async function getProductById(productId: number) {
-  const db = await getDb();
-  if (!db) {
-    return MOCK_PRODUCTS.find((product) => product.id === productId);
-  }
-  const result = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+  if (!db) return MOCK_UNITS.find((u: any) => u.id === id);
+  const result = await db.select().from(units).where(eq(units.id, id)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
-// Productos
-
-export async function getAllProducts() {
+export async function getUnitByCode(code: string) {
   const db = await getDb();
-  if (!db) return MOCK_PRODUCTS;
-  return await db.select().from(products);
+  if (!db) return MOCK_UNITS.find((u: any) => u.code === code);
+  const result = await db.select().from(units).where(eq(units.code, code)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
 }
 
-export async function createProduct(data: InsertProduct) {
+export async function createUnit(data: InsertUnit) {
   const db = await getDb();
   if (!db) {
-    const newId = MOCK_PRODUCTS.length + 1;
-    const newProduct = { ...data, id: newId, salePrice: data.salePrice || 0, createdAt: new Date(), updatedAt: new Date() };
-    MOCK_PRODUCTS.push(newProduct);
-
-    // Crear registro de inventario mock
-    MOCK_INVENTORY.push({
-      id: MOCK_INVENTORY.length + 1,
-      productId: newId,
-      quantity: 0,
-      minStock: 10,
-      lastUpdated: new Date()
-    });
-
+    const newId = MOCK_UNITS.length + 1;
+    const newUnit = { ...data, id: newId, createdAt: new Date(), updatedAt: new Date() };
+    MOCK_UNITS.push(newUnit);
     syncMocksToDisk();
-    console.log("[DB] Demo Mode: Product created in memory", newProduct);
     return { insertId: newId };
   }
-
-  try {
-    // Usar SQL raw para evitar problemas con columnas DEFAULT en MySQL
-    // Drizzle genera DEFAULT para columnas no proporcionadas, pero la BD real puede no tenerlas
-    const pool = _pool!;
-    const sql = `
-      INSERT INTO products (code, name, category, price, salePrice, wholesalePrice, discountPrice,
-        wholesaleDiscountType, wholesaleDiscountValue, unit, presentationQuantity, presentationUnit,
-        presentationVolumeMl, presentationWeightGr, productionRole, storageLocation, supplierName,
-        productionNotes, status, imageUrl)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    const params = [
-      data.code,
-      data.name,
-      data.category || "finished_product",
-      data.price,
-      data.salePrice ?? 0,
-      data.wholesalePrice ?? 0,
-      data.discountPrice ?? 0,
-      data.wholesaleDiscountType || "percentage",
-      data.wholesaleDiscountValue ?? 0,
-      data.unit || "unidad",
-      data.presentationQuantity ?? 1,
-      data.presentationUnit || "unidad",
-      data.presentationVolumeMl ?? 0,
-      data.presentationWeightGr ?? 0,
-      data.productionRole || "none",
-      data.storageLocation || null,
-      data.supplierName || null,
-      data.productionNotes || null,
-      data.status || "active",
-      data.imageUrl || null,
-    ];
-
-    console.log("[DB] Creating product with raw SQL, params:", JSON.stringify(params));
-    const [result] = await pool.execute(sql, params) as any;
-
-    const productId = result?.insertId;
-
-    // Crear automáticamente un registro de inventario con stock inicial de 0
-    if (productId) {
-      await pool.execute(
-        `INSERT INTO inventory (productId, quantity, minStock) VALUES (?, 0, 5)`,
-        [productId]
-      );
-    }
-
-    return { insertId: productId };
-  } catch (error: any) {
-    console.error("[DB] Error creating product:", error);
-    throw error;
-  }
+  const result = await db.insert(units).values(data);
+  return { insertId: getInsertId(result) };
 }
 
-// Inventario
-export async function getInventoryByProductId(productId: number, branchId?: number) {
+export async function updateUnit(id: number, data: Partial<InsertUnit>) {
   const db = await getDb();
-  const targetBranchId = branchId || 1;
   if (!db) {
-    return MOCK_INVENTORY.find(inv => inv.productId === productId && (inv.branchId || 1) === targetBranchId);
+    const idx = MOCK_UNITS.findIndex((u: any) => u.id === id);
+    if (idx !== -1) {
+      MOCK_UNITS[idx] = { ...MOCK_UNITS[idx], ...data, updatedAt: new Date() };
+      syncMocksToDisk();
+      return { success: true };
+    }
+    return { success: false };
   }
-  const result = await db.select().from(inventory).where(
-    and(
-      eq(inventory.productId, productId),
-      eq(inventory.branchId, targetBranchId)
-    )
-  ).limit(1);
-  return result.length > 0 ? result[0] : undefined;
+  await db.update(units).set({ ...data, updatedAt: new Date() }).where(eq(units.id, id));
+  return { success: true };
+}
+
+export async function deleteUnit(id: number) {
+  const db = await getDb();
+  if (!db) {
+    const idx = MOCK_UNITS.findIndex((u: any) => u.id === id);
+    if (idx !== -1) {
+      MOCK_UNITS.splice(idx, 1);
+      syncMocksToDisk();
+    }
+    return { success: true };
+  }
+  await db.delete(units).where(eq(units.id, id));
+  return { success: true };
+}
+
+// Adaptadores de compatibilidad para Unidades (Reemplaza productos e inventario fungible)
+export async function updateProductPrice(unitId: number, price: number) {
+  const db = await getDb();
+  if (!db) return;
+  return await db.update(units).set({ salePrice: price }).where(eq(units.id, unitId));
+}
+
+export async function updateProduct(unitId: number, data: any) {
+  return updateUnit(unitId, data);
+}
+
+export async function getProductById(unitId: number) {
+  const u = await getUnitById(unitId);
+  if (!u) return undefined;
+  return {
+    ...u,
+    name: `${u.brand} ${u.model}`,
+    price: u.salePrice || u.purchasePrice || 0,
+  };
+}
+
+export async function getAllProducts() {
+  const allUnits = await getAllUnits();
+  return allUnits.map((u: any) => ({
+    ...u,
+    name: `${u.brand} ${u.model}`,
+    price: u.salePrice || u.purchasePrice || 0,
+  }));
+}
+
+export async function createProduct(data: any) {
+  const amountToCents = (value: any) => {
+    const numeric = Number(value || 0);
+    return numeric > 0 && numeric < 1000 ? Math.round(numeric * 100) : Math.round(numeric);
+  };
+
+  return createUnit({
+    code: data.code,
+    type: data.type || "accessory",
+    brand: data.brand || data.supplierName || "General",
+    model: data.model || data.name || data.code,
+    specs: data.specs || JSON.stringify({
+      legacyName: data.name,
+      legacyCategory: data.category,
+      unit: data.unit,
+      presentationQuantity: data.presentationQuantity,
+      presentationUnit: data.presentationUnit,
+      productionRole: data.productionRole,
+      storageLocation: data.storageLocation,
+      productionNotes: data.productionNotes,
+      imageUrl: data.imageUrl,
+    }),
+    condition: data.condition ?? 10,
+    batteryHealth: data.batteryHealth || "n_a",
+    damageChecklist: data.damageChecklist || JSON.stringify({}),
+    damageNotes: data.damageNotes || null,
+    functionalTestPassed: data.functionalTestPassed ?? 1,
+    status: data.status === "inactive" ? "in_diagnosis" : (data.unitStatus || "available"),
+    purchasePrice: amountToCents(data.purchasePrice ?? data.price),
+    salePrice: amountToCents(data.salePrice ?? data.price),
+    discountPrice: data.discountPrice ? amountToCents(data.discountPrice) : null,
+    wholesalePrice: data.wholesalePrice ? amountToCents(data.wholesalePrice) : null,
+    supplierId: data.supplierId || null,
+    purchaseId: data.purchaseId || null,
+    purchaseDate: data.purchaseDate || null,
+    photos: data.photos || (data.imageUrl ? JSON.stringify([data.imageUrl]) : null),
+    branchId: data.branchId || 1,
+  } as any);
+}
+
+export async function getInventoryByProductId(unitId: number, branchId?: number) {
+  const u = await getUnitById(unitId);
+  if (!u) return undefined;
+  return {
+    id: u.id,
+    productId: u.id,
+    unitId: u.id,
+    quantity: u.status === "available" ? 1 : 0,
+    minStock: 1,
+    product: {
+      ...u,
+      name: `${u.brand} ${u.model}`,
+      price: u.salePrice || u.purchasePrice || 0,
+    }
+  };
 }
 
 export async function getAllInventory(branchId?: number) {
-  const db = await getDb();
-  if (!db) {
-    let list = MOCK_INVENTORY;
-    if (branchId) {
-      list = list.filter(inv => (inv.branchId || 1) === branchId);
+  const allUnits = await getAllUnits();
+  return allUnits.map((u: any) => ({
+    id: u.id,
+    productId: u.id,
+    unitId: u.id,
+    quantity: u.status === "available" ? 1 : 0,
+    minStock: 1,
+    product: {
+      ...u,
+      name: `${u.brand} ${u.model}`,
+      price: u.salePrice || u.purchasePrice || 0,
     }
-    return list.map(inv => ({
-      ...inv,
-      product: MOCK_PRODUCTS.find(p => p.id === inv.productId)
-    }));
-  }
-
-  let query = db.select({
-    inventory: inventory,
-    product: products
-  })
-  .from(inventory)
-  .leftJoin(products, eq(inventory.productId, products.id))
-  .$dynamic();
-
-  if (branchId) {
-    query = query.where(eq(inventory.branchId, branchId));
-  }
-
-  const results = await query;
-
-  return results.map(r => ({
-    ...r.inventory,
-    product: r.product
   }));
 }
 
@@ -743,59 +826,7 @@ export async function updateInventory(
   batchNumber?: string | null,
   branchId?: number
 ) {
-  const db = await getDb();
-  const targetBranchId = branchId || 1;
-  if (!db) {
-    // Modo Demo: Buscar lote específico en la sucursal o crear uno nuevo
-    let inv = MOCK_INVENTORY.find(inv => 
-      inv.productId === productId && 
-      (inv.branchId || 1) === targetBranchId &&
-      (batchNumber ? inv.batchNumber === batchNumber : !inv.batchNumber)
-    );
-
-    if (inv) {
-      inv.quantity = quantity;
-      inv.branchId = targetBranchId;
-      if (expiryDate !== undefined) inv.expiryDate = expiryDate ? new Date(expiryDate) : null;
-      inv.lastUpdated = new Date();
-    } else {
-      MOCK_INVENTORY.push({
-        id: MOCK_INVENTORY.length + 1,
-        productId,
-        branchId: targetBranchId,
-        batchNumber: batchNumber || null,
-        quantity,
-        minStock: 5,
-        expiryDate: expiryDate ? new Date(expiryDate) : null,
-        lastUpdated: new Date()
-      });
-    }
-    syncMocksToDisk();
-    return;
-  }
-
-  // Real DB: Buscar lote por productId, batchNumber y branchId
-  const existing = await db.select().from(inventory).where(and(
-    eq(inventory.productId, productId),
-    eq(inventory.branchId, targetBranchId),
-    batchNumber ? eq(inventory.batchNumber, batchNumber) : isNull(inventory.batchNumber)
-  )).limit(1);
-
-  if (existing.length > 0) {
-    const updateData: any = { quantity, lastUpdated: new Date() };
-    if (expiryDate !== undefined) updateData.expiryDate = expiryDate || null;
-    return await db.update(inventory).set(updateData).where(eq(inventory.id, existing[0].id));
-  } else {
-    // Crear nuevo lote
-    return await db.insert(inventory).values({
-      productId,
-      branchId: targetBranchId,
-      batchNumber: batchNumber || null,
-      quantity,
-      expiryDate: expiryDate || null,
-      lastUpdated: new Date()
-    });
-  }
+  return { success: true };
 }
 
 // Pedidos
@@ -857,7 +888,6 @@ export async function getRepurchaseSuggestions() {
     ordersData = await db.select({
       id: orders.id,
       customerId: orders.customerId,
-      customerName: orders.customerName,
       createdAt: orders.createdAt,
       status: orders.status,
       customerPhone: customers.phone,
@@ -945,142 +975,45 @@ export async function getOrdersByDeliveryPerson(userId: number) {
     .where(eq(orders.deliveryPersonId, userId));
 }
 
-// Deduce inventory when an order is created (FEFO: First Expired, First Out)
-export async function deductInventoryForOrder(orderId: number, orderNumber: string, items: InsertOrderItem[]) {
+
+export async function deductInventoryForOrder(orderId: number, orderNumber: string, items: any[]) {
   const db = await getDb();
-  if (!db) {
-    for (const item of items) {
-      // En modo demo, buscamos lotes del producto ordenados por fecha de vencimiento
-      const batches = MOCK_INVENTORY
-        .filter(i => i.productId === item.productId)
-        .sort((a, b) => {
-          if (!a.expiryDate) return 1;
-          if (!b.expiryDate) return -1;
-          return new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime();
-        });
+  if (!db) return;
 
-      let remainingToDeduct = item.quantity;
-      for (const batch of batches) {
-        if (remainingToDeduct <= 0) break;
-        const deduct = Math.min(batch.quantity, remainingToDeduct);
-        batch.quantity -= deduct;
-        remainingToDeduct -= deduct;
-      }
-
-      // Si falta stock, restamos del primer lote (permitir stock negativo en demo si es necesario)
-      if (remainingToDeduct > 0 && batches.length > 0) {
-        batches[0].quantity -= remainingToDeduct;
-      }
-
-      MOCK_MOVEMENTS.push({
-        id: MOCK_MOVEMENTS.length + 1,
-        productId: item.productId,
-        type: "exit",
-        quantity: item.quantity,
-        reason: `Pedido reservado ${orderNumber}`,
-        orderId: orderId,
-        createdAt: new Date()
+  for (const item of items) {
+    const uId = item.unitId || item.productId;
+    if (!uId) continue;
+    try {
+      await db.update(units).set({ status: "sold" }).where(eq(units.id, uId));
+      await db.insert(unitEvents).values({
+        unitId: uId,
+        eventType: "sold_order",
+        fromStatus: "available",
+        toStatus: "sold",
+        notes: `Vendido via Pedido ${orderNumber}`,
       });
-    }
-    syncMocksToDisk();
-    return;
+    } catch (_e) { /* ignorar si no existe */ }
   }
-
-  await db.transaction(async (tx: any) => {
-    for (const item of items) {
-      // Buscar lotes ordenados por fecha de vencimiento (FEFO)
-      const batches = await tx.select()
-        .from(inventory)
-        .where(eq(inventory.productId, item.productId))
-        .orderBy(inventory.expiryDate);
-
-      let remainingToDeduct = item.quantity;
-      for (const batch of batches) {
-        if (remainingToDeduct <= 0) break;
-        const deduct = Math.min(batch.quantity, remainingToDeduct);
-        if (deduct > 0) {
-          await (tx as any).update(inventory)
-            .set({ quantity: batch.quantity - deduct, lastUpdated: new Date() })
-            .where(eq(inventory.id, batch.id));
-          
-          await tx.insert(inventoryMovements).values({
-            productId: item.productId,
-            type: "exit",
-            quantity: deduct,
-            batchNumber: batch.batchNumber,
-            reason: `Pedido reservado ${orderNumber}`,
-            orderId: orderId,
-            createdAt: new Date()
-          });
-
-          remainingToDeduct -= deduct;
-        }
-      }
-
-      // Si aún queda por descontar (stock insuficiente en lotes registrados), 
-      // Si falta stock (sobre-venta), restamos del primer lote el excedente
-      if (remainingToDeduct > 0 && batches.length > 0) {
-        const firstBatch = batches[0];
-        await (tx as any).update(inventory)
-          .set({ quantity: firstBatch.quantity - remainingToDeduct, lastUpdated: new Date() })
-          .where(eq(inventory.id, firstBatch.id));
-        
-        await tx.insert(inventoryMovements).values({
-          productId: item.productId,
-          type: "exit",
-          quantity: remainingToDeduct,
-          batchNumber: firstBatch.batchNumber,
-          reason: `Pedido reservado (EXCEDENTE) ${orderNumber}`,
-          orderId: orderId,
-          createdAt: new Date()
-        });
-      }
-    }
-  });
 }
 
-// Restore inventory when an order is cancelled
-export async function restoreInventoryForOrder(orderId: number, orderNumber: string, items: InsertOrderItem[]) {
+export async function restoreInventoryForOrder(orderId: number, orderNumber: string, items: any[]) {
   const db = await getDb();
-  if (!db) {
-    for (const item of items) {
-      const inv = MOCK_INVENTORY.find(i => i.productId === item.productId);
-      if (inv) {
-        inv.quantity += item.quantity;
-        inv.lastUpdated = new Date();
-      }
-      MOCK_MOVEMENTS.push({
-        id: MOCK_MOVEMENTS.length + 1,
-        productId: item.productId,
-        type: "entry",
-        quantity: item.quantity,
-        reason: `Pedido cancelado ${orderNumber}`,
-        orderId: orderId,
-        createdAt: new Date()
-      });
-    }
-    syncMocksToDisk();
-    return;
-  }
+  if (!db) return;
 
-  await db.transaction(async (tx: any) => {
-    for (const item of items) {
-      const invRows = await tx.select().from(inventory).where(eq(inventory.productId, item.productId)).limit(1);
-      const inv = invRows[0];
-      if (inv) {
-        await (tx as any).update(inventory).set({ quantity: inv.quantity + item.quantity, lastUpdated: new Date() })
-          .where(eq(inventory.productId, item.productId));
-      }
-      await tx.insert(inventoryMovements).values({
-        productId: item.productId,
-        type: "entry",
-        quantity: item.quantity,
-        reason: `Pedido cancelado ${orderNumber}`,
-        orderId: orderId,
-        createdAt: new Date()
+  for (const item of items) {
+    const uId = item.unitId || item.productId;
+    if (!uId) continue;
+    try {
+      await db.update(units).set({ status: "available" }).where(eq(units.id, uId));
+      await db.insert(unitEvents).values({
+        unitId: uId,
+        eventType: "order_cancelled",
+        fromStatus: "sold",
+        toStatus: "available",
+        notes: `Restablecido por cancelación de Pedido ${orderNumber}`,
       });
-    }
-  });
+    } catch (_e) { /* ignorar si no existe */ }
+  }
 }
 
 export async function createOrder(data: InsertOrder) {
@@ -1133,19 +1066,36 @@ export async function getAllDeliveryPersons() {
 
 export async function createDeliveryPerson(data: InsertUser) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) {
+    const newId = MOCK_USERS.length + 1;
+    const newUser = { ...data, id: newId, createdAt: new Date() };
+    MOCK_USERS.push(newUser as any);
+    return { insertId: newId };
+  }
   return await db.insert(users).values(data);
 }
 
 export async function updateDeliveryPerson(userId: number, data: Partial<InsertUser>) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) {
+    const idx = MOCK_USERS.findIndex((u: any) => u.id === userId);
+    if (idx !== -1) {
+      MOCK_USERS[idx] = { ...MOCK_USERS[idx], ...data };
+    }
+    return { success: true };
+  }
   return await db.update(users).set(data).where(eq(users.id, userId));
 }
 
 export async function deleteDeliveryPerson(userId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) {
+    const idx = MOCK_USERS.findIndex((u: any) => u.id === userId);
+    if (idx !== -1) {
+      MOCK_USERS.splice(idx, 1);
+    }
+    return { success: true };
+  }
   return await db.delete(users).where(eq(users.id, userId));
 }
 
@@ -1221,18 +1171,10 @@ export async function completeOrderDelivery(orderId: number, method: "cash" | "q
       updatedAt: new Date(),
     }).where(eq(orders.id, orderId));
 
-    // Registrar movimiento de entrega (stock ya descontado al crear pedido)
+    // Actualizar estado de las unidades del pedido a vendidas
     const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
     for (const item of items) {
-      await tx.insert(inventoryMovements).values({
-        productId: item.productId,
-        type: "exit",
-        quantity: item.quantity,
-        reason: `Entrega Pedido ${order.orderNumber}`,
-        orderId: orderId,
-        userId: order.deliveryPersonId,
-        createdAt: new Date()
-      });
+      await tx.update(units).set({ status: "sold", updatedAt: new Date() }).where(eq(units.id, item.unitId));
     }
 
     await tx.insert(financialTransactions).values({
@@ -1276,48 +1218,19 @@ export async function deleteOrderItems(orderId: number) {
   }
   return await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
 }
-// Pagos
-
-export async function createPayment(data: InsertPayment) {
-  const db = await getDb();
-  if (!db) {
-    const newPayment = { ...data, id: MOCK_PAYMENTS.length + 1, createdAt: new Date() };
-    MOCK_PAYMENTS.push(newPayment);
-    // Actualizar el estado de pago del pedido en mock
-    const order = MOCK_ORDERS.find((o: any) => o.id === data.orderId);
-    if (order) {
-      order.paymentStatus = "completed";
-      order.paymentMethod = data.method;
-    }
-    syncMocksToDisk();
-    return newPayment;
-  }
-  return await db.insert(payments).values(data);
+// Pagos (OBSOLETO - tabla eliminada)
+export async function createPayment(data: any) {
+  return { id: 1, ...data };
 }
 
-export async function updatePayment(paymentId: number, data: Partial<InsertPayment>) {
-  const db = await getDb();
-  if (!db) {
-    const idx = MOCK_PAYMENTS.findIndex((p: any) => p.id === paymentId);
-    if (idx >= 0) {
-      MOCK_PAYMENTS[idx] = { ...MOCK_PAYMENTS[idx], ...data };
-      // Actualizar el estado de pago del pedido en mock
-      const order = MOCK_ORDERS.find((o: any) => o.id === MOCK_PAYMENTS[idx].orderId);
-      if (order) {
-        order.paymentStatus = "completed";
-        if (data.method) order.paymentMethod = data.method;
-      }
-    }
-    syncMocksToDisk();
-    return;
-  }
-  return await db.update(payments).set(data).where(eq(payments.id, paymentId));
+export async function updatePayment(paymentId: number, data: any) {
+  return;
 }
 
 // Rastreo GPS
 export async function createGPSTracking(data: InsertGPSTracking) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) return { insertId: Date.now() };
   return await db.insert(gpsTracking).values(data);
 }
 
@@ -1334,64 +1247,29 @@ export async function getGPSTrackingHistory(orderId: number) {
   return await db.select().from(gpsTracking).where(eq(gpsTracking.orderId, orderId));
 }
 
-// Movimientos de Inventario
-
-export async function createInventoryMovement(data: InsertInventoryMovement) {
-  const db = await getDb();
-  if (!db) {
-    MOCK_MOVEMENTS.push({ ...data, id: MOCK_MOVEMENTS.length + 1, createdAt: new Date() });
-    syncMocksToDisk();
-    return;
-  }
-  return await db.insert(inventoryMovements).values(data);
+// Eventos/Movimientos de Unidades
+export async function createInventoryMovement(data: any) {
+  return;
 }
 
-export async function getInventoryMovements(productId: number) {
+export async function getInventoryMovements(unitId: number) {
   const db = await getDb();
-  if (!db) {
-    const movements = MOCK_MOVEMENTS.filter(m => m.productId === productId);
-    return movements.map(m => {
-      const u = MOCK_USERS.find(user => user.id === m.userId);
-      const o = MOCK_ORDERS.find(order => order.id === m.orderId);
-      const s = MOCK_SALES.find(sale => sale.id === m.saleId);
-      const dp = o ? MOCK_USERS.find(user => user.id === o.deliveryPersonId) : null;
-      return {
-        ...m,
-        userName: u?.name || u?.username || null,
-        userRole: u?.role || null,
-        orderNumber: o?.orderNumber || null,
-        saleNumber: s?.saleNumber || null,
-        deliveryPersonName: dp?.name || null,
-        orderStatus: o?.status || null,
-      };
-    });
-  }
+  if (!db) return [];
 
   return await db.select({
-    id: inventoryMovements.id,
-    productId: inventoryMovements.productId,
-    type: inventoryMovements.type,
-    quantity: inventoryMovements.quantity,
-    reason: inventoryMovements.reason,
-    notes: inventoryMovements.notes,
-    userId: inventoryMovements.userId,
-    orderId: inventoryMovements.orderId,
-    saleId: inventoryMovements.saleId,
-    createdAt: inventoryMovements.createdAt,
+    id: unitEvents.id,
+    unitId: unitEvents.unitId,
+    eventType: unitEvents.eventType,
+    fromStatus: unitEvents.fromStatus,
+    toStatus: unitEvents.toStatus,
+    notes: unitEvents.notes,
+    createdAt: unitEvents.createdAt,
     userName: users.name,
-    userRole: users.role,
-    orderNumber: orders.orderNumber,
-    saleNumber: sales.saleNumber,
-    deliveryPersonName: sql<string>`(select name from ${users} where ${users.id} = (select ${orders.deliveryPersonId} from ${orders} where ${orders.id} = ${inventoryMovements.orderId}))`,
-    orderStatus: sql<string>`(select ${orders.status} from ${orders} where ${orders.id} = ${inventoryMovements.orderId})`,
   })
-    .from(inventoryMovements)
-    .leftJoin(users, eq(inventoryMovements.userId, users.id))
-    .leftJoin(orders, eq(inventoryMovements.orderId, orders.id))
-    .leftJoin(sales, eq(inventoryMovements.saleId, sales.id))
-    .where(eq(inventoryMovements.productId, productId));
+    .from(unitEvents)
+    .leftJoin(users, eq(unitEvents.userId, users.id))
+    .where(eq(unitEvents.unitId, unitId));
 }
-
 
 export async function getOrderItems(orderId: number) {
   const db = await getDb();
@@ -1399,29 +1277,28 @@ export async function getOrderItems(orderId: number) {
   if (!db) {
     const items = MOCK_ORDER_ITEMS.filter(item => item.orderId === orderId);
     return items.map(item => {
-      const product = MOCK_PRODUCTS.find(p => p.id === item.productId);
+      const unit = MOCK_UNITS.find(u => u.id === item.unitId);
       return {
         ...item,
-        productName: product ? product.name : "Producto #" + item.productId,
-        productCode: product ? product.code : ""
+        productName: unit ? `${unit.brand} ${unit.model}` : "Unidad #" + item.unitId,
+        productCode: unit ? unit.code : ""
       };
     });
   }
 
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
 
-  // Obtener nombres de productos
   const itemsWithProductNames = await Promise.all(
     items.map(async (item: any) => {
-      const productResult = await db
-        .select({ name: products.name, code: products.code })
-        .from(products)
-        .where(eq(products.id, item.productId))
+      const unitResult = await db
+        .select({ brand: units.brand, model: units.model, code: units.code })
+        .from(units)
+        .where(eq(units.id, item.unitId))
         .limit(1);
       return {
         ...item,
-        productName: productResult.length > 0 ? productResult[0].name : "Producto #" + item.productId,
-        productCode: productResult.length > 0 ? productResult[0].code : "",
+        productName: unitResult.length > 0 ? `${unitResult[0].brand} ${unitResult[0].model}` : "Unidad #" + item.unitId,
+        productCode: unitResult.length > 0 ? unitResult[0].code : "",
       };
     })
   );
@@ -1429,16 +1306,8 @@ export async function getOrderItems(orderId: number) {
   return itemsWithProductNames;
 }
 
-
-
 export async function getPaymentByOrderId(orderId: number) {
-  const db = await getDb();
-  if (!db) {
-    const found = (MOCK_PAYMENTS as any[]).find((p: any) => p.orderId === orderId);
-    return found || undefined;
-  }
-  const result = await db.select().from(payments).where(eq(payments.orderId, orderId)).limit(1);
-  return result.length > 0 ? result[0] : undefined;
+  return undefined;
 }
 
 // --- MÓDULO FINANCIERO Y COMPRAS (DEMO MODE) ---
@@ -1503,13 +1372,15 @@ export async function getAllPurchases(branchId?: number) {
 export async function getPurchaseItems(purchaseId: number) {
   const db = await getDb();
   if (!db) {
-    const items = MOCK_PURCHASE_ITEMS.filter(i => i.purchaseId === purchaseId);
-    return items.map(item => {
-      const product = MOCK_PRODUCTS.find(p => p.id === item.productId);
+    const items = MOCK_PURCHASE_ITEMS.filter((i: any) => i.purchaseId === purchaseId);
+    return items.map((item: any) => {
+      const uId = item.unitId || item.productId;
+      const unit = MOCK_PRODUCTS.find(p => p.id === uId); // usando mock products como fallback
       return {
         ...item,
-        productName: product?.name || "Producto #" + item.productId,
-        productCode: product?.code || ""
+        unitId: uId,
+        productName: unit ? `${unit.brand || ""} ${unit.model || ""}`.trim() : "Unidad #" + uId,
+        productCode: unit?.code || ""
       };
     });
   }
@@ -1517,26 +1388,25 @@ export async function getPurchaseItems(purchaseId: number) {
   const result = await db.select({
     id: purchaseItems.id,
     purchaseId: purchaseItems.purchaseId,
-    productId: purchaseItems.productId,
+    unitId: purchaseItems.unitId,
     quantity: purchaseItems.quantity,
     price: purchaseItems.price,
-    expiryDate: purchaseItems.expiryDate,
     createdAt: purchaseItems.createdAt,
-    productName: products.name,
-    productCode: products.code,
+    productName: sql<string>`concat(${units.brand}, ' ', ${units.model})`,
+    productCode: units.code,
   })
     .from(purchaseItems)
-    .leftJoin(products, eq(purchaseItems.productId, products.id))
+    .leftJoin(units, eq(purchaseItems.unitId, units.id))
     .where(eq(purchaseItems.purchaseId, purchaseId));
 
   return result;
 }
 
-export async function getPurchasesByProductId(productId: number) {
+export async function getPurchasesByProductId(unitId: number) {
   const db = await getDb();
   if (!db) {
     return MOCK_PURCHASE_ITEMS
-      .filter((item: any) => item.productId === productId)
+      .filter((item: any) => (item.unitId || item.productId) === unitId)
       .map((item: any) => {
         const purchase = MOCK_PURCHASES.find((entry: any) => entry.id === item.purchaseId);
         const supplier = MOCK_SUPPLIERS.find((entry: any) => entry.id === purchase?.supplierId);
@@ -1556,10 +1426,9 @@ export async function getPurchasesByProductId(productId: number) {
     .select({
       id: purchaseItems.id,
       purchaseId: purchaseItems.purchaseId,
-      productId: purchaseItems.productId,
+      unitId: purchaseItems.unitId,
       quantity: purchaseItems.quantity,
       price: purchaseItems.price,
-      expiryDate: purchaseItems.expiryDate,
       createdAt: purchaseItems.createdAt,
       purchaseNumber: purchases.purchaseNumber,
       purchaseStatus: purchases.status,
@@ -1570,7 +1439,7 @@ export async function getPurchasesByProductId(productId: number) {
     .from(purchaseItems)
     .innerJoin(purchases, eq(purchaseItems.purchaseId, purchases.id))
     .leftJoin(suppliers, eq(purchases.supplierId, suppliers.id))
-    .where(eq(purchaseItems.productId, productId));
+    .where(eq(purchaseItems.unitId, unitId));
 }
 
 export async function createPurchase(purchaseData: any, items: any[], userId?: number) {
@@ -1675,42 +1544,12 @@ export async function createPurchase(purchaseData: any, items: any[], userId?: n
     const id = getInsertId(result);
     console.log(`[DB] Purchase inserted with ID: ${id}`);
 
-    // 3. Insertar items y actualizar stock
+    // 3. Insertar items de compra
+    // En el modelo de electrónica, cada unidad (laptop/accesorio) se crea directamente
+    // en la tabla `units` con su purchaseId. El purchaseItems sólo referencia unitId.
     for (const item of items) {
-      // Limpiar item para que solo contenga campos de la tabla
       const { productName, ...cleanItem } = item;
-      
       await tx.insert(purchaseItems).values({ ...cleanItem, purchaseId: id });
-
-      if (purchaseData.status === "received") {
-        const existing = await tx.select().from(inventory).where(eq(inventory.productId, item.productId)).limit(1);
-        if (existing.length > 0) {
-          await (tx as any).update(inventory).set({
-            quantity: existing[0].quantity + Number(item.quantity),
-            expiryDate: item.expiryDate ? new Date(item.expiryDate) : existing[0].expiryDate,
-            lastUpdated: new Date()
-          }).where(eq(inventory.productId, item.productId));
-        } else {
-          await tx.insert(inventory).values({
-            productId: item.productId,
-            quantity: Number(item.quantity),
-            minStock: 10,
-            expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
-            lastUpdated: new Date()
-          });
-        }
-
-        // Crear registro en inventoryMovements
-        await tx.insert(inventoryMovements).values({
-          productId: item.productId,
-          type: "entry",
-          quantity: Number(item.quantity),
-          reason: `Compra ${purchaseToInsert.purchaseNumber}`,
-          notes: item.batchNumber ? `Lote/Marca: ${item.batchNumber}` : "",
-          batchNumber: item.batchNumber || null,
-          userId: userId || null,
-        });
-      }
     }
 
     // 4. Registrar transacción financiera en Caja (Gasto)
@@ -1746,18 +1585,7 @@ export async function updatePurchase(purchaseId: number, purchaseData: any, item
 
     const oldItems = await tx.select().from(purchaseItems).where(eq(purchaseItems.purchaseId, purchaseId));
 
-    // 1. Revert Inventory for old items (if it was received)
-    if (existingPurchase.status === "received") {
-      for (const item of oldItems) {
-        const inv = await tx.select().from(inventory).where(eq(inventory.productId, item.productId)).limit(1);
-        if (inv.length > 0) {
-          await (tx as any).update(inventory).set({
-            quantity: Math.max(0, inv[0].quantity - Number(item.quantity)),
-            lastUpdated: new Date()
-          }).where(eq(inventory.productId, item.productId));
-        }
-      }
-    }
+    // 1. (No stock revert needed - units are tracked individually)
 
     // 2. Revert Financial Transaction
     await tx.delete(financialTransactions).where(
@@ -1789,29 +1617,10 @@ export async function updatePurchase(purchaseId: number, purchaseData: any, item
       orderDate: purchaseData.orderDate ? new Date(purchaseData.orderDate) : new Date(),
     }).where(eq(purchases.id, purchaseId));
 
-    // 6. Insert new items and apply to inventory
+    // 6. Insert new items (units referenced from purchaseItems)
     for (const item of items) {
-      const { productName, id, purchaseId: pid, createdAt, ...cleanItem } = item;
+      const { productName, id: _id, purchaseId: pid, createdAt, ...cleanItem } = item;
       await tx.insert(purchaseItems).values({ ...cleanItem, purchaseId: purchaseId });
-
-      if (purchaseData.status === "received") {
-        const existing = await tx.select().from(inventory).where(eq(inventory.productId, item.productId)).limit(1);
-        if (existing.length > 0) {
-          await (tx as any).update(inventory).set({
-            quantity: existing[0].quantity + Number(item.quantity),
-            expiryDate: item.expiryDate ? new Date(item.expiryDate) : existing[0].expiryDate,
-            lastUpdated: new Date()
-          }).where(eq(inventory.productId, item.productId));
-        } else {
-          await tx.insert(inventory).values({
-            productId: item.productId,
-            quantity: Number(item.quantity),
-            minStock: 10,
-            expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
-            lastUpdated: new Date()
-          });
-        }
-      }
     }
 
     // 7. Apply new Financial Transaction
@@ -2035,6 +1844,126 @@ export async function createFinancialTransaction(data: any) {
     const result = await tx.insert(financialTransactions).values({ ...data, branchId: data.branchId || 1 });
     return result;
   });
+}
+
+/**
+ * Registra una transacción de costo interno (COGS, costo de reparación, costo de garantía).
+ * NO valida apertura de caja porque estos son costos contables/internos que afectan
+ * el P&L pero no necesariamente salen de una caja en ese instante.
+ * Para costos que sí salen de caja (ej: pago a técnico), usar createFinancialTransaction normal.
+ */
+export async function createCostTransaction(data: {
+  category: "cogs" | "repair_cost" | "warranty_repair_cost" | "warranty_replacement_cost";
+  amount: number;
+  unitCost?: number;
+  paymentMethod?: "cash" | "qr" | "transfer";
+  userId?: number;
+  branchId?: number;
+  referenceId?: number;
+  notes?: string;
+}) {
+  const db = await getDb();
+  const record = {
+    type: "expense" as const,
+    category: data.category,
+    amount: data.amount,
+    unitCost: data.unitCost,
+    paymentMethod: data.paymentMethod || "cash",
+    userId: data.userId,
+    branchId: data.branchId || 1,
+    referenceId: data.referenceId,
+    notes: data.notes,
+  };
+
+  if (!db) {
+    const newId = MOCK_FINANCIAL_TRANSACTIONS.length + 1;
+    MOCK_FINANCIAL_TRANSACTIONS.push({ ...record, id: newId, createdAt: new Date() });
+    syncMocksToDisk();
+    return { insertId: newId };
+  }
+
+  const result = await db.insert(financialTransactions).values(record);
+  return result;
+}
+
+/**
+ * Registra un gasto operativo automático (creado por el sistema, no por el usuario).
+ * Usado cuando se completa una reparación o se procesa una garantía.
+ * Si el pago es inmediato (paid) Y la categoría NO es "cogs", también crea la
+ * transacción financiera correspondiente.
+ *
+ * IMPORTANTE: "cogs" NO genera transacción financiera adicional porque el egreso
+ * de caja ya fue registrado como "purchase" al momento de la compra.
+ * Registrarlo de nuevo duplicaría el descuento en el saldo de caja.
+ */
+export async function createAutomaticOperationalExpense(data: {
+  branchId: number;
+  description: string;
+  category: "repair_cost" | "warranty_repair_cost" | "warranty_replacement_cost" | "cogs";
+  costType: string;
+  referenceType: string;
+  referenceId: number;
+  amount: number;
+  paymentMethod: "cash" | "qr" | "transfer";
+  userId?: number;
+  notes?: string;
+  status?: "pending" | "paid";
+}) {
+  const db = await getDb();
+  const status = data.status || "paid";
+  // COGS no genera egreso de caja adicional — la compra ya lo registró.
+  const shouldCreateFinancialTx = status === "paid" && data.category !== "cogs";
+
+  const record = {
+    branchId: data.branchId,
+    description: data.description,
+    category: data.category,
+    costType: data.costType,
+    referenceType: data.referenceType,
+    referenceId: data.referenceId,
+    isAutomatic: 1,
+    amount: data.amount,
+    paymentMethod: data.paymentMethod,
+    expenseDate: new Date(),
+    status,
+    notes: data.notes,
+    userId: data.userId,
+  };
+
+  if (!db) {
+    const newId = MOCK_OPERATIONAL_EXPENSES.length + 1;
+    MOCK_OPERATIONAL_EXPENSES.push({ ...record, id: newId, createdAt: new Date(), updatedAt: new Date() });
+    if (shouldCreateFinancialTx) {
+      await createCostTransaction({
+        category: data.category as any,
+        amount: data.amount,
+        paymentMethod: data.paymentMethod,
+        userId: data.userId,
+        branchId: data.branchId,
+        referenceId: data.referenceId,
+        notes: data.description,
+      });
+    }
+    syncMocksToDisk();
+    return { insertId: newId };
+  }
+
+  const result = await db.insert(operationalExpenses).values(record);
+  const insertId = getInsertId(result);
+
+  if (shouldCreateFinancialTx) {
+    await createCostTransaction({
+      category: data.category as any,
+      amount: data.amount,
+      paymentMethod: data.paymentMethod,
+      userId: data.userId,
+      branchId: data.branchId,
+      referenceId: insertId,
+      notes: data.description,
+    });
+  }
+
+  return { insertId };
 }
 
 export async function getFinancialTransactions(userId?: number, branchId?: number) {
@@ -2597,7 +2526,7 @@ export async function createFinancialTransactionsForDeliveries(closureId: number
       eq(financialTransactions.userId, userId),
       sql`DATE(DATE_SUB(${financialTransactions.createdAt}, INTERVAL 4 HOUR)) = ${date}`
     ));
-  const existingIds = new Set(existingRefs.map(r => r.referenceId).filter(Boolean));
+  const existingIds = new Set(existingRefs.map((r: any) => r.referenceId).filter(Boolean));
 
   const deliveredOrders = await db.select()
     .from(orders)
@@ -2796,9 +2725,9 @@ export async function getExpectedDailyTotals(userId: number, date: string) {
     ));
 
   if (approvedClosures.length > 0) {
-    const alreadyExpectedCash = approvedClosures.reduce((sum, c) => sum + (c.expectedCash || 0), 0);
-    const alreadyExpectedQr = approvedClosures.reduce((sum, c) => sum + (c.expectedQr || 0), 0);
-    const alreadyExpectedTransfer = approvedClosures.reduce((sum, c) => sum + (c.expectedTransfer || 0), 0);
+    const alreadyExpectedCash = approvedClosures.reduce((sum: number, c: any) => sum + (c.expectedCash || 0), 0);
+    const alreadyExpectedQr = approvedClosures.reduce((sum: number, c: any) => sum + (c.expectedQr || 0), 0);
+    const alreadyExpectedTransfer = approvedClosures.reduce((sum: number, c: any) => sum + (c.expectedTransfer || 0), 0);
 
     totals.cash = Math.max(0, totals.cash - alreadyExpectedCash);
     totals.qr = Math.max(0, totals.qr - alreadyExpectedQr);
@@ -2818,7 +2747,7 @@ type SalePaymentStatus = "pending" | "completed";
 type SaleStatus = "completed" | "cancelled";
 
 type SaleItemCreateInput = {
-  productId: number;
+  unitId: number;
   pricingType: "unit" | "wholesale";
   quantity: number;
   basePrice: number;
@@ -2844,6 +2773,7 @@ type SaleCreatePayload = {
   paymentMethod: "cash" | "qr" | "transfer" | "credit";
   paymentStatus: SalePaymentStatus;
   creditDays?: number;
+  warrantyDays?: number;
   dueDate?: string;
   notes?: string;
   items: SaleItemCreateInput[];
@@ -2871,9 +2801,14 @@ function mapSaleWithRelations(sale: any, usersList: any[], customersList: any[])
 export async function getNextSaleNumber() {
   const db = await getDb();
   const allData = db ? await db.select({ saleNumber: sales.saleNumber }).from(sales) : MOCK_SALES;
-  const max = allData.length > 0
-    ? Math.max(...allData.map((s: any) => parseInt(s.saleNumber.replace('VTA-', '')) || 0))
-    : 0;
+  const numbers = (allData || [])
+    .map((s: any) => {
+      if (!s || !s.saleNumber) return 0;
+      const digitsOnly = String(s.saleNumber).replace(/[^0-9]/g, "");
+      return parseInt(digitsOnly, 10) || 0;
+    })
+    .filter((n: number) => Number.isFinite(n));
+  const max = numbers.length > 0 ? Math.max(...numbers) : 0;
   return `VTA-${String(max + 1).padStart(3, '0')}`;
 }
 
@@ -2920,9 +2855,9 @@ export async function getProductsWithStock() {
 
   return allProducts.map((product: any) => {
     const productBatches = allInventory.filter((item: any) => item.productId === product.id);
-    const stock = productBatches.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const stock = productBatches.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
     // Tomamos el stock mínimo del primer lote que tenga uno definido, o por defecto 5
-    const minStock = productBatches.find(b => b.minStock != null)?.minStock || 5;
+    const minStock = productBatches.find((b: any) => b.minStock != null)?.minStock || 5;
 
     return {
       ...product,
@@ -2937,14 +2872,27 @@ export async function createSaleWithItems(payload: SaleCreatePayload) {
   const db = await getDb();
 
   if (!db) {
-    for (const item of payload.items) {
-      const product = MOCK_PRODUCTS.find((entry: any) => entry.id === item.productId);
-      if (!product || product.status !== "active") {
-        throw new Error(`Producto ${item.productId} no disponible para la venta`);
+    // 1. Validation loop
+    for (const item of payload.items as any[]) {
+      const targetId = item.unitId || item.productId;
+
+      // Check if it's a unit in MOCK_UNITS
+      const unit = MOCK_UNITS.find((u: any) => u.id === targetId);
+      if (unit) {
+        if (unit.status !== "available") {
+          throw new Error(`Unidad ${unit.code || targetId} no está disponible para la venta (Estado actual: ${unit.status})`);
+        }
+        continue;
       }
 
-      const productBatches = MOCK_INVENTORY.filter((entry: any) => entry.productId === item.productId);
-      const totalStock = productBatches.reduce((sum, b) => sum + b.quantity, 0);
+      // Check regular catalog product in MOCK_PRODUCTS
+      const product = MOCK_PRODUCTS.find((entry: any) => entry.id === targetId);
+      if (!product || product.status !== "active") {
+        throw new Error(`Producto ${targetId} no disponible para la venta`);
+      }
+
+      const productBatches = MOCK_INVENTORY.filter((entry: any) => entry.productId === targetId);
+      const totalStock = productBatches.reduce((sum: number, b: any) => sum + b.quantity, 0);
       if (totalStock < item.quantity) {
         throw new Error(`Stock insuficiente para ${product.name}. Disponible: ${totalStock}`);
       }
@@ -2953,6 +2901,7 @@ export async function createSaleWithItems(payload: SaleCreatePayload) {
     const newSaleId = MOCK_SALES.length + 1;
     MOCK_SALES.push({
       id: newSaleId,
+      branchId: payload.branchId || 1,
       saleNumber: payload.saleNumber,
       customerId: payload.customerId || null,
       customerName: payload.customerId ? null : payload.customerName || "Anónimo",
@@ -2974,11 +2923,13 @@ export async function createSaleWithItems(payload: SaleCreatePayload) {
       createdAt: new Date(),
     });
 
-    for (const item of payload.items) {
+    // 2. Process sale items and update stock/unit status
+    for (const item of payload.items as any[]) {
+      const targetId = item.unitId || item.productId;
       MOCK_SALE_ITEMS.push({
         id: MOCK_SALE_ITEMS.length + 1,
         saleId: newSaleId,
-        productId: item.productId,
+        unitId: targetId,
         pricingType: item.pricingType,
         quantity: item.quantity,
         basePrice: item.basePrice,
@@ -2990,10 +2941,70 @@ export async function createSaleWithItems(payload: SaleCreatePayload) {
         createdAt: new Date(),
       });
 
+      // Update unit status to "sold" if it's a unit
+      const unitIdx = MOCK_UNITS.findIndex((u: any) => u.id === targetId);
+      if (unitIdx !== -1) {
+        const oldStatus = MOCK_UNITS[unitIdx].status;
+        MOCK_UNITS[unitIdx] = {
+          ...MOCK_UNITS[unitIdx],
+          status: "sold",
+          updatedAt: new Date(),
+        };
+
+        MOCK_UNIT_EVENTS.push({
+          id: MOCK_UNIT_EVENTS.length + 1,
+          unitId: targetId,
+          eventType: "sold",
+          fromStatus: oldStatus,
+          toStatus: "sold",
+          userId: payload.soldBy,
+          notes: `Venta #${payload.saleNumber}`,
+          createdAt: new Date(),
+        });
+
+        // Crear registro de garantía si aplica
+        const warrantyDays = payload.warrantyDays !== undefined ? payload.warrantyDays : 30;
+        if (warrantyDays > 0) {
+          const startDate = new Date();
+          const endDate = new Date(startDate.getTime() + warrantyDays * 24 * 60 * 60 * 1000);
+          MOCK_WARRANTIES.push({
+            id: MOCK_WARRANTIES.length + 1,
+            saleId: newSaleId,
+            orderId: payload.orderId || null,
+            unitId: targetId,
+            days: warrantyDays,
+            startDate,
+            endDate,
+            status: "active",
+            createdAt: new Date(),
+          });
+        }
+
+        // COGS: registrar costo de adquisición de la unidad vendida
+        const soldUnit = MOCK_UNITS[unitIdx];
+        if (soldUnit && soldUnit.purchasePrice && soldUnit.purchasePrice > 0) {
+          await createAutomaticOperationalExpense({
+            branchId: payload.branchId || 1,
+            description: `COGS - ${soldUnit.brand || ""} ${soldUnit.model || ""} (${soldUnit.code || targetId}) · Venta ${payload.saleNumber}`,
+            category: "cogs",
+            costType: "direct_cost",
+            referenceType: "sale",
+            referenceId: newSaleId,
+            amount: soldUnit.purchasePrice,
+            paymentMethod: "cash", // contable, no sale de caja
+            userId: payload.soldBy,
+            notes: `Costo de adquisición registrado al momento de venta ${payload.saleNumber}`,
+            status: "paid",
+          });
+        }
+        continue;
+      }
+
+      // Deduct inventory for regular products
       if (!payload.orderId) {
         const productBatches = MOCK_INVENTORY
-          .filter((entry: any) => entry.productId === item.productId)
-          .sort((a, b) => {
+          .filter((entry: any) => entry.productId === targetId)
+          .sort((a: any, b: any) => {
             if (!a.expiryDate) return 1;
             if (!b.expiryDate) return -1;
             return new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime();
@@ -3010,7 +3021,7 @@ export async function createSaleWithItems(payload: SaleCreatePayload) {
       }
 
       await createInventoryMovement({
-        productId: item.productId,
+        productId: targetId,
         type: "exit",
         quantity: item.quantity,
         reason: payload.orderId ? `Venta Pedido ${payload.orderId}` : `Venta ${payload.saleNumber}`,
@@ -3096,81 +3107,67 @@ export async function createSaleWithItems(payload: SaleCreatePayload) {
     const saleId = getInsertId(saleResult);
 
     for (const item of payload.items) {
-      const productRows = await tx.select().from(products).where(eq(products.id, item.productId)).limit(1);
-      const product = productRows[0];
-      if (!product || product.status !== "active") {
-        throw new Error(`Producto ${item.productId} no disponible para la venta`);
+      await tx.insert(saleItems).values({
+        ...item,
+        saleId,
+      });
+
+      // Obtener datos de la unidad para COGS y garantía
+      const [unitRow] = await tx.select().from(units).where(eq(units.id, item.unitId)).limit(1);
+
+      // Actualizar estado de la unidad a vendida
+      await tx.update(units).set({
+        status: "sold",
+        updatedAt: new Date(),
+      }).where(eq(units.id, item.unitId));
+
+      // Registrar evento
+      await tx.insert(unitEvents).values({
+        unitId: item.unitId,
+        eventType: "sold",
+        fromStatus: "available",
+        toStatus: "sold",
+        userId: payload.soldBy,
+        notes: `Vendido en venta #${payload.saleNumber}`,
+      });
+
+      // Crear registro de garantía si aplica
+      const warrantyDays = payload.warrantyDays !== undefined ? payload.warrantyDays : 30;
+      if (warrantyDays > 0) {
+        const startDate = new Date();
+        const endDate = new Date(startDate.getTime() + warrantyDays * 24 * 60 * 60 * 1000);
+        await tx.insert(schema.warranties).values({
+          unitId: item.unitId,
+          saleId,
+          orderId: payload.orderId || null,
+          days: warrantyDays,
+          startDate,
+          endDate,
+          status: "active",
+        });
       }
 
-      if (!payload.orderId) {
-        const productBatches = await tx.select()
-          .from(inventory)
-          .where(eq(inventory.productId, item.productId))
-          .orderBy(inventory.expiryDate);
-
-        let remaining = item.quantity;
-        for (const batch of productBatches) {
-          if (remaining <= 0) break;
-          const deduct = Math.min(batch.quantity, remaining);
-          if (deduct > 0) {
-            await (tx as any).update(inventory)
-              .set({ quantity: batch.quantity - deduct, lastUpdated: new Date() })
-              .where(eq(inventory.id, batch.id));
-            
-            await tx.insert(inventoryMovements).values({
-              productId: item.productId,
-              type: "exit",
-              quantity: deduct,
-              batchNumber: batch.batchNumber,
-              reason: `Venta ${payload.saleNumber}`,
-              notes: `Salida por venta ${payload.saleNumber}`,
-              saleId,
-              orderId: payload.orderId,
-              userId: payload.soldBy,
-            });
-            
-            remaining -= deduct;
-          }
-        }
-
-        if (remaining > 0) {
-          const defaultInvRows = await tx.select().from(inventory).where(eq(inventory.productId, item.productId)).limit(1);
-          if (defaultInvRows.length > 0) {
-             await (tx as any).update(inventory)
-               .set({ quantity: defaultInvRows[0].quantity - remaining, lastUpdated: new Date() })
-               .where(eq(inventory.id, defaultInvRows[0].id));
-          } else {
-             await tx.insert(inventory).values({
-                productId: item.productId,
-                quantity: -remaining,
-                minStock: 10,
-                lastUpdated: new Date()
-             });
-          }
-          await tx.insert(inventoryMovements).values({
-            productId: item.productId,
-            type: "exit",
-            quantity: remaining,
-            reason: `Venta ${payload.saleNumber}`,
-            notes: `Salida por venta ${payload.saleNumber} (Sin stock previo)`,
-            saleId,
-            orderId: payload.orderId,
-            userId: payload.soldBy,
-          });
-        }
-      } else {
-        // Si hay orderId, el stock ya fue descontado por deductInventoryForOrder.
-        // Solo registramos el movimiento para trazabilidad de la venta.
-        await tx.insert(inventoryMovements).values({
-          productId: item.productId,
-          type: "exit",
-          quantity: item.quantity,
-          reason: `Venta Pedido vinculado`,
-          notes: `Salida ya procesada en pedido #${payload.orderId}`,
-          saleId,
-          orderId: payload.orderId,
+      // COGS: registrar costo de adquisición de la unidad vendida
+      // Solo va a operationalExpenses (P&L). NO se inserta en financialTransactions
+      // porque el COGS es un costo contable, no un egreso real de caja.
+      // El dinero de compra ya salió cuando se registró la unidad (category: "purchase").
+      if (unitRow && unitRow.purchasePrice && unitRow.purchasePrice > 0) {
+        await tx.insert(operationalExpenses).values({
+          branchId: payload.branchId || 1,
+          description: `COGS - ${unitRow.brand || ""} ${unitRow.model || ""} (${unitRow.code || item.unitId}) · Venta ${payload.saleNumber}`,
+          category: "cogs",
+          costType: "direct_cost",
+          referenceType: "sale",
+          referenceId: saleId,
+          isAutomatic: 1,
+          amount: unitRow.purchasePrice,
+          paymentMethod: "cash",
+          expenseDate: new Date(),
+          status: "paid",
           userId: payload.soldBy,
+          notes: `Costo de adquisición registrado al momento de venta ${payload.saleNumber}`,
         });
+        // ⚠️ No insertar en financialTransactions — COGS no afecta saldo de caja.
       }
     }
 
@@ -3301,21 +3298,14 @@ export async function cancelSaleRecord(saleId: number, cancelledByUserId: number
     }).where(eq(sales.id, saleId));
 
     for (const item of items as any[]) {
-      const inventoryRows = await tx.select().from(inventory).where(eq(inventory.productId, item.productId)).limit(1);
-      const inventoryItem = inventoryRows[0];
-      const currentStock = inventoryItem?.quantity || 0;
-
-      await (tx as any).update(inventory).set({
-        quantity: currentStock + item.quantity,
-        lastUpdated: new Date(),
-      }).where(eq(inventory.productId, item.productId));
-
-      await tx.insert(inventoryMovements).values({
-        productId: item.productId,
-        type: "entry",
-        quantity: item.quantity,
-        reason: `Anulación ${sale.saleNumber}`,
-        notes: `Reposición por anulación de venta ${sale.saleNumber}`,
+      // Restaurar estado de la unidad a disponible
+      await tx.update(units).set({ status: "available", updatedAt: new Date() }).where(eq(units.id, item.unitId));
+      await tx.insert(unitEvents).values({
+        unitId: item.unitId,
+        eventType: "status_change",
+        fromStatus: "sold",
+        toStatus: "available",
+        notes: `Anulación de venta ${sale.saleNumber}`,
       });
     }
 
@@ -3340,11 +3330,11 @@ export async function getAllSales(branchId?: number) {
   if (!db) {
     let list = MOCK_SALES;
     if (branchId) {
-      list = list.filter((s: any) => (s.branchId || 1) === branchId);
+      list = list.filter((s: any) => !s.branchId || s.branchId === branchId);
     }
     return list.map((sale: any) => {
       return mapSaleWithRelations(sale, MOCK_USERS, MOCK_CUSTOMERS);
-    }).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }).sort((a: any, b: any) => new Date(b.createdAt || Date.now()).getTime() - new Date(a.createdAt || Date.now()).getTime());
   }
 
   let rawSalesQuery = db.select().from(sales).$dynamic();
@@ -3360,7 +3350,7 @@ export async function getAllSales(branchId?: number) {
 
   return rawSales
     .map((sale: any) => mapSaleWithRelations(sale, usersList, customersList))
-    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    .sort((a: any, b: any) => new Date(b.createdAt || Date.now()).getTime() - new Date(a.createdAt || Date.now()).getTime());
 }
 
 export async function getSaleById(saleId: number) {
@@ -3384,26 +3374,36 @@ export async function getSaleItemsBySaleId(saleId: number) {
   if (!db) {
     const items = MOCK_SALE_ITEMS.filter((i: any) => i.saleId === saleId);
     return items.map((item: any) => {
-      const product = MOCK_PRODUCTS.find((p: any) => p.id === item.productId);
-      return { ...item, productName: product?.name || 'Producto #' + item.productId, productCode: product?.code || '' };
+      const productRef = item.unitId ?? item.productId;
+      const unit = MOCK_UNITS.find((u: any) => u.id === productRef);
+      if (unit) {
+        const name = `${unit.brand ?? ""} ${unit.model ?? ""}`.trim() || unit.code || `Unidad #${productRef}`;
+        return { ...item, productName: name, productCode: unit.code || "" };
+      }
+      const product = MOCK_PRODUCTS.find((p: any) => p.id === productRef);
+      if (product) {
+        return { ...item, productName: product.name, productCode: product.code || "" };
+      }
+      return { ...item, productName: `Producto #${productRef ?? "?"}`, productCode: "" };
     });
   }
   const items = await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
   return await Promise.all(items.map(async (item: any) => {
-    const prod = await db.select({ name: products.name, code: products.code }).from(products).where(eq(products.id, item.productId)).limit(1);
-    return { ...item, productName: prod[0]?.name || '', productCode: prod[0]?.code || '' };
+    const unit = await db.select({ brand: units.brand, model: units.model, code: units.code }).from(units).where(eq(units.id, item.unitId)).limit(1);
+    const u = unit[0];
+    return { ...item, productName: u ? `${u.brand} ${u.model}` : `Unidad #${item.unitId}`, productCode: u?.code || '' };
   }));
 }
 
 export async function getOnOrderQuantities() {
   const db = await getDb();
   if (!db) {
-    // Modo demo
     const result: Record<number, number> = {};
     MOCK_ORDER_ITEMS.forEach(item => {
       const order = MOCK_ORDERS.find(o => o.id === item.orderId);
       if (order && !['delivered', 'cancelled'].includes(order.status)) {
-        result[item.productId] = (result[item.productId] || 0) + item.quantity;
+        const uId = item.unitId || item.productId;
+        result[uId] = (result[uId] || 0) + item.quantity;
       }
     });
     return result;
@@ -3411,7 +3411,7 @@ export async function getOnOrderQuantities() {
 
   const rows = await db
     .select({
-      productId: orderItems.productId,
+      unitId: orderItems.unitId,
       totalQuantity: sql<number>`cast(sum(${orderItems.quantity}) as signed)`,
     })
     .from(orderItems)
@@ -3420,11 +3420,11 @@ export async function getOnOrderQuantities() {
       ne(orders.status, 'delivered'),
       ne(orders.status, 'cancelled')
     ))
-    .groupBy(orderItems.productId);
+    .groupBy(orderItems.unitId);
 
   const result: Record<number, number> = {};
   rows.forEach((row: any) => {
-    result[row.productId] = Number(row.totalQuantity);
+    result[row.unitId] = Number(row.totalQuantity);
   });
   return result;
 }
@@ -3495,7 +3495,8 @@ export async function getNextQuotationNumber() {
 export async function createQuotationWithItems(data: InsertQuotation & { items: InsertQuotationItem[] }) {
   const db = await getDb();
   if (!db) {
-    const newId = MOCK_QUOTATIONS.length + 1;
+    const existingIds = MOCK_QUOTATIONS.map((q: any) => q.id).filter((n: any) => typeof n === "number");
+    const newId = (existingIds.length ? Math.max(...existingIds) : 0) + 1;
     const { items, ...quotationData } = data;
     const newQuotation = {
       ...quotationData,
@@ -3505,10 +3506,12 @@ export async function createQuotationWithItems(data: InsertQuotation & { items: 
     };
     MOCK_QUOTATIONS.push(newQuotation);
 
+    const itemExistingIds = MOCK_QUOTATION_ITEMS.map((it: any) => it.id).filter((n: any) => typeof n === "number");
+    let nextItemId = (itemExistingIds.length ? Math.max(...itemExistingIds) : 0) + 1;
     items.forEach((item, index) => {
       MOCK_QUOTATION_ITEMS.push({
         ...item,
-        id: MOCK_QUOTATION_ITEMS.length + 1,
+        id: nextItemId++,
         quotationId: newId,
         createdAt: new Date()
       });
@@ -3540,15 +3543,24 @@ export async function createQuotationWithItems(data: InsertQuotation & { items: 
 export async function getAllQuotations() {
   const db = await getDb();
   if (!db) {
+    const toMs = (v: any): number => {
+      if (v instanceof Date) return v.getTime();
+      if (typeof v === "string" || typeof v === "number") return new Date(v).getTime();
+      return 0;
+    };
     return MOCK_QUOTATIONS.map(q => {
       const customer = MOCK_CUSTOMERS.find(c => c.id === q.customerId);
       const creator = MOCK_USERS.find(u => u.id === q.createdBy);
+      const createdAt = q.createdAt instanceof Date ? q.createdAt : new Date(q.createdAt);
+      const updatedAt = q.updatedAt instanceof Date ? q.updatedAt : new Date(q.updatedAt);
       return {
         ...q,
+        createdAt,
+        updatedAt,
         customerDisplayName: customer ? customer.name : q.customerName,
         creatorName: creator ? creator.name : "Desconocido"
       };
-    }).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    }).sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
   }
 
   const result = await db.select({
@@ -3596,24 +3608,27 @@ export async function getQuotationItemsByQuotationId(quotationId: number) {
   const db = await getDb();
   if (!db) {
     return MOCK_QUOTATION_ITEMS
-      .filter(item => item.quotationId === quotationId)
-      .map(item => {
-        const product = MOCK_PRODUCTS.find(p => p.id === item.productId);
+      .filter((item: any) => item.quotationId === quotationId)
+      .map((item: any) => {
+        const productRef = item.unitId ?? item.productId;
+        const unit = MOCK_UNITS.find((u: any) => u.id === productRef);
+        const createdAt = item.createdAt instanceof Date ? item.createdAt : new Date(item.createdAt);
         return {
           ...item,
-          productName: product ? product.name : "Producto desconocido",
-          productCode: product ? product.code : "N/A"
+          createdAt,
+          productName: unit ? `${unit.brand} ${unit.model}`.trim() : "Unidad desconocida",
+          productCode: unit ? unit.code : "N/A"
         };
       });
   }
 
   return await db.select({
     ...quotationItems,
-    productName: products.name,
-    productCode: products.code,
+    productName: sql<string>`CONCAT(${units.brand}, ' ', ${units.model})`,
+    productCode: units.code,
   })
     .from(quotationItems)
-    .leftJoin(products, eq(quotationItems.productId, products.id))
+    .leftJoin(units, eq(quotationItems.unitId, units.id))
     .where(eq(quotationItems.quotationId, quotationId));
 }
 
@@ -3635,226 +3650,39 @@ export async function updateQuotationStatus(quotationId: number, status: "pendin
 }
 
 // =============================================
-// Carga Extra de Repartidores
+// Carga Extra de Repartidores (OBSOLETO - tabla eliminada en pivote a electrónica)
 // =============================================
-export async function assignDeliveryExtraLoad(data: InsertDeliveryExtraLoad) {
-  const db = await getDb();
-  
-  // 1. Descontar del inventario central
-  const { productId, quantity, deliveryPersonId, type } = data;
-  
-  if (!db) {
-    const inventoryItem = MOCK_INVENTORY.find(i => i.productId === productId);
-    if (!inventoryItem || inventoryItem.quantity < quantity) {
-      throw new Error("Stock insuficiente en almacén central");
-    }
-    inventoryItem.quantity -= quantity;
-    inventoryItem.lastUpdated = new Date();
-    
-    // Registrar movimiento
-    await createInventoryMovement({
-      productId,
-      type: "exit",
-      quantity,
-      reason: `Carga Extra Repartidor (${type === 'sale' ? 'Venta' : 'Muestra'})`,
-      userId: deliveryPersonId,
-    });
-
-    const newId = MOCK_DELIVERY_EXTRA_LOAD.length + 1;
-    MOCK_DELIVERY_EXTRA_LOAD.push({
-      ...data,
-      id: newId,
-      status: "loaded",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    syncMocksToDisk();
-    return { insertId: newId };
-  }
-
-  return await db.transaction(async (tx) => {
-    // Validar stock
-    const inv = await tx.select().from(inventory).where(eq(inventory.productId, productId)).limit(1);
-    if (!inv[0] || inv[0].quantity < quantity) {
-      throw new Error("Stock insuficiente en almacén central");
-    }
-
-    // Descontar
-    await (tx as any).update(inventory).set({ 
-      quantity: inv[0].quantity - quantity,
-      lastUpdated: new Date() 
-    }).where(eq(inventory.productId, productId));
-
-    // Registrar movimiento
-    await tx.insert(inventoryMovements).values({
-      productId,
-      type: "exit",
-      quantity,
-      reason: `Carga Extra Repartidor (${type === 'sale' ? 'Venta' : 'Muestra'})`,
-      userId: deliveryPersonId,
-    });
-
-    // Crear carga extra
-    const result = await tx.insert(deliveryExtraLoad).values(data);
-    return result;
-  });
+export async function assignDeliveryExtraLoad(data: any) {
+  return { success: false, message: "Módulo de carga extra no aplica para electrónica." };
 }
 
 export async function getDeliveryExtraLoad(deliveryPersonId: number, date: string) {
-  const db = await getDb();
-  if (!db) {
-    return MOCK_DELIVERY_EXTRA_LOAD
-      .filter(item => item.deliveryPersonId === deliveryPersonId && item.date === date)
-      .map(item => {
-        const product = MOCK_PRODUCTS.find(p => p.id === item.productId);
-        return { ...item, productName: product?.name || "Desconocido" };
-      });
-  }
-
-  return await db.select({
-    ...deliveryExtraLoad,
-    productName: products.name,
-  })
-    .from(deliveryExtraLoad)
-    .leftJoin(products, eq(deliveryExtraLoad.productId, products.id))
-    .where(and(
-      eq(deliveryExtraLoad.deliveryPersonId, deliveryPersonId),
-      eq(deliveryExtraLoad.date, date)
-    ));
+  return [];
 }
 
-export async function updateDeliveryExtraLoadStatus(id: number, status: "loaded" | "sold" | "used" | "returned", userId: number) {
-  const db = await getDb();
-  
-  if (!db) {
-    const index = MOCK_DELIVERY_EXTRA_LOAD.findIndex(i => i.id === id);
-    if (index === -1) throw new Error("Carga extra no encontrada");
-    
-    const item = MOCK_DELIVERY_EXTRA_LOAD[index];
-    const oldStatus = item.status;
-    
-    // Si se devuelve, reingresar stock
-    if (status === "returned" && oldStatus !== "returned") {
-      const inv = MOCK_INVENTORY.find(i => i.productId === item.productId);
-      if (inv) {
-        inv.quantity += item.quantity;
-        inv.lastUpdated = new Date();
-      }
-      await createInventoryMovement({
-        productId: item.productId,
-        type: "entry",
-        quantity: item.quantity,
-        reason: "Devolución Carga Extra Repartidor",
-        userId,
-      });
-    }
-
-    MOCK_DELIVERY_EXTRA_LOAD[index].status = status;
-    MOCK_DELIVERY_EXTRA_LOAD[index].updatedAt = new Date();
-    syncMocksToDisk();
-    return { success: true };
-  }
-
-  return await db.transaction(async (tx) => {
-    const items = await tx.select().from(deliveryExtraLoad).where(eq(deliveryExtraLoad.id, id)).limit(1);
-    const item = items[0];
-    if (!item) throw new Error("Carga extra no encontrada");
-
-    if (status === "returned" && item.status !== "returned") {
-      const inv = await tx.select().from(inventory).where(eq(inventory.productId, item.productId)).limit(1);
-      if (inv[0]) {
-        await (tx as any).update(inventory).set({ 
-          quantity: inv[0].quantity + item.quantity,
-          lastUpdated: new Date() 
-        }).where(eq(inventory.productId, item.productId));
-      }
-      await tx.insert(inventoryMovements).values({
-        productId: item.productId,
-        type: "entry",
-        quantity: item.quantity,
-        reason: "Devolución Carga Extra Repartidor",
-        userId,
-      });
-    }
-
-    await tx.update(deliveryExtraLoad).set({ status, updatedAt: new Date() }).where(eq(deliveryExtraLoad.id, id));
-    return { success: true };
-  });
+export async function updateDeliveryExtraLoadStatus(id: number, status: string, userId: number) {
+  return { success: false, message: "Módulo de carga extra no aplica para electrónica." };
 }
 
 // =============================================
-// Alertas Inteligentes de Inventario (Opción 5)
+// Alertas Inteligentes (adaptado a unidades/electronics)
 // =============================================
 export async function getSmartInventoryAlerts() {
   const db = await getDb();
-  const daysToLookBack = 30;
-  const today = new Date();
-  const startDate = new Date();
-  startDate.setDate(today.getDate() - daysToLookBack);
-  const startDateStr = getLocalDateKey(startDate);
+  if (!db) return [];
 
-  // 1. Obtener todos los productos activos
-  const allProducts = await getAllProducts();
-  const inventoryData = await getAllInventory();
+  // Unidades sin precio de venta
+  const unpriced = await db
+    .select({ id: units.id, brand: units.brand, model: units.model, status: units.status })
+    .from(units)
+    .where(sql`${units.salePrice} IS NULL AND ${units.status} = 'available'`);
 
-  // 2. Obtener ventas de los últimos 30 días para calcular velocidad
-  let salesVelocity: Record<number, number> = {};
-
-  if (!db) {
-    const recentSales = MOCK_SALE_ITEMS.filter(item => {
-      const sale = MOCK_SALES.find(s => s.id === item.saleId);
-      return sale && getLocalDateKey(sale.createdAt) >= startDateStr;
-    });
-
-    recentSales.forEach(item => {
-      salesVelocity[item.productId] = (salesVelocity[item.productId] || 0) + item.quantity;
-    });
-  } else {
-    const results = await db.select({
-      productId: saleItems.productId,
-      totalQuantity: sql<number>`sum(${saleItems.quantity})`,
-    })
-    .from(saleItems)
-    .innerJoin(sales, eq(saleItems.saleId, sales.id))
-    .where(and(
-      ne(sales.status, "cancelled"),
-      sql`DATE(DATE_SUB(${sales.createdAt}, INTERVAL 4 HOUR)) >= ${startDateStr}`
-    ))
-    .groupBy(saleItems.productId);
-
-    results.forEach((r: any) => {
-      salesVelocity[r.productId] = r.totalQuantity;
-    });
-  }
-
-  // 3. Cruzar datos para generar alertas
-  const alerts = allProducts.map(product => {
-    const productInventory = inventoryData.filter(i => i.productId === product.id);
-    const totalStock = productInventory.reduce((sum, i) => sum + i.quantity, 0);
-    const velocity30d = salesVelocity[product.id] || 0;
-    const dailyVelocity = velocity30d / daysToLookBack;
-
-    let daysRemaining = dailyVelocity > 0 ? Math.floor(totalStock / dailyVelocity) : 999;
-    
-    // Un lote próximo a vencer (en menos de 7 días)
-    const urgentExpiry = productInventory.find(i => {
-      if (!i.expiryDate) return false;
-      const daysToExpiry = (new Date(i.expiryDate).getTime() - today.getTime()) / (1000 * 3600 * 24);
-      return daysToExpiry >= 0 && daysToExpiry <= 7;
-    });
-
-    return {
-      productId: product.id,
-      productName: product.name,
-      totalStock,
-      dailyVelocity: dailyVelocity.toFixed(2),
-      daysRemaining,
-      urgentExpiry: urgentExpiry ? urgentExpiry.expiryDate : null,
-      status: daysRemaining < 7 ? "critical" : daysRemaining < 15 ? "warning" : "ok"
-    };
-  }).filter(a => a.status !== "ok" || a.urgentExpiry);
-
-  return alerts;
+  return unpriced.map((u: any) => ({
+    unitId: u.id,
+    productName: `${u.brand} ${u.model}`,
+    status: "warning",
+    message: "Unidad disponible sin precio de venta asignado",
+  }));
 }
 
 // Branches

@@ -82,7 +82,7 @@ export default function ClosuresHistory() {
                 <CardTitle className="text-sm font-medium">Aprobados</CardTitle>
               </CardHeader>
               <CardContent className="text-2xl font-bold text-green-600">
-                {closures.filter(c => c.status === "approved").length}
+                {closures.filter((c: any) => c.status === "approved").length}
               </CardContent>
             </Card>
             <Card>
@@ -90,7 +90,7 @@ export default function ClosuresHistory() {
                 <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
               </CardHeader>
               <CardContent className="text-2xl font-bold text-orange-600">
-                {closures.filter(c => c.status === "pending").length}
+                {closures.filter((c: any) => c.status === "pending").length}
               </CardContent>
             </Card>
             <Card>
@@ -98,7 +98,7 @@ export default function ClosuresHistory() {
                 <CardTitle className="text-sm font-medium">Rechazados</CardTitle>
               </CardHeader>
               <CardContent className="text-2xl font-bold text-red-600">
-                {closures.filter(c => c.status === "rejected").length}
+                {closures.filter((c: any) => c.status === "rejected").length}
               </CardContent>
             </Card>
           </div>

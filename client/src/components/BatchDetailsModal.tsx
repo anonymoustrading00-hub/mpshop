@@ -25,7 +25,7 @@ interface BatchDetailsModalProps {
 export function BatchDetailsModal({ batch, isOpen, onClose }: BatchDetailsModalProps) {
   if (!batch) return null;
 
-  const { data: batchDetails, isLoading } = trpc.production.getBatchDetails.useQuery(
+  const { data: batchDetails, isLoading } = (trpc as any).production.getBatchDetails.useQuery(
     { batchId: batch.id },
     { enabled: isOpen }
   );

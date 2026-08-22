@@ -110,7 +110,7 @@ export const quotationsRouter = router({
         const pricing = getLinePricing(item.basePrice, item.quantity, item.discountType, item.discountValue);
 
         return {
-          productId: item.productId,
+          unitId: item.productId,
           pricingType: item.pricingType,
           quantity: pricing.quantity,
           basePrice: pricing.basePrice,

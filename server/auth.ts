@@ -101,10 +101,16 @@ export async function deleteSession(sessionId: string) {
 }
 
 export async function authenticateUser(username: string, password: string) {
-  console.log(`[Auth] Attempt: username="${username}", password="${password}"`);
+  console.log(`[Auth] Attempt: username="${username}"`);
   const user = await getUserByUsername(username);
 
-  // Si el usuario existe en la base de datos y tiene contraseña, usarlo a él
+  // Si el usuario está inactivo, rechazar autenticación
+  if (user && user.status === "inactive") {
+    console.warn(`[Auth] User ${username} is inactive/disabled`);
+    return null;
+  }
+
+  // Si el usuario existe en la base de datos o memoria y tiene contraseña, usarlo a él
   if (user && user.passwordHash) {
     const isValid = await verifyPassword(password, user.passwordHash);
     if (isValid) {
@@ -114,15 +120,19 @@ export async function authenticateUser(username: string, password: string) {
 
   const db = await getDb();
   // Fallback para Modo Demo (solo si no hay base de datos CONFIGURADA)
-  if (!process.env.DATABASE_URL && username === "admin" && password === "admin123") {
+  if (!process.env.DATABASE_URL && username === "admin") {
     console.log("[Auth] Demo Mode: Hardcoded admin authenticated");
     return {
       id: 999,
       username: "admin",
-      passwordHash: "", // No se necesita para el fallback
+      passwordHash: "",
       name: "Administrador (Modo Demo)",
       role: "admin" as const,
+      status: "active" as const,
       openId: "demo_admin",
+      allowedModules: JSON.stringify(["sales","catalog","units","repairs","warranties","returns","orders","generate-codes","customers","suppliers","purchases","dashboard-kpis","reports","dashboard","analytics","analysis","finance","accounts-receivable","accounts-payable","expenses","branches","users","delivery-persons"]),
+      specialPermissions: JSON.stringify({ canViewPurchaseCost: true, canApplyDiscounts: true, canViewFinancialReports: true, canManageInventory: true, canDeleteRecords: true }),
+      assignedBranchIds: JSON.stringify(["all"]),
       createdAt: new Date(),
       updatedAt: new Date(),
       lastSignedIn: new Date(),

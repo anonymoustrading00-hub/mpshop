@@ -1,6 +1,6 @@
-import { getDb, cashClosures, financialTransactions } from "./db";
+import { getDb, processFinancialLiquidation } from "./db";
+import { cashClosures, financialTransactions } from "../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { processFinancialLiquidation } from "./db";
 
 async function repair() {
   console.log("Iniciando reparación de saldos financieros...");

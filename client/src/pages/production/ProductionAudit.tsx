@@ -348,7 +348,7 @@ function AuditBatchCard({
                         <tr key={`${entry.date}-${entry.event}`}>
                           <td>
                             <span className="kefir-stage-dot" />
-                            {entry.event.replace("Avanza a ", "").replace("Lote ", "")}
+                            {String(entry.event || "").replace("Avanza a ", "").replace("Lote ", "")}
                           </td>
                           <td>{formatDateTime(entry.date)}</td>
                           <td>{next ? formatDateTime(next.date) : batch.status === "en_proceso" ? "En curso..." : formatDateTime(batch.endDate)}</td>

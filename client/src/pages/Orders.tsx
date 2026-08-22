@@ -95,7 +95,7 @@ export default function Orders() {
       utils.orders.listForDelivery.invalidate();
       utils.finance.getExpectedDaily.invalidate();
       utils.finance.getMyStatus.invalidate();
-      utils.inventory.listInventory.invalidate();
+      utils.units.list.invalidate();
       utils.finance.getTransactions.invalidate();
     },
     onError: (err: any) => toast.error(err.message || "Error al registrar entrega"),
@@ -200,9 +200,9 @@ export default function Orders() {
   }, [orders, searchTerm, statusFilter, sortOrder, dateFilter, deliveryPersonFilter]);
 
   // Pedidos por categoría
-  const routeOrders = sortedOrders.filter(o => ["pending", "assigned", "in_transit", "rescheduled"].includes(o.status));
-  const deliveredOrders = sortedOrders.filter(o => o.status === "delivered");
-  const cancelledOrders = sortedOrders.filter(o => o.status === "cancelled");
+  const routeOrders = sortedOrders.filter((o: any) => ["pending", "assigned", "in_transit", "rescheduled"].includes(o.status));
+  const deliveredOrders = sortedOrders.filter((o: any) => o.status === "delivered");
+  const cancelledOrders = sortedOrders.filter((o: any) => o.status === "cancelled");
 
   // Pedidos paginados por categoría
   const paginatedRouteOrders = routeOrders.slice((currentPage - 1) * ORDERS_PER_PAGE, currentPage * ORDERS_PER_PAGE);
@@ -241,7 +241,7 @@ export default function Orders() {
     }
 
     // Limpiar el número: dejar solo dígitos
-    const cleaned = phone.replace(/\D/g, "");
+    const cleaned = String(phone || "").replace(/\D/g, "");
     if (!cleaned || cleaned.length < 7) {
       toast.error("El número de teléfono no es válido");
       return;
@@ -698,19 +698,19 @@ export default function Orders() {
               <TabsTrigger value="route" className="rounded-[1.2rem] h-12 px-6 font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 En Ruta
                 <Badge className="ml-2 bg-slate-900 text-white border-none text-[10px]">
-                  {sortedOrders.filter(o => ["pending", "assigned", "in_transit", "rescheduled"].includes(o.status)).length}
+                  {sortedOrders.filter((o: any) => ["pending", "assigned", "in_transit", "rescheduled"].includes(o.status)).length}
                 </Badge>
               </TabsTrigger>
               <TabsTrigger value="delivered" className="rounded-[1.2rem] h-12 px-6 font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 Entregados
                 <Badge className="ml-2 bg-emerald-500 text-white border-none text-[10px]">
-                  {sortedOrders.filter(o => o.status === "delivered").length}
+                  {sortedOrders.filter((o: any) => o.status === "delivered").length}
                 </Badge>
               </TabsTrigger>
               <TabsTrigger value="cancelled" className="rounded-[1.2rem] h-12 px-6 font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 Bajas
                 <Badge className="ml-2 bg-red-500 text-white border-none text-[10px]">
-                  {sortedOrders.filter(o => o.status === "cancelled").length}
+                  {sortedOrders.filter((o: any) => o.status === "cancelled").length}
                 </Badge>
               </TabsTrigger>
             </TabsList>

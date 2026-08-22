@@ -3,6 +3,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { formatCurrency } from "@/lib/currency";
+import { AlertsPanel } from "@/components/AlertsPanel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,22 +26,31 @@ import {
   LineChart,
   CreditCard,
   Landmark,
+  Tag,
 } from "lucide-react";
 
 const adminModules = [
-  { href: "/dashboard", title: "Dashboard", description: "Metricas y control general.", icon: LayoutGrid },
-  { href: "/orders", title: "Pedidos", description: "Gestion y seguimiento del dia.", icon: ShoppingCart },
-  { href: "/inventory", title: "Inventario", description: "Stock, vencimientos e historial.", icon: Package },
-  { href: "/production", title: "Producción", description: "Lotes, mermas y rendimiento.", icon: Factory },
+  { href: "/catalog", title: "Inventario / Catálogo", description: "Catálogo visual de laptops, equipos y artículos comprados con fotos e impresión.", icon: Package },
+  { href: "/units", title: "Unidades", description: "Lista correlativa de laptops y accesorios reacondicionados.", icon: Tag },
+  { href: "/repairs", title: "Taller & Técnico", description: "Órdenes de servicio, repuestos y diagnóstico.", icon: Factory },
+  { href: "/warranties", title: "Garantías", description: "Cobertura de garantía por venta realizada.", icon: LayoutGrid },
+  { href: "/returns", title: "Devoluciones (RMA)", description: "Procesamiento de RMA y reingreso a taller.", icon: AlertTriangle },
+  { href: "/generate-codes", title: "Generar Códigos", description: "Creación por lote e impresión PDF de etiquetas.", icon: LayoutGrid },
+  { href: "/orders", title: "Pedidos", description: "Gestión y seguimiento del día.", icon: ShoppingCart },
+  { href: "/sales", title: "Ventas", description: "Ventas rápidas y cobros.", icon: ShoppingBag },
+  { href: "/dashboard", title: "Dashboard", description: "Métricas y control general.", icon: LayoutGrid },
+  { href: "/dashboard-kpis", title: "KPIs Tiempo Real", description: "6 KPIs prioritarios del negocio.", icon: LineChart },
+  { href: "/analytics", title: "Analítica Avanzada", description: "Margen, rotación, taller, comercial.", icon: LineChart },
+  { href: "/rentabilidad", title: "Rentabilidad Real", description: "P&L real: margen, COGS y utilidad neta.", icon: LineChart },
+  { href: "/reports", title: "Reportes", description: "Reportes ejecutivos de ventas, finanzas e inventario.", icon: LineChart },
+  { href: "/users", title: "Usuarios & Permisos", description: "Roles, control de accesos y sucursales.", icon: Users },
+  { href: "/branches", title: "Sucursales", description: "Gestión de sucursales y bodegas.", icon: Package },
   { href: "/suppliers", title: "Proveedores", description: "Contactos y abastecimiento.", icon: Users },
-  { href: "/purchases", title: "Compras", description: "Registro de compras e ingresos.", icon: ShoppingCart },
-  { href: "/sales", title: "Ventas", description: "Ventas rapidas y cobros.", icon: ShoppingBag },
+  { href: "/purchases", title: "Compras", description: "Registro de compras de lotes.", icon: ShoppingCart },
   { href: "/customers", title: "Clientes", description: "Frecuencia, deuda y zonas.", icon: Users },
   { href: "/finance", title: "Finanzas", description: "Caja, ingresos y egresos.", icon: DollarSign },
   { href: "/accounts-receivable", title: "Cuentas por Cobrar", description: "Créditos, cobranzas y pagarés.", icon: CreditCard },
-  { href: "/accounts-payable", title: "Cuentas por Pagar", description: "Deudas y obligaciones a proveedores.", icon: Landmark },
-  { href: "/analysis", title: "Análisis", description: "Reportes, rentabilidad y KPIs.", icon: LineChart },
-  { href: "/products", title: "Catalogo", description: "Precios, imagenes y categorias.", icon: LayoutGrid },
+  { href: "/accounts-payable", title: "Cuentas por Pagar", description: "Deudas a proveedores.", icon: Landmark },
   { href: "/delivery-persons", title: "Repartidores", description: "Equipo, asignaciones y control.", icon: Truck },
 ];
 
@@ -104,12 +114,10 @@ export default function Home() {
   const { data: myOrders } = trpc.orders.listForDelivery.useQuery(undefined, {
     enabled: isDelivery,
   });
-  const { data: inventory } = trpc.inventory.listInventory.useQuery(undefined, {
+  const { data: inventory } = trpc.units.list.useQuery(undefined, {
     enabled: isAdmin,
   });
-  const { data: expiryAlerts } = trpc.inventory.getExpiryAlerts.useQuery(undefined, {
-    enabled: isAdmin,
-  });
+  const expiryAlerts: any[] = [];
   const { data: sales } = trpc.sales.list.useQuery(undefined, {
     enabled: isAdmin,
   });
@@ -136,9 +144,9 @@ export default function Home() {
 
   const lowStockItems = useMemo(() => {
     if (!inventory) return [];
-    return (inventory as any[])
-      .filter((item: any) => item.isLowStock)
-      .sort((a: any, b: any) => a.quantity - b.quantity)
+    const items = (inventory as unknown as { items?: any[] })?.items || [];
+    return items
+      .filter((item: any) => item.status !== 'sold')
       .slice(0, 6);
   }, [inventory]);
 
@@ -399,7 +407,7 @@ export default function Home() {
               <OperationalRow
                 title="Productos con stock bajo"
                 subtitle="Atencion de reposicion"
-                value={`${adminStats?.lowStockProducts || 0} productos`}
+                value={`${(inventory as any)?.items?.filter((u: any) => u.status === 'available').length || 0} unidades`}
                 badge={lowStockItems.length > 0 ? "Revisar" : "Ok"}
                 tone={lowStockItems.length > 0 ? "danger" : "normal"}
               />
@@ -468,6 +476,8 @@ export default function Home() {
               <h2 className="mt-1 text-2xl font-bold text-slate-900">Accesos rapidos</h2>
             </div>
           </div>
+          {/* ── Alertas operativas ── */}
+          <AlertsPanel />
           <div className="soft-grid md:grid-cols-2 xl:grid-cols-3">
             {adminModules.map((module) => (
               <ModuleCard key={module.href} module={module} />

@@ -83,7 +83,7 @@ export default function Purchases() {
 
   const { user } = useAuth();
   const utils = trpc.useContext();
-  const { data: purchases, isLoading: isPurchasesLoading } = (trpc.purchases as any).list.useQuery();
+  const { data: purchases, isLoading: isPurchasesLoading } = (trpc.purchases as any).listAll.useQuery();
   const { data: suppliers } = (trpc.suppliers as any).list.useQuery();
   const { data: products } = (trpc.inventory as any).listProducts.useQuery();
 
@@ -386,7 +386,7 @@ export default function Purchases() {
             <div>
               <CardTitle className="text-xl font-black text-slate-900">Historial de Compras</CardTitle>
               <CardDescription className="text-xs text-slate-400 font-bold uppercase tracking-wider">
-                Entradas de mercancía e insumos
+                Compras tradicionales + compras por registro de unidades
               </CardDescription>
             </div>
           </div>
@@ -432,11 +432,20 @@ export default function Purchases() {
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-lg font-black text-slate-900">{purchase.purchaseNumber}</span>
+                          {purchase.source === "unit_purchase" && (
+                            <span className="text-[10px] font-black text-violet-600 bg-violet-50 border border-violet-100 rounded-full px-2 py-0.5">
+                              📱 Unidad
+                            </span>
+                          )}
                           <Badge variant="outline" className={`rounded-full text-[10px] font-black uppercase ${purchase.status === 'received' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
                             {purchase.status === "received" ? "OK" : "PENDIENTE"}
                           </Badge>
                         </div>
-                        <p className="text-sm font-bold text-slate-600 truncate max-w-[200px]">{purchase.supplierName || "Sin Proveedor"}</p>
+                        <p className="text-sm font-bold text-slate-600 truncate max-w-[200px]">
+                          {purchase.source === "unit_purchase"
+                            ? `${purchase.unitBrand || ""} ${purchase.unitModel || ""} · ${purchase.unitCode || ""}`
+                            : purchase.supplierName || "Sin Proveedor"}
+                        </p>
                         <div className="flex items-center gap-1.5 mt-2">
                            <div className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center">
                              <User className="h-3 w-3 text-slate-400" />
@@ -524,10 +533,26 @@ export default function Purchases() {
                 ) : (
                   filteredPurchases.map((purchase: any) => (
                     <TableRow key={purchase.id} className="group hover:bg-slate-50/80 transition-colors border-slate-100">
-                      <TableCell className="font-black text-slate-900 py-5 text-base">{purchase.purchaseNumber}</TableCell>
+                      <TableCell className="font-black text-slate-900 py-5 text-base">
+                        <div className="flex flex-col gap-1">
+                          <span>{purchase.purchaseNumber}</span>
+                          {purchase.source === "unit_purchase" && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-violet-600 bg-violet-50 border border-violet-100 rounded-full px-2 py-0.5 w-fit">
+                              📱 Registro Unidad
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-800">{purchase.supplierName || "Sin Proveedor"}</span>
+                          <span className="font-bold text-slate-800">
+                            {purchase.source === "unit_purchase"
+                              ? `${purchase.unitBrand || ""} ${purchase.unitModel || ""} · ${purchase.unitCode || ""}`
+                              : purchase.supplierName || "Sin Proveedor"}
+                          </span>
+                          {purchase.source === "unit_purchase" && (
+                            <span className="text-xs text-slate-400">Compra directa de equipo</span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -1427,8 +1452,7 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
         }
         
         toast.success("Ítem de inventario creado exitosamente");
-        utils.inventory.listProducts.invalidate();
-        (utils as any).inventory.listInventory.invalidate();
+        utils.units.list.invalidate();
         utils.purchases.list.invalidate();
         utils.finance.getTransactions.invalidate();
         

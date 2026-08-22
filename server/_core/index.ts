@@ -9,7 +9,6 @@ import path from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { drizzle } from "drizzle-orm/mysql2";
 import { migrate } from "drizzle-orm/mysql2/migrator";
-import superjson from "superjson";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -473,7 +472,6 @@ async function startServer() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
-      // transformer: superjson,
     })
   );
   // development mode uses Vite, production mode uses static files

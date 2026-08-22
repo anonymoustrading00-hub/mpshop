@@ -52,7 +52,7 @@ export default function EditOrder() {
     items: [] as { productId: number; productCode: string; quantity: number; price: number; pricingType: "unit" | "wholesale" | "discount" }[],
   });
 
-  const { data: products } = trpc.inventory.getProductsWithStock.useQuery();
+  const { data: products } = (trpc.inventory as any).getProductsWithStock.useQuery();
   const { data: deliveryPersons } = trpc.users.listDeliveryPersons.useQuery();
   const { data: orderDetails, isLoading: isLoadingOrder } = trpc.orders.getDetails.useQuery(
     { orderId },
@@ -153,7 +153,7 @@ export default function EditOrder() {
   const getSummaryText = () => {
     const itemsText = formData.items
       .map((item) => {
-        const prod = products?.find((p) => p.id === item.productId);
+        const prod = (products as any)?.find((p: any) => p.id === item.productId);
         return `• ${item.quantity}x ${prod?.name || item.productCode} - ${formatCurrency(item.price * item.quantity)}`;
       })
       .join("\n");
@@ -209,7 +209,7 @@ export default function EditOrder() {
                   let updatedItems = formData.items;
                   if (newCustomerType !== formData.customerType) {
                     updatedItems = formData.items.map(item => {
-                      const prod = products?.find(p => p.id === item.productId);
+                      const prod = (products as any)?.find((p: any) => p.id === item.productId);
                       if (newCustomerType === "wholesale") {
                         return {
                           ...item,
@@ -395,7 +395,7 @@ export default function EditOrder() {
                       <Select
                         value={item.productCode}
                         onValueChange={(val) => {
-                          const prod = products?.find(p => p.code === val);
+                          const prod = (products as any)?.find((p: any) => p.code === val);
                           const newItems = [...formData.items];
                           const pricingType = formData.customerType === "wholesale" ? "wholesale" : "unit";
                           const price = formData.customerType === "wholesale" ? (prod?.wholesalePrice || prod?.salePrice || 0) : (prod?.salePrice || 0);
