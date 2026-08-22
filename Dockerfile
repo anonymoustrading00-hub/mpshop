@@ -9,7 +9,7 @@ COPY patches ./patches
 RUN pnpm install --frozen-lockfile
 
 COPY . .
-RUN pnpm run build
+RUN rm -rf dist && pnpm run build
 
 ENV NODE_ENV=production
 
