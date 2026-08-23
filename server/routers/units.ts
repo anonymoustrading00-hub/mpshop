@@ -24,7 +24,7 @@ import {
 } from "../db";
 import { generatedCodes, units, unitEvents, purchases, purchaseItems, suppliers, financialTransactions, operationalExpenses, users, repairs, warranties, returns, saleItems, sales, systemSettings } from "../../drizzle/schema";
 import * as schema from "../../drizzle/schema";
-import { eq, like, or, and, desc, sql, asc } from "drizzle-orm";
+import { eq, like, or, and, desc, sql, asc, inArray } from "drizzle-orm";
 import { DEFAULT_COMPANY_CONFIG, readCompanyConfig } from "./settings";
 
 // Tipos de unidad que no requieren diagnóstico (van directo a 'available')
@@ -461,6 +461,7 @@ export const unitsRouter = router({
         wholesalePrice: z.number().min(0).optional(),
         supplierId: z.number().optional(),
         purchaseDate: z.string().optional(),
+        quantity: z.number().int().min(1).max(500).default(1),
         // Método de pago con que se compró el equipo (afecta la caja)
         paymentMethod: z.enum(["cash", "qr", "transfer"]).default("cash"),
         branchId: z.number().default(1),
@@ -470,49 +471,30 @@ export const unitsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
+      const qty = input.quantity || 1;
+      const baseCodeClean = input.code.trim();
 
       // ─── HELPER: genera número de compra único ───────────────────────────
       const genPurchaseNumber = (id: number | string) =>
         `COMP-UNIT-${String(id).padStart(6, "0")}`;
 
+      const getUnitCode = (index: number) => {
+        if (qty <= 1) return baseCodeClean;
+        const padLen = qty > 99 ? 3 : 2;
+        return `${baseCodeClean}-${String(index + 1).padStart(padLen, "0")}`;
+      };
+
       if (!db) {
-        const codeClean = input.code.trim();
-        const existingUnit = await getUnitByCode(codeClean);
-        if (existingUnit) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: `El código ${codeClean} ya está registrado para otra unidad.`,
-          });
-        }
-        const created = await createUnit({
-          code: codeClean,
-          codeId: input.codeId || null,
-          type: input.type,
-          brand: input.brand,
-          model: input.model,
-          serialNumber: input.serialNumber || null,
-          specs: JSON.stringify(input.specs || {}),
-          condition: input.condition || 10,
-          batteryHealth: input.batteryHealth || "n_a",
-          damageChecklist: JSON.stringify(input.damageChecklist || {}),
-          damageNotes: input.damageNotes || null,
-          functionalTestPassed: SIMPLE_TYPES.has(input.type) ? (input.functionalTestPassed ? 1 : 0) : 1,
-          status: input.status || defaultStatusForType(input.type),
-          purchasePrice: input.purchasePrice || 0,
-          salePrice: input.salePrice || 0,
-          discountPrice: input.discountPrice || null,
-          wholesalePrice: input.wholesalePrice || null,
-          supplierId: input.supplierId || null,
-          branchId: input.branchId || 1,
-          photos: input.photos || null,
-          tiktokUrl: input.tiktokUrl || null,
-        } as any);
+        // ─── MOCK MODE ─────────────────────────────────────────────────────
+        const createdUnitIds: number[] = [];
+        const createdCodes: string[] = [];
 
-        const newUnitId = created.insertId;
+        // 1. Crear registro de compra maestro y egreso consolidado si hay precio
+        let purchaseId: number | null = null;
+        const totalPurchaseAmount = (input.purchasePrice || 0) * qty;
 
-        // ── Mock: crear registro de compra ──────────────────────────────────
-        if (input.purchasePrice > 0) {
-          const purchaseId = MOCK_PURCHASES.length + 1;
+        if (totalPurchaseAmount > 0) {
+          purchaseId = MOCK_PURCHASES.length + 1;
           const purchaseNumber = genPurchaseNumber(purchaseId);
 
           MOCK_PURCHASES.push({
@@ -520,7 +502,7 @@ export const unitsRouter = router({
             supplierId: input.supplierId || null,
             purchaseNumber,
             orderDate: input.purchaseDate ? new Date(input.purchaseDate) : new Date(),
-            totalAmount: input.purchasePrice,
+            totalAmount: totalPurchaseAmount,
             status: "received",
             paymentStatus: "paid",
             paymentMethod: input.paymentMethod,
@@ -529,72 +511,114 @@ export const unitsRouter = router({
             updatedAt: new Date(),
           });
 
-          MOCK_PURCHASE_ITEMS.push({
-            id: MOCK_PURCHASE_ITEMS.length + 1,
-            purchaseId,
-            unitId: newUnitId,
-            quantity: 1,
-            price: input.purchasePrice,
-            createdAt: new Date(),
-          });
-
-          // Egreso de caja
+          // Egreso de caja consolidado
           MOCK_FINANCIAL_TRANSACTIONS.push({
             id: MOCK_FINANCIAL_TRANSACTIONS.length + 1,
             branchId: input.branchId || 1,
             type: "expense",
             category: "purchase",
-            amount: input.purchasePrice,
+            amount: totalPurchaseAmount,
             paymentMethod: input.paymentMethod,
             referenceId: purchaseId,
             userId: ctx.user.id,
-            notes: `Compra ${input.brand} ${input.model} (${codeClean}) · ${purchaseNumber}`,
+            notes: `Compra (${qty} uds.) ${input.brand} ${input.model} (${baseCodeClean}) · ${purchaseNumber}`,
             createdAt: new Date(),
           });
-
-          // ⚠️ NO registrar COGS aquí — el equipo entra al inventario (activo).
-          // El COGS se reconoce automáticamente en createSaleWithItems al momento de la venta.
         }
 
-        // ── Evento de creación (timeline del equipo) ────────────────────────
-        const finalStatus = input.status || defaultStatusForType(input.type);
-        MOCK_UNIT_EVENTS.push({
-          id: Date.now() + 1,
-          unitId: newUnitId,
-          eventType: "created",
-          fromStatus: null,
-          toStatus: finalStatus,
-          userId: ctx.user.id,
-          notes: `Registro inicial — ${input.type.toUpperCase()} ${input.brand} ${input.model} · Estado: ${finalStatus}`,
-          createdAt: new Date().toISOString(),
-        });
+        // 2. Crear las N unidades
+        for (let i = 0; i < qty; i++) {
+          const unitCode = getUnitCode(i);
+          const newUnitId = MOCK_UNITS.length + 1;
+          const finalStatus = input.status || defaultStatusForType(input.type);
+
+          MOCK_UNITS.push({
+            id: newUnitId,
+            code: unitCode,
+            codeId: i === 0 ? (input.codeId || null) : null,
+            type: input.type,
+            brand: input.brand,
+            model: input.model,
+            serialNumber: input.serialNumber ? (qty > 1 ? `${input.serialNumber}-${i + 1}` : input.serialNumber) : null,
+            specs: JSON.stringify(input.specs || {}),
+            condition: input.condition || 10,
+            batteryHealth: input.batteryHealth || "n_a",
+            damageChecklist: JSON.stringify(input.damageChecklist || {}),
+            damageNotes: input.damageNotes || null,
+            functionalTestPassed: SIMPLE_TYPES.has(input.type) ? (input.functionalTestPassed ? 1 : 0) : 1,
+            status: finalStatus,
+            purchaseId: purchaseId,
+            purchasePrice: input.purchasePrice || 0,
+            salePrice: input.salePrice || 0,
+            discountPrice: input.discountPrice || null,
+            wholesalePrice: input.wholesalePrice || null,
+            supplierId: input.supplierId || null,
+            branchId: input.branchId || 1,
+            photos: input.photos || null,
+            tiktokUrl: input.tiktokUrl || null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } as any);
+
+          if (purchaseId && input.purchasePrice > 0) {
+            MOCK_PURCHASE_ITEMS.push({
+              id: MOCK_PURCHASE_ITEMS.length + 1,
+              purchaseId,
+              unitId: newUnitId,
+              quantity: 1,
+              price: input.purchasePrice,
+              createdAt: new Date(),
+            });
+          }
+
+          MOCK_UNIT_EVENTS.push({
+            id: Date.now() + i + 1,
+            unitId: newUnitId,
+            eventType: "created",
+            fromStatus: null,
+            toStatus: finalStatus,
+            userId: ctx.user.id,
+            notes: `Registro inicial ${qty > 1 ? `(Lote ${i + 1}/${qty}) ` : ""}— ${input.type.toUpperCase()} ${input.brand} ${input.model} · Estado: ${finalStatus}`,
+            createdAt: new Date().toISOString(),
+          });
+
+          createdUnitIds.push(newUnitId);
+          createdCodes.push(unitCode);
+        }
 
         syncMocksToDisk();
-        return { success: true, unitId: newUnitId, code: codeClean };
+        return {
+          success: true,
+          unitId: createdUnitIds[0],
+          unitIds: createdUnitIds,
+          code: createdCodes[0],
+          codes: createdCodes,
+          count: qty,
+          purchaseId,
+        };
       }
 
-      // ─── DB MODE ─────────────────────────────────────────────────────────
-      const codeClean = input.code.trim();
-
-      const [existingUnit] = await db
-        .select()
+      // ─── DB MODE (MYSQL) ─────────────────────────────────────────────────
+      // Verificar que los códigos a generar no colisionen
+      const codesToCheck = Array.from({ length: qty }, (_, i) => getUnitCode(i));
+      const existingUnits = await db
+        .select({ code: units.code })
         .from(units)
-        .where(eq(units.code, codeClean))
-        .limit(1);
+        .where(inArray(units.code, codesToCheck));
 
-      if (existingUnit) {
+      if (existingUnits.length > 0) {
         throw new TRPCError({
           code: "CONFLICT",
-          message: `El código ${codeClean} ya está registrado para otra unidad.`,
+          message: `El código ${existingUnits[0].code} ya está registrado para otra unidad.`,
         });
       }
 
       let resolvedCodeId = input.codeId;
-      if (!resolvedCodeId) {
+      if (!resolvedCodeId && qty === 1) {
         const [genCode] = await db
           .select()
           .from(generatedCodes)
-          .where(eq(generatedCodes.code, codeClean))
+          .where(eq(generatedCodes.code, baseCodeClean))
           .limit(1);
         if (genCode) {
           resolvedCodeId = genCode.id;
@@ -621,112 +645,126 @@ export const unitsRouter = router({
         }
       }
 
-      // Toda la operación en una transacción
+      const totalPurchaseAmount = (input.purchasePrice || 0) * qty;
+
+      // Toda la operación en una transacción atómica
       return await db.transaction(async (tx: any) => {
-        // 1. Insertar unidad
-        const result: any = await tx.insert(units).values({
-          code: codeClean,
-          codeId: resolvedCodeId,
-          type: input.type,
-          brand: input.brand,
-          model: input.model,
-          serialNumber: input.serialNumber || null,
-          specs: specsJson,
-          condition: input.condition,
-          batteryHealth: input.batteryHealth,
-          damageChecklist: damageChecklistJson,
-          damageNotes: input.damageNotes || null,
-          functionalTestPassed: SIMPLE_TYPES.has(input.type) ? (input.functionalTestPassed ? 1 : 0) : 1,
-          status: input.status || defaultStatusForType(input.type),
-          purchasePrice: input.purchasePrice,
-          salePrice: input.salePrice || 0,
-          discountPrice: input.discountPrice ?? null,
-          wholesalePrice: input.wholesalePrice ?? null,
-          supplierId: finalSupplierId,
-          purchaseId: null, // se actualiza abajo
-          branchId: input.branchId,
-          photos: input.photos || null,
-          tiktokUrl: input.tiktokUrl || null,
-        });
+        let newPurchaseId: number | null = null;
+        const purchaseNumber = genPurchaseNumber(Date.now());
 
-        const newUnitId = result?.insertId || result?.[0]?.insertId;
-
-        if (!newUnitId) {
-          throw new Error("No se pudo obtener el ID de la unidad recién creada. insertId vacío.");
-        }
-
-        // 2. Marcar código generado como asignado
-        if (resolvedCodeId) {
-          await tx
-            .update(generatedCodes)
-            .set({ status: "assigned", assignedUnitId: newUnitId, assignedAt: new Date() })
-            .where(eq(generatedCodes.id, resolvedCodeId));
-        }
-
-        const finalStatus = input.status || defaultStatusForType(input.type);
-
-        // 3. Evento de creación
-        await tx.insert(unitEvents).values({
-          unitId: newUnitId,
-          eventType: "created",
-          fromStatus: null,
-          toStatus: finalStatus,
-          userId: ctx.user.id,
-          notes: `Registro inicial de unidad ${input.type.toUpperCase()} ${input.brand} ${input.model}`,
-        });
-
-        // 4. Si tiene precio de compra → crear registro en purchases + egreso de caja + COGS
-        if (input.purchasePrice > 0) {
-          // Generar número de compra secuencial basado en timestamp
-          const purchaseNumber = genPurchaseNumber(Date.now());
-
-          // 4a. Insertar compra
+        // 1. Si tiene precio de compra → crear registro maestro en purchases + egreso consolidado en caja
+        if (totalPurchaseAmount > 0) {
           const purchaseResult: any = await tx.insert(purchases).values({
             supplierId: finalSupplierId!,
             purchaseNumber,
             orderDate: input.purchaseDate ? new Date(input.purchaseDate + "T00:00:00") : new Date(),
-            totalAmount: input.purchasePrice,
+            totalAmount: totalPurchaseAmount,
             status: "received",
             paymentStatus: "paid",
             paymentMethod: input.paymentMethod,
             isCredit: 0,
           });
-          const newPurchaseId = purchaseResult?.insertId || purchaseResult?.[0]?.insertId;
+
+          newPurchaseId = purchaseResult?.insertId || purchaseResult?.[0]?.insertId;
 
           if (!newPurchaseId) {
             throw new Error("No se pudo obtener el ID de la compra recién creada. insertId vacío.");
           }
 
-          // 4b. Insertar item de compra (la unidad)
-          await tx.insert(purchaseItems).values({
-            purchaseId: newPurchaseId,
-            unitId: newUnitId,
-            quantity: 1,
-            price: input.purchasePrice,
-          });
-
-          // 4c. Actualizar la unidad con el purchaseId
-          await tx.update(units)
-            .set({ purchaseId: newPurchaseId })
-            .where(eq(units.id, newUnitId));
-
-          // 4d. Egreso de caja (transacción financiera real)
+          // Egreso de caja consolidado (transacción financiera real del lote)
           await tx.insert(financialTransactions).values({
             branchId: input.branchId || 1,
             type: "expense",
             category: "purchase",
-            amount: input.purchasePrice,
+            amount: totalPurchaseAmount,
             paymentMethod: input.paymentMethod,
             referenceId: newPurchaseId,
             userId: ctx.user.id,
-            notes: `Compra ${input.brand} ${input.model} (${codeClean}) · ${purchaseNumber}`,
+            notes: `Compra (${qty} uds.) ${input.brand} ${input.model} (${baseCodeClean}) · ${purchaseNumber}`,
           });
-
-          // ⚠️ NO registrar COGS aquí — el equipo entra al inventario (activo).
-          // El COGS se reconoce automáticamente en createSaleWithItems al momento de la venta.
         }
 
-        return { success: true, unitId: newUnitId, code: codeClean };
+        const createdUnitIds: number[] = [];
+        const createdCodes: string[] = [];
+        const finalStatus = input.status || defaultStatusForType(input.type);
+
+        // 2. Insertar las N unidades individuales
+        for (let i = 0; i < qty; i++) {
+          const unitCode = getUnitCode(i);
+          const unitSerialNumber = input.serialNumber ? (qty > 1 ? `${input.serialNumber}-${i + 1}` : input.serialNumber) : null;
+
+          const unitInsertResult: any = await tx.insert(units).values({
+            code: unitCode,
+            codeId: i === 0 ? resolvedCodeId : null,
+            type: input.type,
+            brand: input.brand,
+            model: input.model,
+            serialNumber: unitSerialNumber,
+            specs: specsJson,
+            condition: input.condition,
+            batteryHealth: input.batteryHealth,
+            damageChecklist: damageChecklistJson,
+            damageNotes: input.damageNotes || null,
+            functionalTestPassed: SIMPLE_TYPES.has(input.type) ? (input.functionalTestPassed ? 1 : 0) : 1,
+            status: finalStatus,
+            purchasePrice: input.purchasePrice,
+            salePrice: input.salePrice || 0,
+            discountPrice: input.discountPrice ?? null,
+            wholesalePrice: input.wholesalePrice ?? null,
+            supplierId: finalSupplierId,
+            purchaseId: newPurchaseId,
+            branchId: input.branchId,
+            photos: input.photos || null,
+            tiktokUrl: input.tiktokUrl || null,
+          });
+
+          const unitId = unitInsertResult?.insertId || unitInsertResult?.[0]?.insertId;
+
+          if (!unitId) {
+            throw new Error(`No se pudo obtener el ID de la unidad #${i + 1}. insertId vacío.`);
+          }
+
+          createdUnitIds.push(unitId);
+          createdCodes.push(unitCode);
+
+          // Si es la primera unidad y tenía codeId, marcar el generatedCode como asignado
+          if (i === 0 && resolvedCodeId) {
+            await tx
+              .update(generatedCodes)
+              .set({ status: "assigned", assignedUnitId: unitId, assignedAt: new Date() })
+              .where(eq(generatedCodes.id, resolvedCodeId));
+          }
+
+          // Insertar item de compra para cada unidad individual
+          if (newPurchaseId && input.purchasePrice > 0) {
+            await tx.insert(purchaseItems).values({
+              purchaseId: newPurchaseId,
+              unitId: unitId,
+              quantity: 1,
+              price: input.purchasePrice,
+            });
+          }
+
+          // Evento de creación en el historial del equipo
+          await tx.insert(unitEvents).values({
+            unitId: unitId,
+            eventType: "created",
+            fromStatus: null,
+            toStatus: finalStatus,
+            userId: ctx.user.id,
+            notes: `Registro inicial ${qty > 1 ? `(Lote ${i + 1}/${qty}) ` : ""}de unidad ${input.type.toUpperCase()} ${input.brand} ${input.model}`,
+          });
+        }
+
+        return {
+          success: true,
+          unitId: createdUnitIds[0],
+          unitIds: createdUnitIds,
+          code: createdCodes[0],
+          codes: createdCodes,
+          count: qty,
+          purchaseId: newPurchaseId,
+        };
       });
     }),
 

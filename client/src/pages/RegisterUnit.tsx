@@ -8,9 +8,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { QrCode, Search, CheckCircle, AlertTriangle, Plus, Laptop, Trash2, Camera, ImagePlus, X, Smartphone, Tablet, Monitor, Plug, Package, MoreHorizontal, Wallet, Landmark, Video, ExternalLink, Play } from "lucide-react";
+import { QrCode, Search, CheckCircle, AlertTriangle, Plus, Minus, Laptop, Trash2, Camera, ImagePlus, X, Smartphone, Tablet, Monitor, Plug, Package, MoreHorizontal, Wallet, Landmark, Video, ExternalLink, Play, Boxes, Layers, Calculator, Printer } from "lucide-react";
 import { useLocation } from "wouter";
 import { formatCurrency } from "@/lib/currency";
+import { BatchLabelsModal } from "@/components/BatchLabelsModal";
 
 type UnitType = "laptop" | "tablet" | "phone" | "monitor" | "charger" | "accessory" | "other";
 
@@ -136,11 +137,22 @@ export default function RegisterUnit() {
   const [salePrice, setSalePrice] = useState("");
   const [discountPrice, setDiscountPrice] = useState("");
   const [wholesalePrice, setWholesalePrice] = useState("");
+  const [quantity, setQuantity] = useState<number>(1);
   const [supplierId, setSupplierId] = useState<number | undefined>();
   const [purchaseDate, setPurchaseDate] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "qr" | "transfer">("cash");
   const [damageNotes, setDamageNotes] = useState("");
   const [tiktokUrl, setTiktokUrl] = useState("");
+
+  // Estado para modal de impresión de etiquetas de lote
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const [batchCreatedData, setBatchCreatedData] = useState<{
+    codes: string[];
+    brand: string;
+    model: string;
+    type: string;
+    salePrice?: number;
+  } | null>(null);
 
   // Fotos del equipo (base64)
   const [photos, setPhotos] = useState<string[]>([]);
@@ -284,8 +296,18 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
   const createUnitMutation = trpc.units.create.useMutation({
     onSuccess: (data: any) => {
-      toast.success(`Unidad ${data.code} registrada exitosamente`);
-      setLocation("/units");
+      const count = data.count || 1;
+      const codes = data.codes || (data.code ? [data.code] : []);
+      toast.success(`✅ ${count} ${count > 1 ? "unidades registradas" : "unidad registrada"} exitosamente`);
+
+      setBatchCreatedData({
+        codes,
+        brand,
+        model,
+        type,
+        salePrice: salePrice ? Math.round(parseFloat(salePrice) * 100) : undefined,
+      });
+      setBatchModalOpen(true);
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -388,6 +410,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
       salePrice: sPriceCents,
       discountPrice: dPriceCents,
       wholesalePrice: wPriceCents,
+      quantity: Math.max(1, quantity),
       supplierId,
       purchaseDate: purchaseDate || undefined,
       paymentMethod,
@@ -686,57 +709,207 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
               </div>
             </div>
 
-            {/* Precios */}
-            <div className="border-t pt-4 space-y-3">
-              <label className="text-xs font-semibold block">Precios (Bs):</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Cantidad y Precios */}
+            <div className="border-t pt-4 space-y-4">
+              {/* Sección de Cantidad de Unidades */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800/80 dark:to-indigo-950/40 p-4 rounded-2xl border border-blue-200/80 dark:border-indigo-800/40 shadow-sm space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="text-sm font-black text-blue-900 dark:text-blue-200 flex items-center gap-2">
+                      <Boxes className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      Cantidad de Unidades a Comprar / Registrar:
+                    </label>
+                    <p className="text-xs text-blue-700/80 dark:text-blue-300/80">
+                      Ideal para cargadores, accesorios o compras por lote (10, 20, 50 piezas).
+                    </p>
+                  </div>
+                  
+                  {/* Selector numérico con botones + / - */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 rounded-xl border-blue-300 bg-white dark:bg-slate-800 shadow-sm font-bold text-blue-700 hover:bg-blue-100"
+                      onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
+                      disabled={quantity <= 1}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={quantity}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        setQuantity(isNaN(val) ? 1 : Math.max(1, Math.min(500, val)));
+                      }}
+                      className="w-20 text-center font-black text-lg h-9 bg-white dark:bg-slate-900 border-blue-300 text-blue-950 dark:text-blue-100 rounded-xl"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 rounded-xl border-blue-300 bg-white dark:bg-slate-800 shadow-sm font-bold text-blue-700 hover:bg-blue-100"
+                      onClick={() => setQuantity((prev) => Math.min(500, prev + 1))}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Botones de selección rápida */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[11px] font-bold text-blue-800 dark:text-blue-300 mr-1 uppercase tracking-wider">
+                    Acceso Rápido:
+                  </span>
+                  {[1, 2, 5, 10, 20, 30, 50, 100].map((q) => (
+                    <Button
+                      key={q}
+                      type="button"
+                      size="sm"
+                      variant={quantity === q ? "default" : "outline"}
+                      className={`h-7 text-xs px-2.5 rounded-lg font-bold transition-all ${
+                        quantity === q
+                          ? "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                          : "bg-white/80 dark:bg-slate-800/80 hover:bg-blue-100/80 text-blue-900 dark:text-blue-200 border-blue-200"
+                      }`}
+                      onClick={() => setQuantity(q)}
+                    >
+                      {q === 1 ? "1 unidad" : `${q} uds.`}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* Explicación si quantity > 1 */}
+                {quantity > 1 && (
+                  <div className="bg-white/90 dark:bg-slate-900/90 rounded-xl p-2.5 border border-blue-200/60 text-xs text-blue-900 dark:text-blue-200 flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-blue-600 shrink-0" />
+                    <span>
+                      Se darán de alta <strong>{quantity} unidades independientes</strong> en stock con códigos correlativos (ej. <code className="font-mono bg-blue-100 dark:bg-blue-950 px-1 py-0.5 rounded text-[11px]">{activeCode || suggestedCode}-01</code> al <code className="font-mono bg-blue-100 dark:bg-blue-950 px-1 py-0.5 rounded text-[11px]">{activeCode || suggestedCode}-{String(quantity).padStart(quantity > 99 ? 3 : 2, "0")}</code>) listas para imprimir etiquetas y vender por separado.
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Precios Unitarios */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
-                  <label className="text-xs font-semibold block mb-1">Precio de Compra (Bs) *:</label>
+                  <label className="text-xs font-semibold block mb-1 text-slate-800 dark:text-slate-200">
+                    Costo Compra Unitario (Bs) *:
+                  </label>
                   <Input
                     type="number"
                     step="0.01"
                     value={purchasePrice}
                     onChange={(e) => setPurchasePrice(e.target.value)}
-                    placeholder="ej. 1500.00"
+                    placeholder="ej. 80.00"
+                    className="font-medium"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold block mb-1 text-blue-700">💰 Precio Venta Unit (Bs):</label>
+                  <label className="text-xs font-semibold block mb-1 text-blue-700 dark:text-blue-400">
+                    💰 Precio Venta Unitario (Bs):
+                  </label>
                   <Input
                     type="number"
                     step="0.01"
                     value={salePrice}
                     onChange={(e) => setSalePrice(e.target.value)}
-                    placeholder="ej. 2200.00"
-                    className="border-blue-300 focus:border-blue-500"
+                    placeholder="ej. 150.00"
+                    className="border-blue-300 focus:border-blue-500 font-medium"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold block mb-1 text-amber-700">🏷️ Precio Descuento (Bs):</label>
+                  <label className="text-xs font-semibold block mb-1 text-amber-700 dark:text-amber-400">
+                    🏷️ Precio Descuento (Bs):
+                  </label>
                   <Input
                     type="number"
                     step="0.01"
                     value={discountPrice}
                     onChange={(e) => setDiscountPrice(e.target.value)}
-                    placeholder="ej. 2000.00"
-                    className="border-amber-300 focus:border-amber-500"
+                    placeholder="ej. 130.00"
+                    className="border-amber-300 focus:border-amber-500 font-medium"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold block mb-1 text-green-700">📦 Precio Mayor (Bs):</label>
+                  <label className="text-xs font-semibold block mb-1 text-green-700 dark:text-green-400">
+                    📦 Precio Mayorista (Bs):
+                  </label>
                   <Input
                     type="number"
                     step="0.01"
                     value={wholesalePrice}
                     onChange={(e) => setWholesalePrice(e.target.value)}
-                    placeholder="ej. 1900.00"
-                    className="border-green-300 focus:border-green-500"
+                    placeholder="ej. 110.00"
+                    className="border-green-300 focus:border-green-500 font-medium"
                   />
                 </div>
               </div>
+
+              {/* Resumen Financiero Total del Lote */}
+              {parseFloat(purchasePrice) > 0 && (
+                <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-md space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-700 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Calculator className="h-4 w-4 text-emerald-400" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                        Resumen Financiero y Contable de la Operación:
+                      </span>
+                    </div>
+                    <Badge className="bg-slate-800 text-slate-200 border-slate-700 text-xs">
+                      {quantity} {quantity === 1 ? "unidad" : "unidades en total"}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center sm:text-left">
+                    <div className="bg-slate-800/80 p-2.5 rounded-xl">
+                      <div className="text-[10px] text-slate-400 uppercase font-bold">Costo Unitario</div>
+                      <div className="text-base font-bold text-slate-200">
+                        {formatCurrency(Math.round((parseFloat(purchasePrice) || 0) * 100))}
+                      </div>
+                    </div>
+
+                    <div className="bg-emerald-950/60 border border-emerald-800/50 p-2.5 rounded-xl">
+                      <div className="text-[10px] text-emerald-400 uppercase font-bold">Total Egreso de Caja</div>
+                      <div className="text-base font-black text-emerald-300">
+                        {formatCurrency(Math.round(((parseFloat(purchasePrice) || 0) * quantity) * 100))}
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-950/60 border border-blue-800/50 p-2.5 rounded-xl">
+                      <div className="text-[10px] text-blue-400 uppercase font-bold">Venta Total Proyectada</div>
+                      <div className="text-base font-bold text-blue-300">
+                        {parseFloat(salePrice) > 0
+                          ? formatCurrency(Math.round(((parseFloat(salePrice) || 0) * quantity) * 100))
+                          : "—"}
+                      </div>
+                    </div>
+
+                    <div className="bg-purple-950/60 border border-purple-800/50 p-2.5 rounded-xl">
+                      <div className="text-[10px] text-purple-400 uppercase font-bold">Margen Proyectado</div>
+                      <div className="text-base font-black text-purple-300">
+                        {parseFloat(salePrice) > 0
+                          ? formatCurrency(
+                              Math.round(
+                                (((parseFloat(salePrice) || 0) - (parseFloat(purchasePrice) || 0)) * quantity) * 100
+                              )
+                            )
+                          : "—"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-slate-400 italic">
+                    * Se registrará 1 sola orden de compra consolidada y 1 solo egreso de caja por {formatCurrency(Math.round(((parseFloat(purchasePrice) || 0) * quantity) * 100))}.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* ─── Información de Compra ─── */}
@@ -1029,11 +1202,32 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
             </div>
 
             <Button onClick={handleSaveUnit} className="w-full gap-2 text-base py-5 font-black bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200" disabled={createUnitMutation.isPending}>
-              <CheckCircle className="h-5 w-5" /> Guardar y Vincular Unidad
+              <CheckCircle className="h-5 w-5" />
+              {quantity > 1
+                ? `Guardar y Dar de Alta Lote (${quantity} Unidades)`
+                : "Guardar y Vincular Unidad"}
             </Button>
           </CardContent>
         </Card>
 
+      )}
+
+      {/* Modal para Impresión de Etiquetas del Lote Registrado */}
+      {batchCreatedData && (
+        <BatchLabelsModal
+          open={batchModalOpen}
+          onOpenChange={(open) => {
+            setBatchModalOpen(open);
+            if (!open) {
+              setLocation("/units");
+            }
+          }}
+          brand={batchCreatedData.brand}
+          model={batchCreatedData.model}
+          type={batchCreatedData.type}
+          salePrice={batchCreatedData.salePrice}
+          codes={batchCreatedData.codes}
+        />
       )}
     </div>
   );
