@@ -222,6 +222,8 @@ async function main() {
         )
       `);
       console.log("[FixColumns] ✓ Created unitEvents table");
+    } else {
+      console.log("[FixColumns] ⊘ unitEvents table already exists");
     }
 
     if (!(await tableExists(conn, "repairs"))) {
