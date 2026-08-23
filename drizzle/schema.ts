@@ -357,7 +357,9 @@ export type InsertSale = typeof sales.$inferInsert;
 export const saleItems = mysqlTable("saleItems", {
   id: int("id").autoincrement().primaryKey(),
   saleId: int("saleId").notNull().references(() => sales.id),
-  unitId: int("unitId").notNull().references(() => units.id),
+  productId: int("productId"),                                                    // nullable — inventario general
+  unitId: int("unitId"),                                                          // nullable — equipos/unidades
+  pricingType: mysqlEnum("pricingType", ["unit", "wholesale", "discount"]).notNull().default("unit"),
   quantity: int("quantity").notNull().default(1),
   basePrice: int("basePrice").notNull(),
   discountType: mysqlEnum("discountType", ["none", "percentage", "fixed"]).notNull().default("none"),

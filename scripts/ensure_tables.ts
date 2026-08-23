@@ -521,6 +521,7 @@ export async function ensureTables() {
       CREATE TABLE IF NOT EXISTS sales (
         id int AUTO_INCREMENT NOT NULL,
         saleNumber varchar(50) NOT NULL,
+        branchId int NOT NULL DEFAULT 1,
         customerId int,
         customerName varchar(255),
         saleChannel enum('local','delivery') NOT NULL DEFAULT 'local',
@@ -532,8 +533,11 @@ export async function ensureTables() {
         discountValue int NOT NULL DEFAULT 0,
         discountAmount int NOT NULL DEFAULT 0,
         total int NOT NULL,
-        paymentMethod enum('cash','qr','transfer') NOT NULL,
+        paymentMethod enum('cash','qr','transfer','credit') NOT NULL,
         paymentStatus enum('pending','completed') NOT NULL DEFAULT 'completed',
+        dueDate varchar(10) NULL,
+        warrantyDays int NOT NULL DEFAULT 30,
+        adminOverrideUserId int NULL,
         notes text,
         cancelReason text,
         cancelledAt timestamp NULL,
@@ -543,6 +547,16 @@ export async function ensureTables() {
         CONSTRAINT sales_saleNumber_unique UNIQUE(saleNumber)
       )
     `);
+    // Migrate existing sales table — add missing columns and expand enum
+    await runSQL("sales.branchId column", `ALTER TABLE sales ADD COLUMN IF NOT EXISTS branchId int NOT NULL DEFAULT 1 AFTER saleNumber`);
+    await runSQL("sales.dueDate column", `ALTER TABLE sales ADD COLUMN IF NOT EXISTS dueDate varchar(10) NULL AFTER paymentStatus`);
+    await runSQL("sales.warrantyDays column", `ALTER TABLE sales ADD COLUMN IF NOT EXISTS warrantyDays int NOT NULL DEFAULT 30 AFTER dueDate`);
+    await runSQL("sales.adminOverrideUserId column", `ALTER TABLE sales ADD COLUMN IF NOT EXISTS adminOverrideUserId int NULL AFTER warrantyDays`);
+    await runSQL("sales.creditDays column", `ALTER TABLE sales ADD COLUMN IF NOT EXISTS creditDays int NULL AFTER warrantyDays`);
+    // Expand paymentMethod enum to include 'credit'
+    await runSQL("sales.paymentMethod expand enum", `
+      ALTER TABLE sales MODIFY COLUMN paymentMethod enum('cash','qr','transfer','credit') NOT NULL
+    `);
 
     // ============================================================
     // 21. SALE ITEMS
@@ -551,7 +565,8 @@ export async function ensureTables() {
       CREATE TABLE IF NOT EXISTS saleItems (
         id int AUTO_INCREMENT NOT NULL,
         saleId int NOT NULL,
-        productId int NOT NULL,
+        productId int NULL,
+        unitId int NULL,
         pricingType enum('unit','wholesale','discount') NOT NULL DEFAULT 'unit',
         quantity int NOT NULL,
         basePrice int NOT NULL,
@@ -564,6 +579,10 @@ export async function ensureTables() {
         CONSTRAINT saleItems_id PRIMARY KEY(id)
       )
     `);
+    // Migrate existing saleItems — make productId nullable and add unitId/pricingType
+    await runSQL("saleItems.productId nullable", `ALTER TABLE saleItems MODIFY COLUMN productId int NULL`);
+    await runSQL("saleItems.unitId column", `ALTER TABLE saleItems ADD COLUMN IF NOT EXISTS unitId int NULL AFTER productId`);
+    await runSQL("saleItems.pricingType column", `ALTER TABLE saleItems ADD COLUMN IF NOT EXISTS pricingType enum('unit','wholesale','discount') NOT NULL DEFAULT 'unit' AFTER unitId`);
 
     // ============================================================
     // 22. AUDIT LOG

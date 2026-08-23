@@ -95,11 +95,20 @@ async function main() {
     await addColumnIfMissing(conn, "operationalExpenses", "branchId",      "int NOT NULL DEFAULT 1");
 
     // ── sales ──────────────────────────────────────────────────────
-    await addColumnIfMissing(conn, "sales", "warrantyDays",  "int NOT NULL DEFAULT 30");
-    await addColumnIfMissing(conn, "sales", "creditDays",    "int NULL");
-    await addColumnIfMissing(conn, "sales", "cancelledAt",   "timestamp NULL");
-    await addColumnIfMissing(conn, "sales", "cancelledBy",   "int NULL");
-    await addColumnIfMissing(conn, "sales", "branchId",      "int NOT NULL DEFAULT 1");
+    await addColumnIfMissing(conn, "sales", "warrantyDays",         "int NOT NULL DEFAULT 30");
+    await addColumnIfMissing(conn, "sales", "creditDays",           "int NULL");
+    await addColumnIfMissing(conn, "sales", "cancelledAt",          "timestamp NULL");
+    await addColumnIfMissing(conn, "sales", "cancelledBy",          "int NULL");
+    await addColumnIfMissing(conn, "sales", "branchId",             "int NOT NULL DEFAULT 1");
+    await addColumnIfMissing(conn, "sales", "dueDate",              "varchar(10) NULL");
+    await addColumnIfMissing(conn, "sales", "adminOverrideUserId",  "int NULL");
+    // Expand paymentMethod enum to include 'credit'
+    await conn.query("ALTER TABLE sales MODIFY COLUMN paymentMethod enum('cash','qr','transfer','credit') NOT NULL").catch(() => {});
+
+    // ── saleItems ──────────────────────────────────────────────────
+    await conn.query("ALTER TABLE saleItems MODIFY COLUMN productId int NULL").catch(() => {});
+    await addColumnIfMissing(conn, "saleItems", "unitId",       "int NULL");
+    await addColumnIfMissing(conn, "saleItems", "pricingType",  "enum('unit','wholesale','discount') NOT NULL DEFAULT 'unit'");
 
     // ── orders ─────────────────────────────────────────────────────
     await addColumnIfMissing(conn, "orders", "branchId", "int NOT NULL DEFAULT 1");
