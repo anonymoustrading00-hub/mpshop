@@ -117,6 +117,51 @@ async function main() {
     await addColumnIfMissing(conn, "purchases", "isCredit",      "int NOT NULL DEFAULT 0");
     await addColumnIfMissing(conn, "purchases", "dueDate",       "varchar(10) NULL");
 
+    // ── suppliers ──────────────────────────────────────────────────
+    await addColumnIfMissing(conn, "suppliers", "taxId",        "varchar(50) NULL");
+    await addColumnIfMissing(conn, "suppliers", "creditDays",   "int NOT NULL DEFAULT 30");
+    await addColumnIfMissing(conn, "suppliers", "creditLimit",  "int NOT NULL DEFAULT 0");
+
+    // ── saleItems ──────────────────────────────────────────────────
+    await addColumnIfMissing(conn, "saleItems", "discountType",  "enum('none','percentage','fixed') NOT NULL DEFAULT 'none'");
+    await addColumnIfMissing(conn, "saleItems", "discountValue", "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "saleItems", "discountAmount","int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "saleItems", "finalUnitPrice","int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "saleItems", "subtotal",      "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "saleItems", "unitId",        "int NULL");
+
+    // ── accountsPayable ────────────────────────────────────────────
+    await addColumnIfMissing(conn, "accountsPayable", "supplierId",  "int NULL");
+    await addColumnIfMissing(conn, "accountsPayable", "paidAmount",  "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "accountsPayable", "balance",     "int NOT NULL DEFAULT 0");
+
+    // ── accountsReceivable ─────────────────────────────────────────
+    await addColumnIfMissing(conn, "accountsReceivable", "customerId",           "int NULL");
+    await addColumnIfMissing(conn, "accountsReceivable", "paidAmount",           "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "accountsReceivable", "balance",              "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "accountsReceivable", "adminOverrideUserId",  "int NULL");
+    await addColumnIfMissing(conn, "accountsReceivable", "adminOverrideReason",  "text NULL");
+
+    // ── cash_closures ──────────────────────────────────────────────
+    await addColumnIfMissing(conn, "cash_closures", "branchId",        "int NOT NULL DEFAULT 1");
+    await addColumnIfMissing(conn, "cash_closures", "reportedCash",    "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "cash_closures", "reportedQr",      "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "cash_closures", "reportedTransfer","int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "cash_closures", "expectedCash",    "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "cash_closures", "expectedQr",      "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "cash_closures", "expectedTransfer","int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "cash_closures", "pendingOrders",   "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "cash_closures", "adminNotes",      "text NULL");
+    await addColumnIfMissing(conn, "cash_closures", "status",          "enum('pending','approved','rejected') NOT NULL DEFAULT 'pending'");
+
+    // ── cash_openings ──────────────────────────────────────────────
+    await addColumnIfMissing(conn, "cash_openings", "openingAmount",     "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "cash_openings", "paymentMethod",     "enum('cash','qr','transfer') NOT NULL DEFAULT 'cash'");
+    await addColumnIfMissing(conn, "cash_openings", "responsibleUserId", "int NULL");
+    await addColumnIfMissing(conn, "cash_openings", "openedByUserId",    "int NULL");
+    await addColumnIfMissing(conn, "cash_openings", "notes",             "text NULL");
+    await addColumnIfMissing(conn, "cash_openings", "status",            "enum('open','closed') NOT NULL DEFAULT 'open'");
+
     // ── purchaseItems ──────────────────────────────────────────────
     await addColumnIfMissing(conn, "purchaseItems", "unitId", "int NULL");
 
