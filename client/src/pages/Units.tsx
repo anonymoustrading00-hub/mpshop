@@ -173,6 +173,15 @@ export default function Units() {
   // ── Kardex Modal State ──
   const [kardexUnitId, setKardexUnitId] = useState<number | null>(null);
   const [isKardexOpen, setIsKardexOpen] = useState(false);
+
+  // ── Paginación, vista y modo ──────────────────────────────────────────────
+  const [page, setPage]           = useState(1);
+  const [pageSize, setPageSize]   = useState<number>(24);
+  const [viewMode, setViewMode]   = useState<"grid" | "table" | "grouped">("grid");
+  // Resetear página cuando cambian filtros
+  const handleSearchChange = (v: string) => { setSearch(v); setPage(1); };
+  const handleTypeChange   = (v: string) => { setTypeFilter(v); setPage(1); };
+  const handleStatusChange = (v: string) => { setStatusFilter(v); setPage(1); };
   const [editBrand, setEditBrand] = useState("");
   const [editModel, setEditModel] = useState("");
   const [editCondition, setEditCondition] = useState("8");
@@ -292,6 +301,8 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     search: search || undefined,
     type: typeFilter !== "all" ? (typeFilter as any) : undefined,
     status: statusFilter !== "all" ? (statusFilter as any) : undefined,
+    limit: viewMode === "grouped" ? 500 : pageSize,
+    offset: viewMode === "grouped" ? 0 : (page - 1) * pageSize,
   });
 
   const { data: suppliersData } = trpc.suppliers.list.useQuery();
@@ -353,7 +364,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
       setIsKardexOpen(true);
     } else {
       // Si no está en la lista, hacer búsqueda por texto como fallback
-      setSearch(code);
+      handleSearchChange(code);
       toast.info(`Buscando: ${code}`);
     }
   };
@@ -559,56 +570,261 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
           </CardContent>
         </Card>
 
-        {/* Filtros */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Input
-            placeholder="Buscar por marca, modelo o specs..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Tipo de Producto" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los Tipos</SelectItem>
-              <SelectItem value="laptop">Laptop</SelectItem>
-              <SelectItem value="accessory">Accesorio / Repuesto</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* Filtros + Controles de Vista */}
+        <div className="space-y-3">
+          {/* Fila 1: Filtros */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Input
+              placeholder="🔍 Buscar por código, serie, RMA, marca, modelo..."
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+            />
+            <Select value={typeFilter} onValueChange={handleTypeChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tipo de Producto" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los Tipos</SelectItem>
+                <SelectItem value="laptop">Laptop</SelectItem>
+                <SelectItem value="tablet">Tablet</SelectItem>
+                <SelectItem value="phone">Celular</SelectItem>
+                <SelectItem value="monitor">Monitor</SelectItem>
+                <SelectItem value="charger">Cargador</SelectItem>
+                <SelectItem value="accessory">Accesorio</SelectItem>
+                <SelectItem value="other">Otro</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={handleStatusChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Estado de Unidad" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los Estados</SelectItem>
+                <SelectItem value="in_diagnosis">En Diagnóstico</SelectItem>
+                <SelectItem value="in_repair">En Taller</SelectItem>
+                <SelectItem value="available">Disponible</SelectItem>
+                <SelectItem value="sold">Vendida</SelectItem>
+                <SelectItem value="returned">Devuelta (RMA)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Estado de Unidad" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los Estados</SelectItem>
-              <SelectItem value="in_diagnosis">En Diagnóstico</SelectItem>
-              <SelectItem value="in_repair">En Taller</SelectItem>
-              <SelectItem value="available">Disponible</SelectItem>
-              <SelectItem value="sold">Vendida</SelectItem>
-              <SelectItem value="returned">Devuelta (RMA)</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Fila 2: Modo vista + por página + total */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Selector de modo vista */}
+            <div className="flex items-center gap-1 bg-muted/50 rounded-xl p-1">
+              <button
+                onClick={() => { setViewMode("grid"); setPage(1); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "grid" ? "bg-white shadow text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                title="Tarjetas visuales"
+              >
+                <Grid className="h-3.5 w-3.5" /> Tarjetas
+              </button>
+              <button
+                onClick={() => { setViewMode("table"); setPage(1); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "table" ? "bg-white shadow text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                title="Tabla compacta"
+              >
+                <List className="h-3.5 w-3.5" /> Tabla
+              </button>
+              <button
+                onClick={() => { setViewMode("grouped"); setPage(1); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "grouped" ? "bg-white shadow text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                title="Agrupado por modelo"
+              >
+                <Boxes className="h-3.5 w-3.5" /> Agrupado
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Por página (solo en grid y tabla) */}
+              {viewMode !== "grouped" && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground font-medium">Por página:</span>
+                  <div className="flex gap-1">
+                    {[24, 48, 96].map(n => (
+                      <button
+                        key={n}
+                        onClick={() => { setPageSize(n); setPage(1); }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${pageSize === n ? "bg-primary text-white border-primary" : "border-muted text-muted-foreground hover:border-primary/50"}`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Total */}
+              {!isLoading && (
+                <span className="text-xs font-semibold text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-lg">
+                  {unitsData?.total ?? 0} unidades
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Grid de Unidades */}
+        {/* Contenido según modo de vista */}
         {isLoading ? (
-          <div className="text-center py-10">Cargando inventario de unidades...</div>
+          <div className="text-center py-10">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">Cargando inventario...</p>
+          </div>
         ) : !unitsData?.items || unitsData.items.length === 0 ? (
           <Card className="text-center p-12">
             <CardContent className="space-y-4">
               <HardDrive className="h-12 w-12 text-muted-foreground mx-auto" />
               <h3 className="text-lg font-semibold">No se encontraron unidades</h3>
               <p className="text-sm text-muted-foreground">
-                Intenta cambiar los filtros o registra una nueva unidad usando el botón de la parte superior.
+                Intenta cambiar los filtros o registra una nueva unidad.
               </p>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {unitsData.items.map((unit: any) => {
-              const specs = unit.specs || {};
+          <>
+            {/* ── MODO TABLA ─────────────────────────────────────────────── */}
+            {viewMode === "table" && (
+              <div className="overflow-x-auto rounded-xl border border-slate-100 shadow-sm bg-white">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      <th className="text-left px-4 py-3 text-xs font-black text-slate-500 uppercase tracking-wider">Código / RMA</th>
+                      <th className="text-left px-4 py-3 text-xs font-black text-slate-500 uppercase tracking-wider">Equipo</th>
+                      <th className="text-left px-4 py-3 text-xs font-black text-slate-500 uppercase tracking-wider">Tipo</th>
+                      <th className="text-left px-4 py-3 text-xs font-black text-slate-500 uppercase tracking-wider">Specs</th>
+                      <th className="text-left px-4 py-3 text-xs font-black text-slate-500 uppercase tracking-wider">Estado</th>
+                      <th className="text-right px-4 py-3 text-xs font-black text-slate-500 uppercase tracking-wider">Precio Venta</th>
+                      <th className="text-right px-4 py-3 text-xs font-black text-slate-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {unitsData.items.map((unit: any) => {
+                      const specs = unit.specs || {};
+                      const cfg = STATUS_CONFIG[unit.status] || STATUS_CONFIG.in_diagnosis;
+                      return (
+                        <tr key={unit.id} className="hover:bg-slate-50/60 transition-colors group">
+                          <td className="px-4 py-3">
+                            <div className="font-mono text-xs font-bold text-slate-700">{unit.code}</div>
+                            {unit.rmaNumber && <div className="font-mono text-[10px] text-emerald-600 font-black">{unit.rmaNumber}</div>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-800">{unit.brand} {unit.model}</div>
+                            {unit.serialNumber && <div className="text-[10px] text-slate-400 font-mono">{unit.serialNumber}</div>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-xs capitalize text-slate-500">{unit.type}</span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500 max-w-[180px]">
+                            {specs.cpu && <span className="mr-2">{specs.cpu}</span>}
+                            {specs.ram && <span className="mr-2">RAM {specs.ram}</span>}
+                            {specs.storage && <span>{specs.storage}</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <UnitStatusSelect currentStatus={unit.status} onStatusChange={(s) => handleStatusChangeRequest(unit, s)} />
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-primary">
+                            {unit.salePrice ? `Bs. ${(unit.salePrice/100).toFixed(2)}` : <span className="text-slate-300 text-xs">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button size="sm" className="h-7 px-2 bg-slate-900 hover:bg-slate-800 text-white gap-1" onClick={() => { setKardexUnitId(unit.id); setIsKardexOpen(true); }}>
+                                <BookOpen className="h-3 w-3" />
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-7 px-2 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => handleOpenEdit(unit)}>
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              {unit.status === "in_repair" && (
+                                <Button size="sm" className="h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleOpenCompleteRepair(unit)}>
+                                  <CheckCircle className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* ── MODO AGRUPADO ──────────────────────────────────────────── */}
+            {viewMode === "grouped" && (() => {
+              // Agrupar por tipo + marca + modelo
+              const groups = new Map<string, { brand: string; model: string; type: string; units: any[]; available: number; inRepair: number; inDiagnosis: number; sold: number }>();
+              for (const unit of (unitsData.items as any[])) {
+                const key = `${unit.type}___${(unit.brand||"").toLowerCase()}___${(unit.model||"").toLowerCase()}`;
+                if (!groups.has(key)) groups.set(key, { brand: unit.brand, model: unit.model, type: unit.type, units: [], available: 0, inRepair: 0, inDiagnosis: 0, sold: 0 });
+                const g = groups.get(key)!;
+                g.units.push(unit);
+                if (unit.status === "available") g.available++;
+                else if (unit.status === "in_repair") g.inRepair++;
+                else if (unit.status === "in_diagnosis") g.inDiagnosis++;
+                else if (unit.status === "sold") g.sold++;
+              }
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array.from(groups.values()).map((g, i) => {
+                    const photo = g.units.find((u: any) => u.photos)?.photos;
+                    const photoUrl = photo ? (() => { try { const p = typeof photo === "string" ? JSON.parse(photo) : photo; return Array.isArray(p) ? p[0] : null; } catch { return null; } })() : null;
+                    const firstUnit = g.units[0];
+                    return (
+                      <Card key={i} className="hover:shadow-md transition-shadow overflow-hidden">
+                        <div className="flex">
+                          {photoUrl && <img src={photoUrl} alt={`${g.brand} ${g.model}`} className="w-20 h-20 object-cover shrink-0 rounded-l-lg" />}
+                          <div className="p-3 flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-1">
+                              <div className="min-w-0">
+                                <p className="font-black text-sm text-slate-800 truncate">{g.brand} {g.model}</p>
+                                <p className="text-[10px] text-slate-400 capitalize">{g.type} · {g.units.length} unidades</p>
+                              </div>
+                              {g.available > 0 && <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 font-black text-xs shrink-0">{g.available} disp.</Badge>}
+                            </div>
+                            <div className="flex gap-1.5 mt-2 flex-wrap">
+                              {g.available > 0 && <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold">{g.available} disponibles</span>}
+                              {g.inRepair > 0 && <span className="text-[10px] bg-red-50 text-red-700 px-1.5 py-0.5 rounded font-bold">{g.inRepair} en taller</span>}
+                              {g.inDiagnosis > 0 && <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold">{g.inDiagnosis} diagnóstico</span>}
+                              {g.sold > 0 && <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">{g.sold} vendidas</span>}
+                            </div>
+                            {firstUnit?.salePrice > 0 && (
+                              <p className="text-sm font-black text-primary mt-1">Bs. {(firstUnit.salePrice/100).toFixed(2)}</p>
+                            )}
+                          </div>
+                        </div>
+                        {/* Lista de unidades individuales del grupo */}
+                        <div className="border-t border-slate-50 px-3 pb-2">
+                          <div className="max-h-28 overflow-y-auto space-y-1 mt-2">
+                            {g.units.map((unit: any) => {
+                              const cfg = STATUS_CONFIG[unit.status] || STATUS_CONFIG.in_diagnosis;
+                              return (
+                                <div key={unit.id} className="flex items-center justify-between text-xs py-0.5">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="font-mono text-slate-600 shrink-0">{unit.code}</span>
+                                    {unit.rmaNumber && <span className="font-mono text-[9px] text-emerald-600 font-black shrink-0">{unit.rmaNumber}</span>}
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <Badge variant="outline" className={`text-[9px] ${cfg.bg} ${cfg.color} px-1 py-0`}>{cfg.label}</Badge>
+                                    <button className="text-slate-400 hover:text-slate-700 p-0.5" onClick={() => { setKardexUnitId(unit.id); setIsKardexOpen(true); }}>
+                                      <BookOpen className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* ── MODO TARJETAS (GRID) ───────────────────────────────────── */}
+            {viewMode === "grid" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {unitsData.items.map((unit: any) => {
+                  const specs = unit.specs || {};
 
               return (
                 <Card key={unit.id} className="hover:shadow-md transition-shadow flex flex-col justify-between">
@@ -737,6 +953,86 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
               );
             })}
           </div>
+            )}
+
+            {/* ── BARRA DE PAGINACIÓN (grid y tabla) ───────────────────────── */}
+            {viewMode !== "grouped" && (() => {
+              const total = unitsData?.total ?? 0;
+              const totalPages = Math.max(1, Math.ceil(total / pageSize));
+              if (totalPages <= 1) return null;
+              return (
+                <div className="flex items-center justify-center gap-2 py-2">
+                  <button
+                    onClick={() => setPage(1)}
+                    disabled={page <= 1}
+                    className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                    title="Primera página"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                    title="Página anterior"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+
+                  {/* Páginas numéricas */}
+                  <div className="flex gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let p: number;
+                      if (totalPages <= 5) {
+                        p = i + 1;
+                      } else if (page <= 3) {
+                        p = i + 1;
+                      } else if (page >= totalPages - 2) {
+                        p = totalPages - 4 + i;
+                      } else {
+                        p = page - 2 + i;
+                      }
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => setPage(p)}
+                          className={`min-w-[36px] h-9 rounded-lg text-sm font-bold transition-all border ${
+                            p === page
+                              ? "bg-primary text-white border-primary shadow-sm"
+                              : "border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                    title="Página siguiente"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setPage(totalPages)}
+                    disabled={page >= totalPages}
+                    className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                    title="Última página"
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </button>
+
+                  <span className="text-xs font-semibold text-muted-foreground ml-2">
+                    Página <strong>{page}</strong> de <strong>{totalPages}</strong>
+                    <span className="text-slate-400 ml-1">({total} total)</span>
+                  </span>
+                </div>
+              );
+            })()}
+          </>
         )}
 
         {/* Modal: Kardex completo de la unidad */}

@@ -64,10 +64,18 @@ export const unitsRouter = router({
           filtered = filtered.filter((u: any) =>
             u.code?.toLowerCase().includes(s) ||
             u.brand?.toLowerCase().includes(s) ||
-            u.model?.toLowerCase().includes(s)
+            u.model?.toLowerCase().includes(s) ||
+            u.serialNumber?.toLowerCase().includes(s) ||
+            u.rmaNumber?.toLowerCase().includes(s)
           );
         }
-        const sanitized = filtered.map((unit: any) => {
+        const total = filtered.length;
+        // Aplicar paginación en mock mode
+        const limit = input?.limit ?? 100;
+        const offset = input?.offset ?? 0;
+        const paginated = filtered.slice(offset, offset + limit);
+
+        const sanitized = paginated.map((unit: any) => {
           const specsParsed = typeof unit.specs === "string" ? JSON.parse(unit.specs) : (unit.specs || {});
           const damageChecklistParsed = typeof unit.damageChecklist === "string" ? JSON.parse(unit.damageChecklist) : (unit.damageChecklist || {});
           return {
@@ -76,7 +84,7 @@ export const unitsRouter = router({
             damageChecklist: damageChecklistParsed,
           };
         });
-        return { items: sanitized, total: sanitized.length };
+        return { items: sanitized, total };
       }
 
       const conditions = [];
@@ -100,6 +108,8 @@ export const unitsRouter = router({
             like(units.code, searchTerm),
             like(units.brand, searchTerm),
             like(units.model, searchTerm),
+            like(units.serialNumber, searchTerm),
+            like(units.rmaNumber, searchTerm),
             like(units.specs, searchTerm)
           )
         );
