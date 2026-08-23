@@ -37,7 +37,7 @@ export async function ensureTables() {
         name text,
         email varchar(320),
         loginMethod varchar(64),
-        role enum('user','admin') NOT NULL DEFAULT 'user',
+        role enum('admin','technician','seller','cashier','user') NOT NULL DEFAULT 'seller',
         createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         lastSignedIn timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -47,6 +47,9 @@ export async function ensureTables() {
       )
     `);
 
+    await runSQL("users.role enum upgrade", `
+      ALTER TABLE users MODIFY COLUMN role enum('admin','technician','seller','cashier','user') NOT NULL DEFAULT 'seller'
+    `);
     await runSQL("users.phone column", `
       ALTER TABLE users ADD COLUMN phone varchar(50) NULL
     `);
@@ -708,14 +711,29 @@ export async function ensureTables() {
       CREATE TABLE IF NOT EXISTS inventory_transfers (
         id int AUTO_INCREMENT NOT NULL,
         transferNumber varchar(50) NOT NULL,
-        direction enum('to_production','to_general') NOT NULL,
-        status enum('completed','cancelled') NOT NULL DEFAULT 'completed',
+        direction varchar(50) NOT NULL DEFAULT 'branch_transfer',
+        sourceBranchId int NOT NULL DEFAULT 1,
+        destinationBranchId int NOT NULL DEFAULT 1,
+        status enum('pending','in_transit','completed','cancelled') NOT NULL DEFAULT 'pending',
         userId int NOT NULL,
         notes text,
         createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT inventory_transfers_id PRIMARY KEY(id),
         CONSTRAINT inventory_transfers_transferNumber_unique UNIQUE(transferNumber)
       )
+    `);
+
+    await runSQL("inventory_transfers.sourceBranchId column", `
+      ALTER TABLE inventory_transfers ADD COLUMN sourceBranchId int NOT NULL DEFAULT 1 AFTER direction
+    `);
+    await runSQL("inventory_transfers.destinationBranchId column", `
+      ALTER TABLE inventory_transfers ADD COLUMN destinationBranchId int NOT NULL DEFAULT 1 AFTER sourceBranchId
+    `);
+    await runSQL("inventory_transfers.direction upgrade", `
+      ALTER TABLE inventory_transfers MODIFY COLUMN direction varchar(50) NOT NULL DEFAULT 'branch_transfer'
+    `);
+    await runSQL("inventory_transfers.status upgrade", `
+      ALTER TABLE inventory_transfers MODIFY COLUMN status enum('pending','in_transit','completed','cancelled') NOT NULL DEFAULT 'pending'
     `);
 
     // ============================================================
@@ -725,13 +743,23 @@ export async function ensureTables() {
       CREATE TABLE IF NOT EXISTS inventory_transfer_items (
         id int AUTO_INCREMENT NOT NULL,
         transferId int NOT NULL,
-        productId int NOT NULL,
-        quantity int NOT NULL,
-        productName varchar(255),
-        productUnit varchar(20),
+        unitId int NOT NULL,
+        quantity int NOT NULL DEFAULT 1,
+        unitCode varchar(50),
+        notes text,
         createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT inventory_transfer_items_id PRIMARY KEY(id)
       )
+    `);
+
+    await runSQL("inventory_transfer_items.unitId column", `
+      ALTER TABLE inventory_transfer_items ADD COLUMN unitId int NOT NULL DEFAULT 0 AFTER transferId
+    `);
+    await runSQL("inventory_transfer_items.unitCode column", `
+      ALTER TABLE inventory_transfer_items ADD COLUMN unitCode varchar(50) NULL AFTER quantity
+    `);
+    await runSQL("inventory_transfer_items.notes column", `
+      ALTER TABLE inventory_transfer_items ADD COLUMN notes text NULL AFTER unitCode
     `);
 
     // ============================================================

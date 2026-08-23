@@ -12,6 +12,67 @@ function getInsertId(result: any): number {
   return result?.insertId || 0;
 }
 
+function toOptionalInteger(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numeric)) return undefined;
+  return Math.round(numeric);
+}
+
+function toPositiveInteger(value: unknown): number | undefined {
+  const numeric = toOptionalInteger(value);
+  return numeric && numeric > 0 ? numeric : undefined;
+}
+
+function normalizePaymentMethod(value: unknown): "cash" | "qr" | "transfer" {
+  return value === "qr" || value === "transfer" || value === "cash" ? value : "cash";
+}
+
+function buildFinancialTransactionRecord(data: any) {
+  const type = data?.type;
+  if (type !== "income" && type !== "expense") {
+    throw new Error("Tipo de transacción financiera inválido");
+  }
+
+  const category = typeof data?.category === "string" ? data.category.trim() : "";
+  if (!category) {
+    throw new Error("Categoría de transacción financiera requerida");
+  }
+
+  const amount = toOptionalInteger(data?.amount);
+  if (amount === undefined || amount <= 0) {
+    throw new Error("Monto de transacción financiera inválido");
+  }
+
+  const record: any = {
+    type,
+    category,
+    amount,
+    paymentMethod: normalizePaymentMethod(data?.paymentMethod),
+    branchId: toPositiveInteger(data?.branchId) || 1,
+  };
+
+  const userId = toPositiveInteger(data?.userId);
+  if (userId !== undefined) record.userId = userId;
+
+  const referenceId = toPositiveInteger(data?.referenceId);
+  if (referenceId !== undefined) record.referenceId = referenceId;
+
+  const unitCost = toOptionalInteger(data?.unitCost);
+  if (unitCost !== undefined) record.unitCost = unitCost;
+
+  if (data?.notes !== undefined && data.notes !== null) {
+    const notes = String(data.notes).trim();
+    if (notes) record.notes = notes;
+  }
+
+  if (data?.createdAt instanceof Date && !Number.isNaN(data.createdAt.getTime())) {
+    record.createdAt = data.createdAt;
+  }
+
+  return record;
+}
+
 import {
   InsertUser,
   users,
@@ -1825,23 +1886,24 @@ export async function recordInventoryEntryAsPurchase(
 // Finanzas y Gastos
 export async function createFinancialTransaction(data: any) {
   const db = await getDb();
+  const record = buildFinancialTransactionRecord(data);
   if (!db) {
     const newId = MOCK_FINANCIAL_TRANSACTIONS.length + 1;
-    MOCK_FINANCIAL_TRANSACTIONS.push({ ...data, branchId: data.branchId || 1, id: newId, createdAt: new Date() });
+    MOCK_FINANCIAL_TRANSACTIONS.push({ ...record, id: newId, createdAt: record.createdAt || new Date() });
     syncMocksToDisk();
     return { insertId: newId };
   }
 
   return await db.transaction(async (tx: any) => {
     // Validar que la caja esté abierta para el método de pago seleccionado
-    if (data.userId && data.paymentMethod) {
+    if (record.userId && record.paymentMethod) {
       const today = getLocalDateKey(new Date());
       if (today) {
-        await checkCashRegisterOpening(tx, data.userId, data.paymentMethod, today);
+        await checkCashRegisterOpening(tx, record.userId, record.paymentMethod, today);
       }
     }
 
-    const result = await tx.insert(financialTransactions).values({ ...data, branchId: data.branchId || 1 });
+    const result = await tx.insert(financialTransactions).values(record);
     return result;
   });
 }
@@ -2100,16 +2162,17 @@ export async function createOperationalExpense(data: any) {
     }
 
     if (data.status === "paid") {
-      await tx.insert(financialTransactions).values({
+      await tx.insert(financialTransactions).values(buildFinancialTransactionRecord({
         type: "expense",
         category: data.category,
         amount: data.amount,
         paymentMethod: data.paymentMethod || "cash",
         notes: data.description || "Gasto Operativo",
         userId: data.userId, // Asociar con el usuario que registra
+        branchId: data.branchId,
         referenceId: insertId,
         createdAt: new Date()
-      });
+      }));
     }
     return { insertId };
   });

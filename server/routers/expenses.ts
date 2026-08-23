@@ -234,6 +234,8 @@ export const expensesRouter = router({
       const { id, ...data } = input;
       return await updateOperationalExpense(id, {
         ...data,
+        userId: ctx.user.id,
+        branchId: ctx.branchId,
         expenseDate: data.expenseDate ? new Date(data.expenseDate) : undefined,
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
       });
@@ -259,6 +261,8 @@ export const expensesRouter = router({
       return await updateOperationalExpense(input.id, {
         status: "paid",
         paymentMethod: input.paymentMethod || expense.paymentMethod,
+        userId: ctx.user.id,
+        branchId: ctx.branchId,
       });
     }),
 

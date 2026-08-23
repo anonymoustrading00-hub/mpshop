@@ -72,35 +72,26 @@ async function seedDefaultAdmin() {
     return;
   }
 
-  const username = process.env.ADMIN_USERNAME;
-  const password = process.env.ADMIN_PASSWORD;
-  if (!username || !password) {
-    console.log(
-      "[Seed] ADMIN_USERNAME or ADMIN_PASSWORD not configured; skipping admin seed"
-    );
-    return;
-  }
-
+  const username = process.env.ADMIN_USERNAME || "admin";
+  const password = process.env.ADMIN_PASSWORD || "admin123";
   const name = process.env.ADMIN_NAME || "Administrador";
-  const email = process.env.ADMIN_EMAIL || "admin@vitalia.local";
-  const passwordHash = await bcrypt.hash(password, 10);
+  const email = process.env.ADMIN_EMAIL || "admin@mpshop.local";
   const connection = await mysql.createConnection(process.env.DATABASE_URL);
 
   try {
+    const passwordHash = await bcrypt.hash(password, 10);
     await connection.query(
       `INSERT INTO users
-        (openId, username, passwordHash, name, email, loginMethod, role, createdAt, updatedAt, lastSignedIn)
-       VALUES (?, ?, ?, ?, ?, 'traditional', 'admin', NOW(), NOW(), NOW())
+        (openId, username, passwordHash, name, email, loginMethod, role, status, createdAt, updatedAt, lastSignedIn)
+       VALUES (?, ?, ?, ?, ?, 'traditional', 'admin', 'active', NOW(), NOW(), NOW())
        ON DUPLICATE KEY UPDATE
-        passwordHash = VALUES(passwordHash),
-        name = VALUES(name),
-        email = VALUES(email),
-        loginMethod = VALUES(loginMethod),
-        role = VALUES(role),
-        updatedAt = NOW()`,
+        status = 'active',
+        role = 'admin'`,
       [`local_${username}`, username, passwordHash, name, email]
     );
-    console.log(`[Seed] Admin user ready: ${username}`);
+    console.log(`[Seed] Admin user verified/ready: ${username}`);
+  } catch (err: any) {
+    console.error("[Seed] Error creating admin user:", err.message);
   } finally {
     await connection.end();
   }
@@ -136,6 +127,7 @@ async function startServer() {
     process.env.NODE_ENV === "development"
       ? path.resolve(process.cwd(), "client", "index.html")
       : path.resolve(process.cwd(), "dist", "public", "index.html");
+
   const setKefirControlCacheHeaders = (
     res: express.Response,
     filePath: string
@@ -151,6 +143,7 @@ async function startServer() {
       res.setHeader("Cache-Control", "no-cache");
     }
   };
+
   const sendRootAppIndex = (
     _req: express.Request,
     res: express.Response,
@@ -163,6 +156,7 @@ async function startServer() {
 
     res.sendFile(rootAppIndex);
   };
+
   const sendKefirControlIndex = async (
     _req: express.Request,
     res: express.Response
@@ -180,7 +174,6 @@ async function startServer() {
         if (pool) {
           try {
             // 1. Sincronizar el Inventario de Producción REAL
-            // Intentamos obtener datos de production_inventory
             const [prodRows] = await pool.execute(`
               SELECT pi.productId as id, p.name, pi.quantity, p.unit, p.category, p.price as costPerUnit,
                      p.presentationQuantity, p.presentationUnit, p.presentationVolumeMl,

@@ -341,6 +341,55 @@ async function main() {
       console.log("[FixColumns] ✓ Created employees table");
     }
 
+    if (!(await tableExists(conn, "inventory_transfers"))) {
+      await conn.query(`
+        CREATE TABLE inventory_transfers (
+          id int AUTO_INCREMENT PRIMARY KEY,
+          transferNumber varchar(50) NOT NULL UNIQUE,
+          direction varchar(50) NOT NULL DEFAULT 'branch_transfer',
+          sourceBranchId int NOT NULL DEFAULT 1,
+          destinationBranchId int NOT NULL DEFAULT 1,
+          status enum('pending','in_transit','completed','cancelled') NOT NULL DEFAULT 'pending',
+          userId int NOT NULL,
+          notes text NULL,
+          createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      console.log("[FixColumns] ✓ Created inventory_transfers table");
+    } else {
+      await addColumnIfMissing(conn, "inventory_transfers", "sourceBranchId", "int NOT NULL DEFAULT 1");
+      await addColumnIfMissing(conn, "inventory_transfers", "destinationBranchId", "int NOT NULL DEFAULT 1");
+      await addColumnIfMissing(conn, "inventory_transfers", "direction", "varchar(50) NOT NULL DEFAULT 'branch_transfer'");
+      try {
+        await conn.query(`ALTER TABLE inventory_transfers MODIFY COLUMN status enum('pending','in_transit','completed','cancelled') NOT NULL DEFAULT 'pending'`);
+      } catch (e: any) {}
+    }
+
+    if (!(await tableExists(conn, "inventory_transfer_items"))) {
+      await conn.query(`
+        CREATE TABLE inventory_transfer_items (
+          id int AUTO_INCREMENT PRIMARY KEY,
+          transferId int NOT NULL,
+          unitId int NOT NULL,
+          quantity int NOT NULL DEFAULT 1,
+          unitCode varchar(50) NULL,
+          notes text NULL,
+          createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      console.log("[FixColumns] ✓ Created inventory_transfer_items table");
+    } else {
+      await addColumnIfMissing(conn, "inventory_transfer_items", "unitId", "int NOT NULL DEFAULT 0");
+      await addColumnIfMissing(conn, "inventory_transfer_items", "unitCode", "varchar(50) NULL");
+      await addColumnIfMissing(conn, "inventory_transfer_items", "notes", "text NULL");
+    }
+
+    // Role upgrade in users table
+    try {
+      await conn.query(`ALTER TABLE users MODIFY COLUMN role enum('admin','technician','seller','cashier','user') NOT NULL DEFAULT 'seller'`);
+      console.log("[FixColumns] ✓ Upgraded users.role enum");
+    } catch (e: any) {}
+
     // Migrar rmaNumber existente de repairs a otNumber
     await conn.query(`
       UPDATE repairs SET otNumber = rmaNumber 

@@ -10,8 +10,10 @@ async function main() {
     CREATE TABLE IF NOT EXISTS inventory_transfers (
       id INT AUTO_INCREMENT PRIMARY KEY,
       transferNumber VARCHAR(50) NOT NULL UNIQUE,
-      direction ENUM('to_production', 'to_general') NOT NULL,
-      status ENUM('completed', 'cancelled') NOT NULL DEFAULT 'completed',
+      direction VARCHAR(50) NOT NULL DEFAULT 'branch_transfer',
+      sourceBranchId INT NOT NULL DEFAULT 1,
+      destinationBranchId INT NOT NULL DEFAULT 1,
+      status ENUM('pending', 'in_transit', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
       userId INT NOT NULL,
       notes TEXT,
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -22,10 +24,10 @@ async function main() {
     CREATE TABLE IF NOT EXISTS inventory_transfer_items (
       id INT AUTO_INCREMENT PRIMARY KEY,
       transferId INT NOT NULL,
-      productId INT NOT NULL,
-      quantity INT NOT NULL,
-      productName VARCHAR(255),
-      productUnit VARCHAR(20),
+      unitId INT NOT NULL,
+      quantity INT NOT NULL DEFAULT 1,
+      unitCode VARCHAR(50),
+      notes TEXT,
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
     )
   `);

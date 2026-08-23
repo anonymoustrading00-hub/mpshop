@@ -27,31 +27,34 @@ import {
   CreditCard,
   Landmark,
   Tag,
+  Settings,
 } from "lucide-react";
 
 const adminModules = [
-  { href: "/catalog", title: "Inventario / Catálogo", description: "Catálogo visual de laptops, equipos y artículos comprados con fotos e impresión.", icon: Package },
-  { href: "/units", title: "Unidades", description: "Lista correlativa de laptops y accesorios reacondicionados.", icon: Tag },
-  { href: "/repairs", title: "Taller & Técnico", description: "Órdenes de servicio, repuestos y diagnóstico.", icon: Factory },
-  { href: "/warranties", title: "Garantías", description: "Cobertura de garantía por venta realizada.", icon: LayoutGrid },
-  { href: "/returns", title: "Devoluciones (RMA)", description: "Procesamiento de RMA y reingreso a taller.", icon: AlertTriangle },
-  { href: "/generate-codes", title: "Generar Códigos", description: "Creación por lote e impresión PDF de etiquetas.", icon: LayoutGrid },
-  { href: "/orders", title: "Pedidos", description: "Gestión y seguimiento del día.", icon: ShoppingCart },
-  { href: "/sales", title: "Ventas", description: "Ventas rápidas y cobros.", icon: ShoppingBag },
-  { href: "/dashboard", title: "Dashboard", description: "Métricas y control general.", icon: LayoutGrid },
-  { href: "/dashboard-kpis", title: "KPIs Tiempo Real", description: "6 KPIs prioritarios del negocio.", icon: LineChart },
-  { href: "/analytics", title: "Analítica Avanzada", description: "Margen, rotación, taller, comercial.", icon: LineChart },
-  { href: "/rentabilidad", title: "Rentabilidad Real", description: "P&L real: margen, COGS y utilidad neta.", icon: LineChart },
-  { href: "/reports", title: "Reportes", description: "Reportes ejecutivos de ventas, finanzas e inventario.", icon: LineChart },
-  { href: "/users", title: "Usuarios & Permisos", description: "Roles, control de accesos y sucursales.", icon: Users },
-  { href: "/branches", title: "Sucursales", description: "Gestión de sucursales y bodegas.", icon: Package },
-  { href: "/suppliers", title: "Proveedores", description: "Contactos y abastecimiento.", icon: Users },
-  { href: "/purchases", title: "Compras", description: "Registro de compras de lotes.", icon: ShoppingCart },
-  { href: "/customers", title: "Clientes", description: "Frecuencia, deuda y zonas.", icon: Users },
+  { href: "/catalog", title: "Inventario / Catálogo", description: "Fotos y fichas de laptops, equipos y artículos en stock.", icon: Package },
+  { href: "/units", title: "Unidades", description: "Cada laptop o accesorio con su código, estado y dueño.", icon: Tag },
+  { href: "/repairs", title: "Taller", description: "Órdenes de servicio, diagnóstico y repuestos.", icon: Factory },
+  { href: "/warranties", title: "Garantías", description: "Cobertura después de una venta.", icon: LayoutGrid },
+  { href: "/returns", title: "Devoluciones", description: "RMA y reingreso al taller.", icon: AlertTriangle },
+  { href: "/generate-codes", title: "Códigos QR", description: "Etiquetas en lote para imprimir.", icon: LayoutGrid },
+  { href: "/orders", title: "Pedidos", description: "Entregas del día, estados y seguimiento.", icon: ShoppingCart },
+  { href: "/sales", title: "Ventas", description: "Cobros rápidos, cotizaciones y tickets.", icon: ShoppingBag },
+  { href: "/dashboard", title: "Dashboard", description: "Números generales del negocio.", icon: LayoutGrid },
+  { href: "/dashboard-kpis", title: "KPIs", description: "Indicadores prioritarios en tiempo real.", icon: LineChart },
+  { href: "/analytics", title: "Analítica", description: "Margen, rotación, taller y comercial.", icon: LineChart },
+  { href: "/rentabilidad", title: "Rentabilidad", description: "Utilidad real: ventas, costos y gastos.", icon: LineChart },
+  { href: "/reports", title: "Reportes", description: "PDFs de ventas, finanzas e inventario.", icon: LineChart },
+  { href: "/users", title: "Usuarios", description: "Quién entra, con qué rol y a qué sucursal.", icon: Users },
+  { href: "/branches", title: "Sucursales", description: "Tiendas y bodegas.", icon: Package },
+  { href: "/suppliers", title: "Proveedores", description: "A quién le compras y cómo contactarlo.", icon: Users },
+  { href: "/purchases", title: "Compras", description: "Lotes que entran al inventario.", icon: ShoppingCart },
+  { href: "/customers", title: "Clientes", description: "Ficha, deuda, zona y WhatsApp.", icon: Users },
   { href: "/finance", title: "Finanzas", description: "Caja, ingresos y egresos.", icon: DollarSign },
-  { href: "/accounts-receivable", title: "Cuentas por Cobrar", description: "Créditos, cobranzas y pagarés.", icon: CreditCard },
-  { href: "/accounts-payable", title: "Cuentas por Pagar", description: "Deudas a proveedores.", icon: Landmark },
-  { href: "/delivery-persons", title: "Repartidores", description: "Equipo, asignaciones y control.", icon: Truck },
+  { href: "/expenses", title: "Gastos", description: "Gastos operativos del día a día.", icon: Receipt },
+  { href: "/accounts-receivable", title: "Cuentas por cobrar", description: "Créditos y cobranzas.", icon: CreditCard },
+  { href: "/accounts-payable", title: "Cuentas por pagar", description: "Deudas con proveedores.", icon: Landmark },
+  { href: "/delivery-persons", title: "Repartidores", description: "Equipo de entrega y asignaciones.", icon: Truck },
+  { href: "/settings", title: "Configuración", description: "Nombre, logo y datos de la empresa.", icon: Settings },
 ];
 
 const deliveryModules = [
@@ -191,7 +194,7 @@ export default function Home() {
           <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
             <div className="hero-panel p-7 sm:p-10">
               <div className="mb-10">
-                <img src="/logo.png" alt="Vitalia Logo" className="h-32 w-auto object-contain" />
+                <img src="/logo.png" alt="MP Shop" className="h-32 w-auto object-contain" />
               </div>
               <h1 className="max-w-2xl text-4xl font-extrabold leading-tight text-slate-900 sm:text-5xl">
                 Pedidos, inventario, clientes y ventas en un mismo sistema.
@@ -361,7 +364,7 @@ export default function Home() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-5">
-                <img src="/logo.png" alt="Vitalia Logo" className="h-20 w-auto object-contain" />
+                <img src="/logo.png" alt="MP Shop" className="h-20 w-auto object-contain" />
                 <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs font-semibold">
                   {user?.name}
                 </Badge>
@@ -370,7 +373,7 @@ export default function Home() {
                 Resumen principal del negocio
               </h1>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground sm:text-base">
-                Aqui tienes primero lo relevante: pedidos por atender, alertas de vencimiento, productos con stock bajo, cobros pendientes y accesos rapidos.
+                Aqui tienes primero lo relevante: pedidos por atender, alertas, stock bajo, cobros pendientes y accesos rapidos a cada modulo.
               </p>
             </div>
 
