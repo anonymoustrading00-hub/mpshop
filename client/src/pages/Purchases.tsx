@@ -383,7 +383,8 @@ export default function Purchases() {
 
       {/* Historial de Compras en FILAS / TABLA (Igual a Historial de Ventas) */}
       <Card className="border-0 shadow-xl shadow-slate-100 rounded-[2.5rem] overflow-hidden bg-white">
-        <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between px-8 py-6 border-b border-slate-100">
+        <CardHeader className="flex flex-col gap-4 px-8 py-6 border-b border-slate-100">
+          {/* Título */}
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
               <ShoppingCart className="h-5 w-5" />
@@ -396,11 +397,11 @@ export default function Purchases() {
             </div>
           </div>
 
-          {/* Filtros */}
-          <div className="flex flex-col gap-3 w-full md:w-auto">
+          {/* Filtros — siempre visibles en dos filas */}
+          <div className="flex flex-col gap-3">
             {/* Fila 1: búsqueda + método de pago */}
             <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1 md:w-72">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   placeholder="Buscar por N° Nota o Proveedor..."
@@ -409,9 +410,8 @@ export default function Purchases() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-
               <Select value={filterPayment} onValueChange={setFilterPayment}>
-                <SelectTrigger className="w-full sm:w-44 h-11 rounded-xl border-slate-200 bg-slate-50/50">
+                <SelectTrigger className="w-full sm:w-48 h-11 rounded-xl border-slate-200 bg-slate-50/50">
                   <SelectValue placeholder="Método de pago" />
                 </SelectTrigger>
                 <SelectContent>
@@ -425,33 +425,37 @@ export default function Purchases() {
             </div>
 
             {/* Fila 2: rango de fechas */}
-            <div className="flex flex-col sm:flex-row items-center gap-2">
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className="text-xs font-semibold text-slate-400 shrink-0">Desde</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 shrink-0">Desde</span>
                 <Input
                   type="date"
                   value={filterDateFrom}
                   onChange={(e) => setFilterDateFrom(e.target.value)}
-                  className="h-10 rounded-xl border-slate-200 bg-slate-50/50 text-sm flex-1 sm:w-40"
+                  className="h-10 rounded-xl border-slate-200 bg-slate-50/50 text-sm w-40"
                 />
               </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className="text-xs font-semibold text-slate-400 shrink-0">Hasta</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 shrink-0">Hasta</span>
                 <Input
                   type="date"
                   value={filterDateTo}
                   onChange={(e) => setFilterDateTo(e.target.value)}
-                  className="h-10 rounded-xl border-slate-200 bg-slate-50/50 text-sm flex-1 sm:w-40"
+                  className="h-10 rounded-xl border-slate-200 bg-slate-50/50 text-sm w-40"
                 />
               </div>
               {(filterDateFrom || filterDateTo) && (
                 <button
                   onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
-                  className="text-xs text-slate-400 hover:text-red-500 transition-colors shrink-0 px-2"
-                  title="Limpiar fechas"
+                  className="text-xs font-semibold text-slate-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
                 >
-                  ✕ Limpiar
+                  ✕ Limpiar fechas
                 </button>
+              )}
+              {(filterDateFrom || filterDateTo) && (
+                <span className="text-xs text-slate-400 font-medium">
+                  {filteredPurchases.length} resultado{filteredPurchases.length !== 1 ? "s" : ""}
+                </span>
               )}
             </div>
           </div>
