@@ -17,7 +17,6 @@ import {
   TrendingUp,
   Truck,
   Users,
-  LayoutDashboard,
   X,
   CreditCard,
   Landmark,
@@ -42,7 +41,6 @@ const ADMIN_SECTIONS = [
   {
     title: "Análisis & Reportes",
     items: [
-      { href: "/dashboard",     label: "Dashboard General", icon: LayoutDashboard },
       { href: "/dashboard-kpis", label: "📊 KPIs Tiempo Real", icon: BarChart3 },
       { href: "/reports",       label: "📈 Reportes",   icon: BarChart3 },
       { href: "/analytics",     label: "Analítica Avanzada", icon: TrendingUp },

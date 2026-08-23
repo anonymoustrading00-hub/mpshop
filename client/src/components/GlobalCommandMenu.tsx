@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/command";
 import {
   Home,
-  LayoutDashboard,
   ShoppingBag,
   Package,
   Truck,
@@ -37,7 +36,6 @@ const NAV_ITEMS = [
   { label: "Códigos QR", href: "/generate-codes", icon: Package, keywords: "codigos qr etiquetas imprimir" },
   { label: "Ventas y Cotizaciones", href: "/sales", icon: ShoppingBag, keywords: "ventas cotizaciones venta pos caja" },
   { label: "Pedidos / Entregas", href: "/orders", icon: Truck, keywords: "pedidos entregas repartidor" },
-  { label: "Dashboard General", href: "/dashboard", icon: LayoutDashboard, keywords: "dashboard panel estadísticas" },
   { label: "📊 KPIs Tiempo Real", href: "/dashboard-kpis", icon: BarChart2, keywords: "kpis indicadores metricas tiempo real" },
   { label: "📈 Reportes Ejecutivos", href: "/reports", icon: BarChart2, keywords: "reportes informes reporte pdf exportar" },
   { label: "Analítica Avanzada", href: "/analytics", icon: FileText, keywords: "analitica avanzada margen rotacion" },

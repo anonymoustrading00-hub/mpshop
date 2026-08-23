@@ -4,7 +4,6 @@ import MobileMenu from "./MobileMenu";
 import { Link, useLocation } from "wouter";
 import {
   ChevronRight,
-  LayoutDashboard,
   ShoppingBag,
   Package,
   TrendingUp,
@@ -64,7 +63,6 @@ export const ADMIN_NAV_ROW1: NavItem[] = [
 export const ADMIN_NAV_ROW2: NavItem[] = [
   { href: "/dashboard-kpis",      label: "📊 KPIs",        icon: BarChart3,        moduleKey: "dashboard-kpis" },
   { href: "/reports",             label: "📈 Reportes",    icon: BarChart3,        moduleKey: "reports" },
-  { href: "/dashboard",           label: "Dashboard",      icon: LayoutDashboard,  moduleKey: "dashboard" },
   { href: "/analytics",           label: "Analítica",      icon: TrendingUp,       moduleKey: "analytics" },
   { href: "/rentabilidad",        label: "💰 Rentabilidad",icon: TrendingUp,       moduleKey: "finance" },
   { href: "/finance",             label: "Finanzas",       icon: DollarSign,       moduleKey: "finance" },

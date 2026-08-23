@@ -10,7 +10,6 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Home from "@/pages/Home";
-import Dashboard from "@/pages/Dashboard";
 import Branches from "@/pages/Branches";
 import Orders from "@/pages/Orders";
 import Units from "@/pages/Units";
@@ -148,9 +147,6 @@ function Router() {
       <div className="pb-20 md:pb-0">
         <Switch>
           <Route path={"/"} component={Home} />
-          <Route path="/dashboard">
-            <ProtectedRoute component={Dashboard} adminOnly={true} />
-          </Route>
           <Route path="/units">
             <ProtectedRoute component={Units} />
           </Route>
