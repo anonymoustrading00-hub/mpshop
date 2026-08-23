@@ -63,6 +63,8 @@ export default function Purchases() {
   const [showEdit, setShowEdit] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPayment, setFilterPayment] = useState<string>("all");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
 
   const [purchaseData, setPurchaseData] = useState({
     purchaseNumber: "COM-" + Math.floor(Math.random() * 10000),
@@ -231,9 +233,12 @@ export default function Purchases() {
         p.purchaseNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.supplierName?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesPayment = filterPayment === "all" || p.paymentMethod === filterPayment || (filterPayment === "credit" && p.isCredit === 1);
-      return matchesSearch && matchesPayment;
+      const purchaseDate = p.createdAt ? new Date(p.createdAt) : null;
+      const matchesFrom = !filterDateFrom || (purchaseDate && purchaseDate >= new Date(filterDateFrom + "T00:00:00"));
+      const matchesTo = !filterDateTo || (purchaseDate && purchaseDate <= new Date(filterDateTo + "T23:59:59"));
+      return matchesSearch && matchesPayment && matchesFrom && matchesTo;
     });
-  }, [purchases, searchQuery, filterPayment]);
+  }, [purchases, searchQuery, filterPayment, filterDateFrom, filterDateTo]);
 
   const totalSpent = useMemo(() => {
     if (!purchases) return 0;
@@ -392,29 +397,63 @@ export default function Purchases() {
           </div>
 
           {/* Filtros */}
-          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Buscar por N° Nota o Proveedor..."
-                className="pl-9 h-11 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+          <div className="flex flex-col gap-3 w-full md:w-auto">
+            {/* Fila 1: búsqueda + método de pago */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1 md:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Buscar por N° Nota o Proveedor..."
+                  className="pl-9 h-11 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <Select value={filterPayment} onValueChange={setFilterPayment}>
+                <SelectTrigger className="w-full sm:w-44 h-11 rounded-xl border-slate-200 bg-slate-50/50">
+                  <SelectValue placeholder="Método de pago" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los pagos</SelectItem>
+                  <SelectItem value="cash">Efectivo</SelectItem>
+                  <SelectItem value="qr">Transferencia QR</SelectItem>
+                  <SelectItem value="transfer">Cuenta Bancaria</SelectItem>
+                  <SelectItem value="credit">A Crédito</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <Select value={filterPayment} onValueChange={setFilterPayment}>
-              <SelectTrigger className="w-full sm:w-44 h-11 rounded-xl border-slate-200 bg-slate-50/50">
-                <SelectValue placeholder="Método de pago" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los pagos</SelectItem>
-                <SelectItem value="cash">Efectivo</SelectItem>
-                <SelectItem value="qr">Transferencia QR</SelectItem>
-                <SelectItem value="transfer">Cuenta Bancaria</SelectItem>
-                <SelectItem value="credit">A Crédito</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Fila 2: rango de fechas */}
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-xs font-semibold text-slate-400 shrink-0">Desde</span>
+                <Input
+                  type="date"
+                  value={filterDateFrom}
+                  onChange={(e) => setFilterDateFrom(e.target.value)}
+                  className="h-10 rounded-xl border-slate-200 bg-slate-50/50 text-sm flex-1 sm:w-40"
+                />
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-xs font-semibold text-slate-400 shrink-0">Hasta</span>
+                <Input
+                  type="date"
+                  value={filterDateTo}
+                  onChange={(e) => setFilterDateTo(e.target.value)}
+                  className="h-10 rounded-xl border-slate-200 bg-slate-50/50 text-sm flex-1 sm:w-40"
+                />
+              </div>
+              {(filterDateFrom || filterDateTo) && (
+                <button
+                  onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
+                  className="text-xs text-slate-400 hover:text-red-500 transition-colors shrink-0 px-2"
+                  title="Limpiar fechas"
+                >
+                  ✕ Limpiar
+                </button>
+              )}
+            </div>
           </div>
         </CardHeader>
 

@@ -57,7 +57,7 @@ export const ADMIN_NAV_ROW1: NavItem[] = [
   { href: "/generate-codes",   label: "Códigos QR",   icon: Tag,         moduleKey: "generate-codes" },
   { href: "/customers",        label: "Clientes",     icon: Users,       moduleKey: "customers" },
   { href: "/suppliers",        label: "Proveedores",  icon: Users,       moduleKey: "suppliers" },
-  { href: "/purchases",        label: "Compras",      icon: ShoppingCart, moduleKey: "purchases" },
+  // Compras oculto del nav — se gestiona desde el módulo de Unidades
 ];
 
 export const ADMIN_NAV_ROW2: NavItem[] = [

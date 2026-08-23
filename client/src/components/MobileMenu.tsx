@@ -60,7 +60,6 @@ const ADMIN_SECTIONS = [
   {
     title: "Finanzas",
     items: [
-      { href: "/purchases",        label: "Compras",      icon: ShoppingCart },
       { href: "/finance",          label: "Finanzas & Caja", icon: DollarSign },
       { href: "/accounts-receivable", label: "C. por Cobrar", icon: CreditCard },
       { href: "/accounts-payable", label: "C. por Pagar", icon: Landmark },

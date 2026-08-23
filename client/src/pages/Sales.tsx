@@ -259,7 +259,8 @@ export default function Sales() {
 
   const [historySearch, setHistorySearch] = useState("");
   const [isFiltersVisible, setIsFiltersVisible] = useState(false);
-  const [historyDate, setHistoryDate] = useState("");
+  const [historyDateFrom, setHistoryDateFrom] = useState("");
+  const [historyDateTo, setHistoryDateTo] = useState("");
   const [historyStatus, setHistoryStatus] = useState<"all" | "completed" | "cancelled">("all");
   const productSearchRef = useRef<HTMLInputElement>(null);
 
@@ -472,15 +473,15 @@ export default function Sales() {
         (sale.customerDisplayName || "").toLowerCase().includes(historySearch.toLowerCase()) ||
         (sale.sellerName || "").toLowerCase().includes(historySearch.toLowerCase());
 
-      const matchesDate =
-        !historyDate ||
-        new Date(sale.createdAt).toISOString().startsWith(historyDate);
+      const saleDate = sale.createdAt ? new Date(sale.createdAt) : null;
+      const matchesFrom = !historyDateFrom || (saleDate && saleDate >= new Date(historyDateFrom + "T00:00:00"));
+      const matchesTo = !historyDateTo || (saleDate && saleDate <= new Date(historyDateTo + "T23:59:59"));
 
       const matchesStatus = historyStatus === "all" || sale.status === historyStatus;
 
-      return matchesSearch && matchesDate && matchesStatus;
+      return matchesSearch && matchesFrom && matchesTo && matchesStatus;
     });
-  }, [historyDate, historySearch, historyStatus, salesList]);
+  }, [historyDateFrom, historyDateTo, historySearch, historyStatus, salesList]);
 
   const handlePricingModeChange = (mode: "unit" | "discount" | "wholesale") => {
     setCurrentPricingMode(mode);
@@ -799,7 +800,33 @@ export default function Sales() {
                   className="w-full pl-9 md:w-80 h-11 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white"
                 />
               </div>
-              <Input type="date" value={historyDate} onChange={(event) => setHistoryDate(event.target.value)} className="w-full md:w-44 h-11 rounded-xl border-slate-200 bg-slate-50/50" />
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-400 shrink-0">Desde</span>
+                <Input
+                  type="date"
+                  value={historyDateFrom}
+                  onChange={(event) => setHistoryDateFrom(event.target.value)}
+                  className="h-11 rounded-xl border-slate-200 bg-slate-50/50 text-sm w-40"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-400 shrink-0">Hasta</span>
+                <Input
+                  type="date"
+                  value={historyDateTo}
+                  onChange={(event) => setHistoryDateTo(event.target.value)}
+                  className="h-11 rounded-xl border-slate-200 bg-slate-50/50 text-sm w-40"
+                />
+              </div>
+              {(historyDateFrom || historyDateTo) && (
+                <button
+                  onClick={() => { setHistoryDateFrom(""); setHistoryDateTo(""); }}
+                  className="text-xs text-slate-400 hover:text-red-500 transition-colors shrink-0 px-2 self-center"
+                  title="Limpiar fechas"
+                >
+                  ✕ Limpiar
+                </button>
+              )}
               <Select value={historyStatus} onValueChange={(value: "all" | "completed" | "cancelled") => setHistoryStatus(value)}>
                 <SelectTrigger className="w-full md:w-44 h-11 rounded-xl border-slate-200 bg-slate-50/50">
                   <SelectValue />
