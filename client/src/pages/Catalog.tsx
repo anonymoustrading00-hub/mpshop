@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,14 +7,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { SpecsCard } from "@/components/SpecsCard";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   Laptop, Package, Search, Filter, Printer, Camera, CheckCircle,
   Tag, Grid, List, ChevronRight, Cpu, HardDrive, Battery, Activity,
   Star, TrendingUp, ShoppingBag, Wrench, Eye, ImageIcon, X, FileText, UserCheck, ShieldAlert,
-  Play, ExternalLink, Video, Sparkles
+  Play, ExternalLink, Video, Sparkles, Boxes, Layers, QrCode, ArrowRight
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { CommercialCatalogModal } from "@/components/CommercialCatalogModal";
@@ -261,6 +261,192 @@ function UnitCard({
   );
 }
 
+/* ─── Grouped Product Card Component ───────────────────────────── */
+interface GroupedProduct {
+  key: string;
+  brand: string;
+  model: string;
+  type: string;
+  units: any[];
+  availableCount: number;
+  inRepairCount: number;
+  inDiagnosisCount: number;
+  soldCount: number;
+  returnedCount: number;
+  primaryUnit: any;
+  photos: string[];
+  salePrice: number;
+  discountPrice?: number;
+  wholesalePrice?: number;
+  specs: any;
+  tiktokUrl?: string;
+}
+
+function GroupedProductCard({
+  group,
+  onOpenGroupUnits,
+  onOpenDetail,
+  onOpenCommercialSheet,
+}: {
+  group: GroupedProduct;
+  onOpenGroupUnits: () => void;
+  onOpenDetail: () => void;
+  onOpenCommercialSheet: (unitId: number) => void;
+}) {
+  const mainPhoto = group.photos[0];
+  const specs = group.specs || {};
+
+  return (
+    <div
+      className="catalog-card group relative bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden cursor-pointer flex flex-col justify-between"
+      onClick={onOpenDetail}
+    >
+      <div>
+        {/* Photo & Stock Badge */}
+        <div className="relative w-full h-44 bg-gradient-to-br from-slate-50 to-slate-100 overflow-hidden">
+          {mainPhoto ? (
+            <img
+              src={mainPhoto}
+              alt={`${group.brand} ${group.model}`}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 gap-2">
+              {group.type === "laptop" ? <Laptop className="h-14 w-14" /> : <Package className="h-14 w-14 text-slate-400" />}
+              <span className="text-xs font-medium">Sin foto</span>
+            </div>
+          )}
+
+          {/* Badge de Stock en la esquina superior derecha */}
+          <div className="absolute top-2 right-2 z-10 flex flex-col items-end gap-1">
+            {group.availableCount > 0 ? (
+              <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-2.5 py-1 shadow-md gap-1">
+                <ShoppingBag className="h-3.5 w-3.5" />
+                {group.availableCount} {group.availableCount === 1 ? "disponible" : "disponibles"}
+              </Badge>
+            ) : group.units.length > 0 ? (
+              <Badge className="bg-amber-600 text-white font-bold text-xs px-2.5 py-1 shadow-md">
+                {group.inRepairCount > 0 ? `${group.inRepairCount} en taller` : "Sin disponibles"}
+              </Badge>
+            ) : (
+              <Badge className="bg-slate-500 text-white font-bold text-xs">Agotado</Badge>
+            )}
+
+            {group.inRepairCount > 0 && group.availableCount > 0 && (
+              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-[10px] py-0.5 px-1.5 font-bold">
+                <Wrench className="h-2.5 w-2.5 mr-1 inline" />
+                {group.inRepairCount} en taller
+              </Badge>
+            )}
+          </div>
+
+          {/* Badge de Tipo de Producto en la esquina superior izquierda */}
+          <div className="absolute top-2 left-2 z-10">
+            <Badge variant="outline" className="bg-white/90 backdrop-blur-sm text-slate-700 font-bold text-[10px] border-slate-200 uppercase tracking-wider">
+              {group.type}
+            </Badge>
+          </div>
+
+          {/* Photo count */}
+          {group.photos.length > 1 && (
+            <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 bg-black/60 text-white text-[10px] rounded-full">
+              <Camera className="h-2.5 w-2.5" />
+              {group.photos.length}
+            </div>
+          )}
+
+          {/* TikTok badge */}
+          {group.tiktokUrl && (
+            <div className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-0.5 bg-pink-600 text-white text-[10px] font-bold rounded-full shadow">
+              <Video className="h-2.5 w-2.5" />
+              TikTok
+            </div>
+          )}
+        </div>
+
+        {/* Info */}
+        <div className="p-4 space-y-2">
+          <div>
+            <h3 className="font-black text-slate-900 text-base leading-tight">
+              {group.brand} {group.model}
+            </h3>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              {group.units.length} {group.units.length === 1 ? "unidad registrada" : "unidades registradas en total"}
+            </p>
+          </div>
+
+          {group.type === "laptop" && (
+            <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-500 pt-1">
+              {specs.cpu && (
+                <div className="flex items-center gap-1">
+                  <Cpu className="h-3 w-3 text-blue-500" />
+                  <span className="truncate">{specs.cpu}</span>
+                </div>
+              )}
+              {(specs.ram || specs.storage) && (
+                <div className="flex items-center gap-1">
+                  <HardDrive className="h-3 w-3 text-purple-500" />
+                  <span className="truncate">{specs.ram} | {specs.storage}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer con Precios y Botones */}
+      <div className="p-4 pt-0 border-t border-slate-100 mt-2 space-y-2.5">
+        <div className="flex items-center justify-between pt-2">
+          <div>
+            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Precio Venta (Bs):</div>
+            <div className="text-xl font-black text-blue-600">
+              {group.salePrice ? `Bs. ${(group.salePrice / 100).toFixed(0)}` : <span className="text-slate-400 text-sm">Sin precio</span>}
+            </div>
+          </div>
+          {group.wholesalePrice ? (
+            <div className="text-right">
+              <div className="text-[10px] text-green-700 font-bold uppercase tracking-wider">Por Mayor:</div>
+              <div className="text-sm font-bold text-green-700">
+                Bs. {(group.wholesalePrice / 100).toFixed(0)}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenGroupUnits();
+            }}
+            className="text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-200 gap-1 h-8"
+          >
+            <Boxes className="h-3.5 w-3.5" />
+            Ver ({group.units.length} uds.)
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (group.primaryUnit?.id) {
+                onOpenCommercialSheet(group.primaryUnit.id);
+              }
+            }}
+            className="text-xs font-bold text-slate-700 hover:text-blue-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 gap-1 h-8"
+          >
+            <FileText className="h-3.5 w-3.5 text-blue-600" />
+            Ficha PDF
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Printable Catalog Card ─────────────────────────────────────── */
 function PrintableCard({ unit }: { unit: any }) {
   const photos: string[] = unit.photos ? (typeof unit.photos === "string" ? JSON.parse(unit.photos) : unit.photos) : [];
@@ -335,12 +521,83 @@ export default function Catalog() {
   const [completeLaborCost, setCompleteLaborCost] = useState("");
   const [completePartsCost, setCompletePartsCost] = useState("");
 
+  // Modo de visualización del Catálogo: Agrupado por Producto (por defecto) o Individual por serie
+  const [catalogMode, setCatalogMode] = useState<"grouped" | "individual">("grouped");
+  const [selectedGroupForUnits, setSelectedGroupForUnits] = useState<GroupedProduct | null>(null);
+  const [isGroupUnitsModalOpen, setIsGroupUnitsModalOpen] = useState(false);
+
   const { data: unitsData, isLoading, refetch } = trpc.units.list.useQuery({
     search: search || undefined,
     type: typeFilter !== "all" ? (typeFilter as any) : undefined,
     status: statusTab !== "all" ? (statusTab as any) : undefined,
-    limit: 200,
+    limit: 500,
   });
+
+  const items: any[] = unitsData?.items || [];
+
+  // Agrupación automática de unidades por Tipo + Marca + Modelo
+  const groupedProducts = useMemo<GroupedProduct[]>(() => {
+    const groupsMap = new Map<string, GroupedProduct>();
+
+    for (const unit of items) {
+      const brandClean = (unit.brand || "").trim();
+      const modelClean = (unit.model || "").trim();
+      const typeClean = unit.type || "other";
+      const key = `${typeClean}___${brandClean.toLowerCase()}___${modelClean.toLowerCase()}`;
+
+      if (!groupsMap.has(key)) {
+        const photos: string[] = unit.photos
+          ? typeof unit.photos === "string"
+            ? JSON.parse(unit.photos)
+            : unit.photos
+          : [];
+        groupsMap.set(key, {
+          key,
+          brand: brandClean,
+          model: modelClean,
+          type: typeClean,
+          units: [unit],
+          availableCount: unit.status === "available" ? 1 : 0,
+          inRepairCount: unit.status === "in_repair" ? 1 : 0,
+          inDiagnosisCount: unit.status === "in_diagnosis" ? 1 : 0,
+          soldCount: unit.status === "sold" ? 1 : 0,
+          returnedCount: unit.status === "returned" ? 1 : 0,
+          primaryUnit: unit,
+          photos: photos,
+          salePrice: unit.salePrice || 0,
+          discountPrice: unit.discountPrice || undefined,
+          wholesalePrice: unit.wholesalePrice || undefined,
+          specs: unit.specs || {},
+          tiktokUrl: unit.tiktokUrl || undefined,
+        });
+      } else {
+        const group = groupsMap.get(key)!;
+        group.units.push(unit);
+        if (unit.status === "available") group.availableCount++;
+        else if (unit.status === "in_repair") group.inRepairCount++;
+        else if (unit.status === "in_diagnosis") group.inDiagnosisCount++;
+        else if (unit.status === "sold") group.soldCount++;
+        else if (unit.status === "returned") group.returnedCount++;
+
+        // Si la unidad actual tiene fotos y el grupo no tenía, asignarlas
+        if (group.photos.length === 0 && unit.photos) {
+          const unitPhotos = typeof unit.photos === "string" ? JSON.parse(unit.photos) : unit.photos;
+          if (unitPhotos.length > 0) {
+            group.photos = unitPhotos;
+            group.primaryUnit = unit;
+          }
+        }
+        if (!group.tiktokUrl && unit.tiktokUrl) {
+          group.tiktokUrl = unit.tiktokUrl;
+        }
+        if (!group.salePrice && unit.salePrice) {
+          group.salePrice = unit.salePrice;
+        }
+      }
+    }
+
+    return Array.from(groupsMap.values());
+  }, [items]);
 
   const changeStatusMutation = trpc.units.changeStatus.useMutation({
     onSuccess: () => {
@@ -360,8 +617,6 @@ export default function Catalog() {
       setWorkOrderModalOpen(true);
     },
   });
-
-  const items: any[] = unitsData?.items || [];
 
   const handleOpenCompleteRepair = (unit: any) => {
     setCompletingUnit(unit);
@@ -595,56 +850,114 @@ export default function Catalog() {
 
         {/* Filters Bar */}
         <div className="container mx-auto px-4 md:px-6 py-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Buscar por marca, modelo, código..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 bg-white border-slate-200 shadow-sm"
-              />
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 flex-1">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Buscar por marca, modelo, código..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 bg-white border-slate-200 shadow-sm"
+                />
+              </div>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-44 bg-white border-slate-200 shadow-sm">
+                  <Filter className="h-4 w-4 mr-2 text-slate-400" />
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los tipos</SelectItem>
+                  <SelectItem value="laptop">Laptops</SelectItem>
+                  <SelectItem value="tablet">Tablets</SelectItem>
+                  <SelectItem value="phone">Celulares</SelectItem>
+                  <SelectItem value="monitor">Monitores</SelectItem>
+                  <SelectItem value="charger">Cargadores</SelectItem>
+                  <SelectItem value="accessory">Accesorios / Repuestos</SelectItem>
+                  <SelectItem value="other">Otros</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-44 bg-white border-slate-200 shadow-sm">
-                <Filter className="h-4 w-4 mr-2 text-slate-400" />
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los tipos</SelectItem>
-                <SelectItem value="laptop">Laptops</SelectItem>
-                <SelectItem value="accessory">Accesorios</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="flex items-center border border-slate-200 rounded-xl bg-white shadow-sm overflow-hidden">
-              <button
-                onClick={() => setViewMode("grid")}
-                className={`p-2.5 transition-colors ${viewMode === "grid" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-700"}`}
-              >
-                <Grid className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setViewMode("list")}
-                className={`p-2.5 transition-colors ${viewMode === "list" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-700"}`}
-              >
-                <List className="h-4 w-4" />
-              </button>
+
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              {/* Selector de Modo: Agrupado por Producto vs Unidades Individuales */}
+              <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => setCatalogMode("grouped")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    catalogMode === "grouped"
+                      ? "bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-400 shadow-sm"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                  }`}
+                  title="Muestra 1 tarjeta por modelo de producto con su stock total"
+                >
+                  <Boxes className="h-3.5 w-3.5" />
+                  Por Producto ({groupedProducts.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCatalogMode("individual")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    catalogMode === "individual"
+                      ? "bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-400 shadow-sm"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                  }`}
+                  title="Muestra todas las unidades físicas y códigos de forma desglosada"
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                  Por Unidad ({items.length})
+                </button>
+              </div>
+
+              {/* Botones de Vista Grid / List */}
+              <div className="flex items-center border border-slate-200 rounded-xl bg-white shadow-sm overflow-hidden">
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`p-2.5 transition-colors ${viewMode === "grid" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-700"}`}
+                  title="Vista en Cuadrícula"
+                >
+                  <Grid className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`p-2.5 transition-colors ${viewMode === "list" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-700"}`}
+                  title="Vista en Lista"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Stats strip */}
-          <div className="flex items-center gap-4 mt-3 text-sm text-slate-500">
-            <span className="font-semibold text-slate-800">{items.length} artículo{items.length !== 1 ? "s" : ""}</span>
+          <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-slate-500">
+            {catalogMode === "grouped" ? (
+              <span className="font-bold text-slate-800">
+                {groupedProducts.length} producto{groupedProducts.length !== 1 ? "s" : ""} · {items.length} unidades físicas en inventario
+              </span>
+            ) : (
+              <span className="font-bold text-slate-800">
+                {items.length} unidad{items.length !== 1 ? "es" : ""} física{items.length !== 1 ? "s" : ""}
+              </span>
+            )}
+
             {items.filter(u => u.status === "available").length > 0 && (
-              <span className="flex items-center gap-1 text-green-600 font-medium">
+              <span className="flex items-center gap-1 text-emerald-600 font-semibold">
                 <ShoppingBag className="h-3.5 w-3.5" />
-                {items.filter(u => u.status === "available").length} para la venta
+                {items.filter(u => u.status === "available").length} disponibles para la venta
               </span>
             )}
             {items.filter(u => u.status === "in_repair").length > 0 && (
-              <span className="flex items-center gap-1 text-red-500 font-medium">
+              <span className="flex items-center gap-1 text-red-500 font-semibold">
                 <Wrench className="h-3.5 w-3.5" />
                 {items.filter(u => u.status === "in_repair").length} en taller
+              </span>
+            )}
+            {items.filter(u => u.status === "in_diagnosis").length > 0 && (
+              <span className="flex items-center gap-1 text-amber-600 font-semibold">
+                <Activity className="h-3.5 w-3.5" />
+                {items.filter(u => u.status === "in_diagnosis").length} en diagnóstico
               </span>
             )}
           </div>
@@ -665,7 +978,7 @@ export default function Catalog() {
                 </div>
               ))}
             </div>
-          ) : items.length === 0 ? (
+          ) : (catalogMode === "grouped" ? groupedProducts.length === 0 : items.length === 0) ? (
             <div className="flex flex-col items-center justify-center py-24 text-center gap-4">
               <div className="p-5 bg-slate-100 rounded-full">
                 <Package className="h-12 w-12 text-slate-400" />
@@ -683,82 +996,308 @@ export default function Catalog() {
                 </Button>
               </a>
             </div>
-          ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {items.map((unit) => (
-                <UnitCard
-                  key={unit.id}
-                  unit={unit}
-                  onSelect={() => { setSelectedUnit(unit); setIsDetailOpen(true); }}
-                  onStatusChange={(newStatus) => handleStatusChangeRequest(unit, newStatus)}
-                  onOpenCommercialSheet={(uId) => {
-                    setCommercialSheetUnitId(uId);
-                    setIsCommercialSheetOpen(true);
-                  }}
-                />
-              ))}
-            </div>
-          ) : (
-            // List view
-            <div className="space-y-3">
-              {items.map((unit) => {
-                const photos: string[] = unit.photos ? (typeof unit.photos === "string" ? JSON.parse(unit.photos) : unit.photos) : [];
-                const specs = unit.specs || {};
-                return (
-                  <div
-                    key={unit.id}
-                    onClick={() => { setSelectedUnit(unit); setIsDetailOpen(true); }}
-                    className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 cursor-pointer overflow-hidden"
-                  >
-                    <div className="flex items-center gap-4 p-4 flex-wrap sm:flex-nowrap">
-                      <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-50 shrink-0 flex items-center justify-center">
-                        {photos[0]
-                          ? <img src={photos[0]} alt="" className="w-full h-full object-cover" />
-                          : <Laptop className="h-8 w-8 text-slate-300" />
+          ) : catalogMode === "grouped" ? (
+            // ═══════════ VISTA AGRUPADA POR PRODUCTO / MODELO ═══════════
+            viewMode === "grid" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                {groupedProducts.map((group) => (
+                  <GroupedProductCard
+                    key={group.key}
+                    group={group}
+                    onOpenGroupUnits={() => {
+                      setSelectedGroupForUnits(group);
+                      setIsGroupUnitsModalOpen(true);
+                    }}
+                    onOpenDetail={() => {
+                      if (group.primaryUnit) {
+                        setSelectedUnit(group.primaryUnit);
+                        setIsDetailOpen(true);
+                      }
+                    }}
+                    onOpenCommercialSheet={(uId) => {
+                      setCommercialSheetUnitId(uId);
+                      setIsCommercialSheetOpen(true);
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              // Vista Agrupada en Lista
+              <div className="space-y-3">
+                {groupedProducts.map((group) => {
+                  const mainPhoto = group.photos[0];
+                  const specs = group.specs || {};
+                  return (
+                    <div
+                      key={group.key}
+                      onClick={() => {
+                        if (group.primaryUnit) {
+                          setSelectedUnit(group.primaryUnit);
+                          setIsDetailOpen(true);
                         }
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-mono text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">{unit.code}</span>
-                          <UnitStatusSelect
-                            currentStatus={unit.status}
-                            onStatusChange={(newStatus) => handleStatusChangeRequest(unit, newStatus)}
-                          />
+                      }}
+                      className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 cursor-pointer overflow-hidden"
+                    >
+                      <div className="flex items-center gap-4 p-4 flex-wrap sm:flex-nowrap">
+                        <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-50 shrink-0 flex items-center justify-center">
+                          {mainPhoto ? (
+                            <img src={mainPhoto} alt="" className="w-full h-full object-cover" />
+                          ) : group.type === "laptop" ? (
+                            <Laptop className="h-8 w-8 text-slate-300" />
+                          ) : (
+                            <Package className="h-8 w-8 text-slate-300" />
+                          )}
                         </div>
-                        <div className="font-bold text-slate-900">{unit.brand} {unit.model}</div>
-                        {unit.type === "laptop" && (
-                          <div className="text-xs text-slate-500 mt-0.5">{specs.cpu} · {specs.ram} · {specs.storage}</div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <div className="text-right">
-                          <div className="text-xl font-black text-blue-600">
-                            {unit.salePrice ? `Bs. ${(unit.salePrice / 100).toFixed(0)}` : <span className="text-slate-400 text-sm">Sin precio</span>}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <Badge variant="outline" className="text-[10px] uppercase font-bold text-slate-600 bg-slate-50">
+                              {group.type}
+                            </Badge>
+                            {group.availableCount > 0 ? (
+                              <Badge className="bg-emerald-600 text-white font-bold text-xs gap-1">
+                                <ShoppingBag className="h-3 w-3" />
+                                {group.availableCount} {group.availableCount === 1 ? "disponible" : "disponibles"}
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-amber-600 text-white font-bold text-xs">
+                                {group.inRepairCount > 0 ? `${group.inRepairCount} en taller` : "Sin stock"}
+                              </Badge>
+                            )}
+                            <span className="text-xs text-slate-400">({group.units.length} uds. en total)</span>
                           </div>
+                          <div className="font-bold text-slate-900 text-base">{group.brand} {group.model}</div>
+                          {group.type === "laptop" && (
+                            <div className="text-xs text-slate-500 mt-0.5">
+                              {specs.cpu} {specs.ram ? `· ${specs.ram}` : ""} {specs.storage ? `· ${specs.storage}` : ""}
+                            </div>
+                          )}
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCommercialSheetUnitId(unit.id);
-                            setIsCommercialSheetOpen(true);
-                          }}
-                          className="text-xs font-bold text-slate-700 hover:text-blue-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 gap-1.5 h-8 shrink-0"
-                        >
-                          <FileText className="h-3.5 w-3.5 text-blue-600" />
-                          Ficha Comercial
-                        </Button>
-                        <ChevronRight className="h-5 w-5 text-slate-300 shrink-0" />
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <div className="text-xl font-black text-blue-600">
+                              {group.salePrice ? `Bs. ${(group.salePrice / 100).toFixed(0)}` : <span className="text-slate-400 text-sm">Sin precio</span>}
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedGroupForUnits(group);
+                              setIsGroupUnitsModalOpen(true);
+                            }}
+                            className="text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-200 gap-1.5 h-8 shrink-0"
+                          >
+                            <Boxes className="h-3.5 w-3.5" />
+                            Ver ({group.units.length})
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (group.primaryUnit?.id) {
+                                setCommercialSheetUnitId(group.primaryUnit.id);
+                                setIsCommercialSheetOpen(true);
+                              }
+                            }}
+                            className="text-xs font-bold text-slate-700 hover:text-blue-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 gap-1.5 h-8 shrink-0"
+                          >
+                            <FileText className="h-3.5 w-3.5 text-blue-600" />
+                            Ficha Comercial
+                          </Button>
+                          <ChevronRight className="h-5 w-5 text-slate-300 shrink-0" />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            // ═══════════ VISTA INDIVIDUAL POR SERIE / CÓDIGO ═══════════
+            viewMode === "grid" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                {items.map((unit) => (
+                  <UnitCard
+                    key={unit.id}
+                    unit={unit}
+                    onSelect={() => { setSelectedUnit(unit); setIsDetailOpen(true); }}
+                    onStatusChange={(newStatus) => handleStatusChangeRequest(unit, newStatus)}
+                    onOpenCommercialSheet={(uId) => {
+                      setCommercialSheetUnitId(uId);
+                      setIsCommercialSheetOpen(true);
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              // List view
+              <div className="space-y-3">
+                {items.map((unit) => {
+                  const photos: string[] = unit.photos ? (typeof unit.photos === "string" ? JSON.parse(unit.photos) : unit.photos) : [];
+                  const specs = unit.specs || {};
+                  return (
+                    <div
+                      key={unit.id}
+                      onClick={() => { setSelectedUnit(unit); setIsDetailOpen(true); }}
+                      className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 cursor-pointer overflow-hidden"
+                    >
+                      <div className="flex items-center gap-4 p-4 flex-wrap sm:flex-nowrap">
+                        <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-50 shrink-0 flex items-center justify-center">
+                          {photos[0]
+                            ? <img src={photos[0]} alt="" className="w-full h-full object-cover" />
+                            : <Laptop className="h-8 w-8 text-slate-300" />
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">{unit.code}</span>
+                            <UnitStatusSelect
+                              currentStatus={unit.status}
+                              onStatusChange={(newStatus) => handleStatusChangeRequest(unit, newStatus)}
+                            />
+                          </div>
+                          <div className="font-bold text-slate-900">{unit.brand} {unit.model}</div>
+                          {unit.type === "laptop" && (
+                            <div className="text-xs text-slate-500 mt-0.5">{specs.cpu} · {specs.ram} · {specs.storage}</div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <div className="text-xl font-black text-blue-600">
+                              {unit.salePrice ? `Bs. ${(unit.salePrice / 100).toFixed(0)}` : <span className="text-slate-400 text-sm">Sin precio</span>}
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCommercialSheetUnitId(unit.id);
+                              setIsCommercialSheetOpen(true);
+                            }}
+                            className="text-xs font-bold text-slate-700 hover:text-blue-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 gap-1.5 h-8 shrink-0"
+                          >
+                            <FileText className="h-3.5 w-3.5 text-blue-600" />
+                            Ficha Comercial
+                          </Button>
+                          <ChevronRight className="h-5 w-5 text-slate-300 shrink-0" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
           )}
         </div>
       </div>
+
+      {/* ═══════════ MODAL: LISTADO DE UNIDADES DEL PRODUCTO / LOTE ═══════════ */}
+      <Dialog open={isGroupUnitsModalOpen} onOpenChange={setIsGroupUnitsModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-slate-900 text-lg font-black">
+              <Boxes className="h-5 w-5 text-blue-600" />
+              Unidades en Inventario: {selectedGroupForUnits?.brand} {selectedGroupForUnits?.model}
+            </DialogTitle>
+            <DialogDescription>
+              Desglose de cada unidad física con su número de código/serie individual y estado actual.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedGroupForUnits && (
+            <div className="space-y-4 py-2 flex-1 overflow-y-auto pr-1">
+              {/* Badges de Resumen del Grupo */}
+              <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-700 dark:text-slate-300">Total registradas:</span>
+                  <Badge className="bg-slate-800 text-white font-bold">{selectedGroupForUnits.units.length} unidades</Badge>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge className="bg-emerald-600 text-white font-bold">
+                    {selectedGroupForUnits.availableCount} Disponibles
+                  </Badge>
+                  {selectedGroupForUnits.inRepairCount > 0 && (
+                    <Badge className="bg-red-600 text-white font-bold">
+                      {selectedGroupForUnits.inRepairCount} En Taller
+                    </Badge>
+                  )}
+                  {selectedGroupForUnits.inDiagnosisCount > 0 && (
+                    <Badge className="bg-amber-600 text-white font-bold">
+                      {selectedGroupForUnits.inDiagnosisCount} En Diagnóstico
+                    </Badge>
+                  )}
+                  {selectedGroupForUnits.soldCount > 0 && (
+                    <Badge className="bg-slate-500 text-white font-bold">
+                      {selectedGroupForUnits.soldCount} Vendidas
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Lista de Unidades Individuales */}
+              <div className="space-y-2">
+                {selectedGroupForUnits.units.map((u: any, idx: number) => {
+                  return (
+                    <div
+                      key={u.id}
+                      className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-white hover:border-blue-300 transition-all gap-3"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-xs font-bold text-slate-400 w-6">#{idx + 1}</span>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                              {u.code}
+                            </span>
+                            {u.serialNumber && (
+                              <span className="text-[11px] text-slate-500 font-mono">
+                                SN: {u.serialNumber}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-500 mt-0.5">
+                            {u.condition ? `Condición: ${u.condition}/10` : ""} {u.batteryHealth && u.batteryHealth !== "n_a" ? `· ${BATTERY_LABEL[u.batteryHealth]}` : ""}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <UnitStatusSelect
+                          currentStatus={u.status}
+                          onStatusChange={(newStatus) => {
+                            handleStatusChangeRequest(u, newStatus);
+                            u.status = newStatus;
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setSelectedUnit(u);
+                            setIsDetailOpen(true);
+                          }}
+                          className="h-8 text-xs font-bold text-blue-600 hover:bg-blue-50"
+                        >
+                          Ver Detalle
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsGroupUnitsModalOpen(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ═══════════ MODAL: FORMULARIO DE TRASPASO A TALLER ═══════════ */}
       <Dialog open={isWorkshopModalOpen} onOpenChange={setIsWorkshopModalOpen}>
