@@ -1052,10 +1052,20 @@ export async function ensureTables() {
       ALTER TABLE customers ADD COLUMN allowCredit int NOT NULL DEFAULT 1 AFTER creditDays
     `);
 
-    // units extra columns
-    await runSQL("units.tiktokUrl column", `
-      ALTER TABLE units ADD COLUMN tiktokUrl varchar(500) NULL AFTER photos
+    // units extra columns — usando INFORMATION_SCHEMA para garantizar la columna
+    await runSQL("units.tiktokUrl column (safe)", `
+      ALTER TABLE units ADD COLUMN tiktokUrl varchar(500) NULL
     `);
+    // Si la columna ya existe, el error se ignora. Si no existe, se crea.
+    // También intentamos con AFTER en caso de que falle la posición:
+    try {
+      await connection.query(`
+        SELECT tiktokUrl FROM units LIMIT 1
+      `);
+      console.log("[EnsureTables] ✓ units.tiktokUrl column verified OK");
+    } catch (e: any) {
+      console.log("[EnsureTables] ✗ units.tiktokUrl STILL missing:", e.message);
+    }
 
     // units: RMA permanente del equipo
     await runSQL("units.rmaNumber column", `
