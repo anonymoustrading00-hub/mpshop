@@ -649,7 +649,11 @@ export const unitsRouter = router({
           tiktokUrl: input.tiktokUrl || null,
         });
 
-        const newUnitId = result.insertId;
+        const newUnitId = result?.insertId || result?.[0]?.insertId;
+
+        if (!newUnitId) {
+          throw new Error("No se pudo obtener el ID de la unidad recién creada. insertId vacío.");
+        }
 
         // 2. Marcar código generado como asignado
         if (resolvedCodeId) {
@@ -659,12 +663,14 @@ export const unitsRouter = router({
             .where(eq(generatedCodes.id, resolvedCodeId));
         }
 
+        const finalStatus = input.status || defaultStatusForType(input.type);
+
         // 3. Evento de creación
         await tx.insert(unitEvents).values({
           unitId: newUnitId,
           eventType: "created",
           fromStatus: null,
-          toStatus: input.status,
+          toStatus: finalStatus,
           userId: ctx.user.id,
           notes: `Registro inicial de unidad ${input.type.toUpperCase()} ${input.brand} ${input.model}`,
         });
