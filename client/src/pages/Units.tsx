@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Laptop, HardDrive, QrCode, Search, Wrench, Shield, ArrowRightLeft, Plus, Cpu, Battery, Activity, ShoppingBag, CheckCircle, Package, Printer, Pencil, Trash2, X, BookOpen, Video, ExternalLink, Play, FileText, Sparkles, Camera, ImagePlus } from "lucide-react";
+import {
+  Laptop, HardDrive, QrCode, Search, Wrench, Shield, ArrowRightLeft, Plus, Cpu, Battery,
+  Activity, ShoppingBag, CheckCircle, Package, Printer, Pencil, Trash2, X, BookOpen, Video,
+  ExternalLink, Play, FileText, Sparkles, Camera, ImagePlus,
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Boxes, Layers, Table, Grid, List
+} from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { UnitKardex } from "@/components/UnitKardex";
 import { CommercialCatalogModal } from "@/components/CommercialCatalogModal";

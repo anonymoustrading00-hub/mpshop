@@ -29,6 +29,7 @@ import { dashboardRouter } from "./routers/dashboard";
 import { analyticsRouter } from "./routers/analytics";
 import { reportsExcelRouter } from "./routers/reports";
 import { settingsRouter } from "./routers/settings";
+import { employeesRouter } from "./routers/employees";
 import { authenticateUser, createSession } from "./auth";
 
 export const appRouter = router({
@@ -104,6 +105,7 @@ export const appRouter = router({
   analytics: analyticsRouter,
   reportsExcel: reportsExcelRouter,
   settings: settingsRouter,
+  employees: employeesRouter,
 });
 
 export type AppRouter = typeof appRouter;
