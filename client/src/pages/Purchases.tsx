@@ -315,7 +315,7 @@ export default function Purchases() {
 
         <Button
           onClick={() => setIsCreateOpen(true)}
-          className="h-14 px-8 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-lg gap-3 shadow-xl shadow-blue-600/20 transition-all hover:scale-105 active:scale-95"
+          className="hidden h-14 px-8 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-lg gap-3 shadow-xl shadow-blue-600/20 transition-all hover:scale-105 active:scale-95"
         >
           <Plus className="h-6 w-6" />
           Nueva Compra
