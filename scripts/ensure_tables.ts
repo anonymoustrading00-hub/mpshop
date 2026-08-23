@@ -47,6 +47,22 @@ export async function ensureTables() {
       )
     `);
 
+    await runSQL("users.phone column", `
+      ALTER TABLE users ADD COLUMN phone varchar(50) NULL
+    `);
+    await runSQL("users.status column", `
+      ALTER TABLE users ADD COLUMN status enum('active','inactive') NOT NULL DEFAULT 'active'
+    `);
+    await runSQL("users.allowedModules column", `
+      ALTER TABLE users ADD COLUMN allowedModules text NULL
+    `);
+    await runSQL("users.specialPermissions column", `
+      ALTER TABLE users ADD COLUMN specialPermissions text NULL
+    `);
+    await runSQL("users.assignedBranchIds column", `
+      ALTER TABLE users ADD COLUMN assignedBranchIds text NULL
+    `);
+
     // ============================================================
     // 2. SESSIONS
     // ============================================================
@@ -58,6 +74,31 @@ export async function ensureTables() {
         createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT sessions_id PRIMARY KEY(id)
       )
+    `);
+
+    // ============================================================
+    // 2b. BRANCHES
+    // ============================================================
+    await runSQL("branches table", `
+      CREATE TABLE IF NOT EXISTS branches (
+        id int AUTO_INCREMENT NOT NULL,
+        name varchar(255) NOT NULL,
+        address text,
+        phone varchar(50),
+        isMainWarehouse int NOT NULL DEFAULT 0,
+        status enum('active','inactive') NOT NULL DEFAULT 'active',
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT branches_id PRIMARY KEY(id)
+      )
+    `);
+
+    await runSQL("default branch", `
+      INSERT INTO branches (id, name, address, isMainWarehouse, status)
+      VALUES (1, 'Sucursal Principal', 'Principal', 1, 'active')
+      ON DUPLICATE KEY UPDATE
+        name = COALESCE(NULLIF(name, ''), VALUES(name)),
+        status = 'active'
     `);
 
     // ============================================================
@@ -321,8 +362,13 @@ export async function ensureTables() {
     await runSQL("operationalExpenses table", `
       CREATE TABLE IF NOT EXISTS operationalExpenses (
         id int AUTO_INCREMENT NOT NULL,
+        branchId int NOT NULL DEFAULT 1,
         description varchar(255) NOT NULL,
-        category enum('facebook_ads','google_ads','electricity','water','internet','telephone','rent','salaries','maintenance','supplies','taxes','insurance','bank_fees','other') NOT NULL,
+        category enum('facebook_ads','google_ads','electricity','water','internet','telephone','rent','salaries','maintenance','supplies','taxes','insurance','bank_fees','repair_cost','warranty_repair_cost','warranty_replacement_cost','cogs','other') NOT NULL,
+        costType varchar(50),
+        referenceType varchar(50),
+        referenceId int,
+        isAutomatic int NOT NULL DEFAULT 0,
         amount int NOT NULL,
         paymentMethod enum('cash','qr','transfer') NOT NULL,
         expenseDate timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -338,22 +384,50 @@ export async function ensureTables() {
       )
     `);
 
+    await runSQL("operationalExpenses.branchId column", `
+      ALTER TABLE operationalExpenses ADD COLUMN branchId int NOT NULL DEFAULT 1
+    `);
+    await runSQL("operationalExpenses.costType column", `
+      ALTER TABLE operationalExpenses ADD COLUMN costType varchar(50) NULL
+    `);
+    await runSQL("operationalExpenses.referenceType column", `
+      ALTER TABLE operationalExpenses ADD COLUMN referenceType varchar(50) NULL
+    `);
+    await runSQL("operationalExpenses.referenceId column", `
+      ALTER TABLE operationalExpenses ADD COLUMN referenceId int NULL
+    `);
+    await runSQL("operationalExpenses.isAutomatic column", `
+      ALTER TABLE operationalExpenses ADD COLUMN isAutomatic int NOT NULL DEFAULT 0
+    `);
+    await runSQL("operationalExpenses.category enum", `
+      ALTER TABLE operationalExpenses MODIFY COLUMN category enum('facebook_ads','google_ads','electricity','water','internet','telephone','rent','salaries','maintenance','supplies','taxes','insurance','bank_fees','repair_cost','warranty_repair_cost','warranty_replacement_cost','cogs','other') NOT NULL
+    `);
+
     // ============================================================
     // 16. FINANCIAL TRANSACTIONS
     // ============================================================
     await runSQL("financialTransactions table", `
       CREATE TABLE IF NOT EXISTS financialTransactions (
         id int AUTO_INCREMENT NOT NULL,
+        branchId int NOT NULL DEFAULT 1,
         type enum('income','expense') NOT NULL,
         category varchar(100) NOT NULL,
         paymentMethod enum('cash','qr','transfer') DEFAULT 'cash',
         amount int NOT NULL,
+        unitCost int,
         userId int,
         referenceId int,
         notes text,
         createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT financialTransactions_id PRIMARY KEY(id)
       )
+    `);
+
+    await runSQL("financialTransactions.branchId column", `
+      ALTER TABLE financialTransactions ADD COLUMN branchId int NOT NULL DEFAULT 1
+    `);
+    await runSQL("financialTransactions.unitCost column", `
+      ALTER TABLE financialTransactions ADD COLUMN unitCost int NULL
     `);
 
     // ============================================================
@@ -378,6 +452,7 @@ export async function ensureTables() {
     await runSQL("cash_closures table", `
       CREATE TABLE IF NOT EXISTS cash_closures (
         id int AUTO_INCREMENT NOT NULL,
+        branchId int NOT NULL DEFAULT 1,
         userId int NOT NULL,
         date varchar(10) NOT NULL,
         initialCash int DEFAULT 0,
@@ -396,12 +471,17 @@ export async function ensureTables() {
       )
     `);
 
+    await runSQL("cash_closures.branchId column", `
+      ALTER TABLE cash_closures ADD COLUMN branchId int NOT NULL DEFAULT 1
+    `);
+
     // ============================================================
     // 19. CASH OPENINGS
     // ============================================================
     await runSQL("cash_openings table", `
       CREATE TABLE IF NOT EXISTS cash_openings (
         id int AUTO_INCREMENT NOT NULL,
+        branchId int NOT NULL DEFAULT 1,
         openingDate varchar(10) NOT NULL,
         openingAmount int NOT NULL DEFAULT 0,
         paymentMethod enum('cash','qr','transfer') DEFAULT 'cash',
@@ -412,6 +492,10 @@ export async function ensureTables() {
         createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT cash_openings_id PRIMARY KEY(id)
       )
+    `);
+
+    await runSQL("cash_openings.branchId column", `
+      ALTER TABLE cash_openings ADD COLUMN branchId int NOT NULL DEFAULT 1
     `);
 
     // Add paymentMethod column if table already existed without it
@@ -718,7 +802,316 @@ export async function ensureTables() {
     await runSQL("products.productionNotes", `ALTER TABLE products ADD COLUMN productionNotes TEXT AFTER supplierName`);
     await runSQL("products.imageUrl", `ALTER TABLE products ADD COLUMN imageUrl VARCHAR(500) AFTER status`);
 
-    console.log("\n[EnsureTables] ✅ All 27 tables verified and all columns ensured!");
+    // ============================================================
+    // MIGRACIONES 0015-0017: columnas nuevas
+    // ============================================================
+
+    // userBranches table
+    await runSQL("userBranches table", `
+      CREATE TABLE IF NOT EXISTS userBranches (
+        id int AUTO_INCREMENT NOT NULL,
+        userId int NOT NULL,
+        branchId int NOT NULL DEFAULT 1,
+        isDefault int NOT NULL DEFAULT 0,
+        CONSTRAINT userBranches_id PRIMARY KEY(id)
+      )
+    `);
+
+    // systemSettings table
+    await runSQL("systemSettings table", `
+      CREATE TABLE IF NOT EXISTS systemSettings (
+        id int AUTO_INCREMENT NOT NULL,
+        \`key\` varchar(100) NOT NULL,
+        value text NOT NULL,
+        updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT systemSettings_id PRIMARY KEY(id),
+        CONSTRAINT systemSettings_key_unique UNIQUE(\`key\`)
+      )
+    `);
+
+    // generatedCodeBatches table
+    await runSQL("generatedCodeBatches table", `
+      CREATE TABLE IF NOT EXISTS generatedCodeBatches (
+        id int AUTO_INCREMENT NOT NULL,
+        quantity int NOT NULL,
+        type enum('qr','barcode') NOT NULL,
+        createdBy int NOT NULL,
+        notes text,
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT generatedCodeBatches_id PRIMARY KEY(id)
+      )
+    `);
+
+    // generatedCodes table
+    await runSQL("generatedCodes table", `
+      CREATE TABLE IF NOT EXISTS generatedCodes (
+        id int AUTO_INCREMENT NOT NULL,
+        code varchar(100) NOT NULL,
+        type enum('qr','barcode') NOT NULL,
+        status enum('unassigned','assigned') NOT NULL DEFAULT 'unassigned',
+        batchId int NOT NULL,
+        assignedUnitId int,
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        assignedAt timestamp NULL,
+        CONSTRAINT generatedCodes_id PRIMARY KEY(id),
+        CONSTRAINT generatedCodes_code_unique UNIQUE(code)
+      )
+    `);
+
+    // units table
+    await runSQL("units table", `
+      CREATE TABLE IF NOT EXISTS units (
+        id int AUTO_INCREMENT NOT NULL,
+        code varchar(50) NOT NULL,
+        rmaNumber varchar(30) NULL,
+        codeId int,
+        type enum('laptop','tablet','phone','monitor','charger','accessory','other') NOT NULL,
+        brand varchar(100) NOT NULL,
+        model varchar(100) NOT NULL,
+        serialNumber varchar(100),
+        specs text,
+        condition int,
+        batteryHealth enum('good','fair','bad_plugged_only','n_a') NOT NULL DEFAULT 'n_a',
+        damageChecklist text,
+        damageNotes text,
+        functionalTestPassed int DEFAULT 1,
+        status enum('in_diagnosis','in_repair','available','sold','returned') NOT NULL DEFAULT 'in_diagnosis',
+        purchaseId int,
+        purchasePrice int NOT NULL DEFAULT 0,
+        salePrice int,
+        discountPrice int,
+        wholesalePrice int,
+        supplierId int,
+        purchaseDate varchar(10),
+        photos text,
+        tiktokUrl varchar(500),
+        branchId int NOT NULL DEFAULT 1,
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT units_id PRIMARY KEY(id),
+        CONSTRAINT units_code_unique UNIQUE(code)
+      )
+    `);
+    await runSQL("units.rmaNumber unique", `
+      ALTER TABLE units ADD UNIQUE INDEX units_rmaNumber_unique (rmaNumber)
+    `);
+
+    // unitEvents table
+    await runSQL("unitEvents table", `
+      CREATE TABLE IF NOT EXISTS unitEvents (
+        id int AUTO_INCREMENT NOT NULL,
+        unitId int NOT NULL,
+        eventType varchar(50) NOT NULL,
+        fromStatus varchar(50),
+        toStatus varchar(50),
+        userId int,
+        notes text,
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT unitEvents_id PRIMARY KEY(id)
+      )
+    `);
+
+    // repairs table
+    await runSQL("repairs table", `
+      CREATE TABLE IF NOT EXISTS repairs (
+        id int AUTO_INCREMENT NOT NULL,
+        rmaNumber varchar(30),
+        otNumber varchar(30),
+        unitId int NOT NULL,
+        technicianId int,
+        startDate timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        endDate timestamp NULL,
+        partsUsed text,
+        laborCost int NOT NULL DEFAULT 0,
+        partsCost int NOT NULL DEFAULT 0,
+        status enum('in_progress','completed','cancelled') NOT NULL DEFAULT 'in_progress',
+        resolutionType enum('return_to_customer','return_to_inventory'),
+        notes text,
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT repairs_id PRIMARY KEY(id)
+      )
+    `);
+
+    // warranties table
+    await runSQL("warranties table", `
+      CREATE TABLE IF NOT EXISTS warranties (
+        id int AUTO_INCREMENT NOT NULL,
+        saleId int,
+        orderId int,
+        unitId int NOT NULL,
+        days int NOT NULL DEFAULT 30,
+        startDate timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        endDate timestamp NOT NULL,
+        status enum('active','claimed','expired','paused') NOT NULL DEFAULT 'active',
+        pausedAt timestamp NULL,
+        remainingDaysAtPause int,
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT warranties_id PRIMARY KEY(id)
+      )
+    `);
+
+    // returns table
+    await runSQL("returns table", `
+      CREATE TABLE IF NOT EXISTS \`returns\` (
+        id int AUTO_INCREMENT NOT NULL,
+        warrantyId int,
+        saleId int,
+        unitId int NOT NULL,
+        returnDate timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        reason text NOT NULL,
+        resolution text,
+        reenteredRepair int NOT NULL DEFAULT 0,
+        refundAmount int,
+        refundPaymentMethod varchar(20),
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT returns_id PRIMARY KEY(id)
+      )
+    `);
+
+    // accountsReceivable table
+    await runSQL("accountsReceivable table", `
+      CREATE TABLE IF NOT EXISTS accountsReceivable (
+        id int AUTO_INCREMENT NOT NULL,
+        saleId int NOT NULL,
+        customerId int NOT NULL,
+        totalAmount int NOT NULL,
+        paidAmount int NOT NULL DEFAULT 0,
+        balance int NOT NULL,
+        dueDate varchar(10),
+        status enum('unpaid','partially_paid','paid','overdue') NOT NULL DEFAULT 'unpaid',
+        adminOverrideUserId int,
+        adminOverrideReason text,
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT accountsReceivable_id PRIMARY KEY(id)
+      )
+    `);
+
+    // creditPayments table
+    await runSQL("creditPayments table", `
+      CREATE TABLE IF NOT EXISTS creditPayments (
+        id int AUTO_INCREMENT NOT NULL,
+        type enum('receivable','payable') NOT NULL,
+        accountsReceivableId int,
+        accountsPayableId int,
+        customerId int,
+        supplierId int,
+        amount int NOT NULL,
+        paymentMethod enum('cash','qr','transfer') NOT NULL DEFAULT 'cash',
+        reference varchar(255),
+        notes text,
+        userId int NOT NULL,
+        receiptNumber varchar(50),
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT creditPayments_id PRIMARY KEY(id)
+      )
+    `);
+
+    // purchaseItems table — add unitId column if missing
+    await runSQL("purchaseItems.unitId column", `
+      ALTER TABLE purchaseItems ADD COLUMN unitId int NULL AFTER purchaseId
+    `);
+
+    // purchases.paymentMethod column
+    await runSQL("purchases.paymentMethod column", `
+      ALTER TABLE purchases ADD COLUMN paymentMethod enum('cash','qr','transfer') NULL AFTER paymentStatus
+    `);
+    await runSQL("purchases.isCredit column", `
+      ALTER TABLE purchases ADD COLUMN isCredit int NOT NULL DEFAULT 0 AFTER paymentMethod
+    `);
+    await runSQL("purchases.dueDate column", `
+      ALTER TABLE purchases ADD COLUMN dueDate varchar(10) NULL AFTER isCredit
+    `);
+
+    // sales extra columns
+    await runSQL("sales.warrantyDays column", `
+      ALTER TABLE sales ADD COLUMN warrantyDays int NOT NULL DEFAULT 30 AFTER paymentStatus
+    `);
+    await runSQL("sales.creditDays column", `
+      ALTER TABLE sales ADD COLUMN creditDays int NULL AFTER warrantyDays
+    `);
+    await runSQL("sales.cancelledAt column", `
+      ALTER TABLE sales ADD COLUMN cancelledAt timestamp NULL AFTER cancelReason
+    `);
+    await runSQL("sales.cancelledBy column", `
+      ALTER TABLE sales ADD COLUMN cancelledBy int NULL AFTER cancelledAt
+    `);
+
+    // customers extra columns
+    await runSQL("customers.taxId column", `
+      ALTER TABLE customers ADD COLUMN taxId varchar(50) NULL AFTER customerType
+    `);
+    await runSQL("customers.creditLimit column", `
+      ALTER TABLE customers ADD COLUMN creditLimit int NOT NULL DEFAULT 0 AFTER taxId
+    `);
+    await runSQL("customers.creditDays column", `
+      ALTER TABLE customers ADD COLUMN creditDays int NOT NULL DEFAULT 30 AFTER creditLimit
+    `);
+    await runSQL("customers.allowCredit column", `
+      ALTER TABLE customers ADD COLUMN allowCredit int NOT NULL DEFAULT 1 AFTER creditDays
+    `);
+
+    // units extra columns
+    await runSQL("units.tiktokUrl column", `
+      ALTER TABLE units ADD COLUMN tiktokUrl varchar(500) NULL AFTER photos
+    `);
+
+    // units: RMA permanente del equipo
+    await runSQL("units.rmaNumber column", `
+      ALTER TABLE units ADD COLUMN rmaNumber varchar(30) NULL AFTER code
+    `);
+
+    // repairs: número de Orden de Trabajo por entrada
+    await runSQL("repairs.otNumber column", `
+      ALTER TABLE repairs ADD COLUMN otNumber varchar(30) NULL AFTER rmaNumber
+    `);
+
+    // Migrar rmaNumber existente de repairs → otNumber
+    await runSQL("repairs: migrate rmaNumber to otNumber", `
+      UPDATE repairs SET otNumber = rmaNumber WHERE otNumber IS NULL AND rmaNumber IS NOT NULL
+    `);
+
+    // returns: campos de devolución de dinero y referencia a venta
+    await runSQL("returns.refundAmount column", `
+      ALTER TABLE \`returns\` ADD COLUMN refundAmount int NULL AFTER reenteredRepair
+    `);
+    await runSQL("returns.refundPaymentMethod column", `
+      ALTER TABLE \`returns\` ADD COLUMN refundPaymentMethod varchar(20) NULL AFTER refundAmount
+    `);
+    await runSQL("returns.saleId column", `
+      ALTER TABLE \`returns\` ADD COLUMN saleId int NULL AFTER refundPaymentMethod
+    `);
+
+    // Tabla de empleados
+    await runSQL("employees table", `
+      CREATE TABLE IF NOT EXISTS employees (
+        id int AUTO_INCREMENT NOT NULL,
+        fullName varchar(255) NOT NULL,
+        ci varchar(20),
+        role enum('repartidor','ventas','almacen','tecnico','administracion','otro') NOT NULL DEFAULT 'otro',
+        userId int,
+        baseSalary int NOT NULL DEFAULT 0,
+        fixedDeductions text,
+        phone varchar(20),
+        address varchar(255),
+        startDate varchar(10),
+        birthDate varchar(10),
+        status enum('active','inactive') NOT NULL DEFAULT 'active',
+        notes text,
+        branchId int NOT NULL DEFAULT 1,
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT employees_id PRIMARY KEY(id)
+      )
+    `);
+
+    // orders: branchId (si falta)
+    await runSQL("orders.branchId column", `
+      ALTER TABLE orders ADD COLUMN branchId int NOT NULL DEFAULT 1 AFTER orderNumber
+    `);
+
+    console.log("\n[EnsureTables] ✅ All tables verified and all columns ensured!");
   } finally {
     await connection.end();
   }
