@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, longtext, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -189,7 +189,7 @@ export const units = mysqlTable("units", {
   wholesalePrice: int("wholesalePrice"), // centavos - Precio Mayor
   supplierId: int("supplierId").references(() => suppliers.id),
   purchaseDate: varchar("purchaseDate", { length: 10 }), // YYYY-MM-DD
-  photos: text("photos"), // JSON array of base64 image strings
+  photos: longtext("photos"), // JSON array of base64 image strings
   tiktokUrl: varchar("tiktokUrl", { length: 500 }), // Enlace a video de TikTok
   branchId: int("branchId").notNull().default(1).references(() => branches.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

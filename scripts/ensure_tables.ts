@@ -911,7 +911,7 @@ export async function ensureTables() {
         wholesalePrice int,
         supplierId int,
         purchaseDate varchar(10),
-        photos text,
+        photos LONGTEXT,
         tiktokUrl varchar(500),
         branchId int NOT NULL DEFAULT 1,
         createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -919,6 +919,9 @@ export async function ensureTables() {
         CONSTRAINT units_id PRIMARY KEY(id),
         CONSTRAINT units_code_unique UNIQUE(code)
       )
+    `);
+    await runSQL("units.photos LONGTEXT", `
+      ALTER TABLE units MODIFY COLUMN photos LONGTEXT
     `);
     await runSQL("units.rmaNumber unique", `
       ALTER TABLE units ADD UNIQUE INDEX units_rmaNumber_unique (rmaNumber)

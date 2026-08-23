@@ -189,6 +189,37 @@ export default function Units() {
   const editPhotoFileInputRef = useRef<HTMLInputElement>(null);
   const editPhotoCameraInputRef = useRef<HTMLInputElement>(null);
 
+function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width;
+      let h = img.height;
+      if (w > maxWidth || h > maxWidth) {
+        if (w > h) {
+          h = Math.round((h * maxWidth) / w);
+          w = maxWidth;
+        } else {
+          w = Math.round((w * maxWidth) / h);
+          h = maxWidth;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(base64);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => resolve(base64);
+    img.src = base64;
+  });
+}
+
   const handleEditPhotoFiles = useCallback((files: FileList | null) => {
     if (!files) return;
     const remaining = 8 - editPhotos.length;
@@ -202,12 +233,13 @@ export default function Units() {
       const file = files[i];
       if (!file.type.startsWith("image/")) continue;
       const reader = new FileReader();
-      reader.onload = (ev) => {
-        const result = ev.target?.result as string;
-        if (result) {
+      reader.onload = async (ev) => {
+        const rawResult = ev.target?.result as string;
+        if (rawResult) {
+          const compressed = await compressImage(rawResult);
           setEditPhotos((prev) => {
             if (prev.length >= 8) return prev;
-            return [...prev, result];
+            return [...prev, compressed];
           });
         }
       };

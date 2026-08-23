@@ -59,7 +59,8 @@ async function main() {
     await addColumnIfMissing(conn, "units", "tiktokUrl",   "varchar(500) NULL");
     await addColumnIfMissing(conn, "units", "rmaNumber",   "varchar(30) NULL");
     await addColumnIfMissing(conn, "units", "purchaseDate","varchar(10) NULL");
-    await addColumnIfMissing(conn, "units", "photos",      "text NULL");
+    await addColumnIfMissing(conn, "units", "photos",      "LONGTEXT NULL");
+    await conn.query("ALTER TABLE units MODIFY COLUMN photos LONGTEXT").catch(() => {});
     await addColumnIfMissing(conn, "units", "supplierId",  "int NULL");
     await addColumnIfMissing(conn, "units", "purchaseId",  "int NULL");
     await addColumnIfMissing(conn, "units", "discountPrice","int NULL");
