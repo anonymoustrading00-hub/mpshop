@@ -1111,7 +1111,7 @@ export async function ensureTables() {
       ALTER TABLE orders ADD COLUMN branchId int NOT NULL DEFAULT 1 AFTER orderNumber
     `);
 
-    console.log("\n[EnsureTables] ✅ All tables verified and all columns ensured!");
+    console.log("\n[EnsureTables] ✅ All tables verified and all columns ensured! v2");
   } finally {
     await connection.end();
   }
