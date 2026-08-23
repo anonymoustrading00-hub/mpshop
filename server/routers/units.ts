@@ -691,7 +691,11 @@ export const unitsRouter = router({
             paymentMethod: input.paymentMethod,
             isCredit: 0,
           });
-          const newPurchaseId = purchaseResult.insertId;
+          const newPurchaseId = purchaseResult?.insertId || purchaseResult?.[0]?.insertId;
+
+          if (!newPurchaseId) {
+            throw new Error("No se pudo obtener el ID de la compra recién creada. insertId vacío.");
+          }
 
           // 4b. Insertar item de compra (la unidad)
           await tx.insert(purchaseItems).values({

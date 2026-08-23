@@ -1,4 +1,4 @@
-﻿import { TRPCError } from "@trpc/server";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import {
@@ -364,7 +364,7 @@ export const returnsRouter = router({
         refundPaymentMethod: input.refundPaymentMethod || null,
       });
 
-      const returnId = insertResult.insertId;
+      const returnId = insertResult?.insertId || insertResult?.[0]?.insertId;
       const targetStatus = input.reenteredRepair ? "in_repair" : "returned";
       const oldStatus = unit.status;
 

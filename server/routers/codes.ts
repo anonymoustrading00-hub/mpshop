@@ -118,7 +118,7 @@ export const codesRouter = router({
         notes: input.notes || null,
       });
 
-      const batchId = batchResult.insertId;
+      const batchId = batchResult?.insertId || batchResult?.[0]?.insertId;
       const prefix = input.prefix || (input.type === "qr" ? "QR" : "BC");
 
       // 2. Generar códigos únicos (cortos y legibles)

@@ -145,7 +145,7 @@ export const employeesRouter = router({
       }
 
       const result: any = await db.insert(employees).values(data as any);
-      return { success: true, employeeId: result.insertId };
+      return { success: true, employeeId: result?.insertId || result?.[0]?.insertId };
     }),
 
   update: protectedProcedure
