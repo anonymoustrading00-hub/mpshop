@@ -318,7 +318,8 @@ export async function ensureTables() {
       CREATE TABLE IF NOT EXISTS purchaseItems (
         id int AUTO_INCREMENT NOT NULL,
         purchaseId int NOT NULL,
-        productId int NOT NULL,
+        productId int NULL,
+        unitId int NULL,
         quantity int NOT NULL,
         price int NOT NULL,
         batchNumber varchar(50),
@@ -326,6 +327,13 @@ export async function ensureTables() {
         createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT purchaseItems_id PRIMARY KEY(id)
       )
+    `);
+    // Ensure productId is nullable (in case table already existed with NOT NULL)
+    await runSQL("purchaseItems.productId nullable", `
+      ALTER TABLE purchaseItems MODIFY COLUMN productId int NULL
+    `);
+    await runSQL("purchaseItems.unitId ensure", `
+      ALTER TABLE purchaseItems ADD COLUMN IF NOT EXISTS unitId int NULL AFTER purchaseId
     `);
 
     // ============================================================

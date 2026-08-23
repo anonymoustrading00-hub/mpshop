@@ -413,7 +413,8 @@ export type InsertReturnRma = typeof returns.$inferInsert;
 export const purchaseItems = mysqlTable("purchaseItems", {
   id: int("id").autoincrement().primaryKey(),
   purchaseId: int("purchaseId").notNull().references(() => purchases.id),
-  unitId: int("unitId").notNull().references(() => units.id),
+  productId: int("productId"),             // nullable — solo se usa en compras de inventario de productos
+  unitId: int("unitId"),                   // nullable — se usa en compras de unidades/equipos
   quantity: int("quantity").notNull().default(1),
   price: int("price").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

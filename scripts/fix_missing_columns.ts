@@ -66,6 +66,10 @@ async function main() {
     await addColumnIfMissing(conn, "units", "discountPrice","int NULL");
     await addColumnIfMissing(conn, "units", "wholesalePrice","int NULL");
 
+    // ── purchaseItems — productId debe ser nullable para poder insertar solo unitId ──
+    await conn.query("ALTER TABLE purchaseItems MODIFY COLUMN productId int NULL").catch(() => {});
+    await addColumnIfMissing(conn, "purchaseItems", "unitId", "int NULL");
+
     // ── repairs ────────────────────────────────────────────────────
     await addColumnIfMissing(conn, "repairs", "otNumber",  "varchar(30) NULL");
     await addColumnIfMissing(conn, "repairs", "endDate",   "timestamp NULL");
