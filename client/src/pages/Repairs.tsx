@@ -344,13 +344,13 @@ function CompleteRepairDialog({
   );
   const activeWarranty = warrantiesData?.items?.[0] ?? null;
 
-  // Resetear al abrir
+  // Resetear al abrir (preseleccionar return_to_inventory por defecto)
   useEffect(() => {
     if (open) {
       setLaborCost("");
       setPartsCost("");
       setNotes("");
-      setResolutionType(null);
+      setResolutionType("return_to_inventory");
       setExtendDays(30);
     }
   }, [open]);
@@ -366,7 +366,7 @@ function CompleteRepairDialog({
 
   const handleConfirm = () => {
     if (!resolutionType) {
-      toast.error("Elegí una opción de resolución antes de confirmar");
+      toast.error("Elige una opción de resolución antes de confirmar");
       return;
     }
     const laborCents = laborCost ? Math.round(parseFloat(laborCost) * 100) : 0;
@@ -386,16 +386,16 @@ function CompleteRepairDialog({
   const confirmLabel = !resolutionType
     ? "Confirmar cierre"
     : resolutionType === "return_to_customer"
-    ? "Confirmar devolución al cliente"
-    : "Confirmar retorno a inventario";
+    ? "✅ Confirmar: Ya Reparada → Devolver al Cliente"
+    : "✅ Confirmar: Ya Reparada → Retornar a Inventario (Disponible)";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600" />
-            Finalizar Reparación — Orden {rmaLabel}
+          <DialogTitle className="flex items-center gap-2 text-emerald-700 font-bold">
+            <CheckCircle className="h-6 w-6 text-emerald-600" />
+            Marcar como YA REPARADA — Orden {rmaLabel}
           </DialogTitle>
           <DialogDescription>
             {repair?.unitBrand} {repair?.unitModel} · Código {repair?.unitCode}
@@ -893,10 +893,10 @@ export default function Repairs() {
                         </Button>
                         <Button
                           size="sm"
-                          className="w-full gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold"
+                          className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
                           onClick={() => handleOpenComplete(activeOT)}
                         >
-                          <CheckCircle className="h-4 w-4" /> Finalizar OT {activeOT.otNumber || `#${activeOT.id}`}
+                          <CheckCircle className="h-4 w-4" /> ✅ Marcar como YA REPARADA / Finalizar ({activeOT.otNumber || `#${activeOT.id}`})
                         </Button>
                       </div>
                     )}

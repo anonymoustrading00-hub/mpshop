@@ -120,9 +120,9 @@ function UnitStatusSelect({
           </SelectItem>
 
           <SelectItem value="available" className="cursor-pointer">
-            <div className="flex items-center gap-2 text-green-700">
-              <ShoppingBag className="h-3.5 w-3.5" />
-              <span>Disponible / Para Venta</span>
+            <div className="flex items-center gap-2 text-green-700 font-bold">
+              <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+              <span>{currentStatus === "in_repair" ? "✅ Ya Reparada (Para Venta)" : "Disponible / Para Venta"}</span>
             </div>
           </SelectItem>
 
@@ -328,6 +328,13 @@ export default function Catalog() {
   const [workOrderRepairId, setWorkOrderRepairId] = useState<number | null>(null);
   const [workOrderUnitId, setWorkOrderUnitId] = useState<number | null>(null);
 
+  // Estados para Modal "Marcar como Ya Reparada"
+  const [isCompleteRepairOpen, setIsCompleteRepairOpen] = useState(false);
+  const [completingUnit, setCompletingUnit] = useState<any>(null);
+  const [completeNotes, setCompleteNotes] = useState("");
+  const [completeLaborCost, setCompleteLaborCost] = useState("");
+  const [completePartsCost, setCompletePartsCost] = useState("");
+
   const { data: unitsData, isLoading, refetch } = trpc.units.list.useQuery({
     search: search || undefined,
     type: typeFilter !== "all" ? (typeFilter as any) : undefined,
@@ -356,6 +363,28 @@ export default function Catalog() {
 
   const items: any[] = unitsData?.items || [];
 
+  const handleOpenCompleteRepair = (unit: any) => {
+    setCompletingUnit(unit);
+    setCompleteNotes("");
+    setCompleteLaborCost("");
+    setCompletePartsCost("");
+    setIsCompleteRepairOpen(true);
+  };
+
+  const handleConfirmCompleteRepair = () => {
+    if (!completingUnit) return;
+    const notesData = `Reparación finalizada — Equipo Listo y Disponible para Venta. ${completeNotes.trim() ? `Notas: ${completeNotes.trim()}` : ""}`;
+
+    changeStatusMutation.mutate({
+      unitId: completingUnit.id,
+      toStatus: "available",
+      notes: notesData,
+    });
+
+    setIsCompleteRepairOpen(false);
+    toast.success("✅ Equipo marcado como YA REPARADO y retornado a inventario disponible.");
+  };
+
   const handleStatusChangeRequest = (unit: any, newStatus: string) => {
     if (newStatus === "in_repair") {
       // Abre el modal de formulario e ingreso a taller
@@ -364,6 +393,8 @@ export default function Catalog() {
       setWorkshopNotes("");
       setWorkshopTechnician(user?.name || "");
       setIsWorkshopModalOpen(true);
+    } else if (unit.status === "in_repair" && newStatus === "available") {
+      handleOpenCompleteRepair(unit);
     } else {
       changeStatusMutation.mutate({ unitId: unit.id, toStatus: newStatus as any });
     }
@@ -986,6 +1017,59 @@ export default function Catalog() {
         open={isCommercialSheetOpen}
         onOpenChange={setIsCommercialSheetOpen}
       />
+
+      {/* Modal: Marcar como YA REPARADA y Disponible */}
+      <Dialog open={isCompleteRepairOpen} onOpenChange={setIsCompleteRepairOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-emerald-700 font-bold">
+              <CheckCircle className="h-6 w-6 text-emerald-600" />
+              Marcar Equipo como YA REPARADO
+            </DialogTitle>
+          </DialogHeader>
+
+          {completingUnit && (
+            <div className="space-y-4 py-2 text-sm">
+              <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-200">
+                <div className="font-mono text-xs font-bold text-emerald-800">
+                  {completingUnit.code}
+                </div>
+                <div className="font-bold text-slate-900 text-base mt-0.5">
+                  {completingUnit.brand} {completingUnit.model}
+                </div>
+                <p className="text-xs text-emerald-700 mt-1">
+                  El equipo cambiará su estado a <strong>Disponible para Venta</strong> y quedará listo en el catálogo comercial.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold block mb-1">
+                  Notas de Cierre / Trabajo Realizado (opcional):
+                </label>
+                <Textarea
+                  value={completeNotes}
+                  onChange={(e) => setCompleteNotes(e.target.value)}
+                  placeholder="Ej. Reparación de pantalla finalizada, mantenimiento térmico realizado..."
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsCompleteRepairOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmCompleteRepair}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2"
+            >
+              <CheckCircle className="h-4 w-4" />
+              Confirmar: Ya Reparado (Disponible)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal: Orden de Trabajo PDF — generado al aprobar traspaso a taller */}
       <WorkOrderModal

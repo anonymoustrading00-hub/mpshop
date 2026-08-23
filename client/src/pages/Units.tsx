@@ -14,6 +14,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { UnitKardex } from "@/components/UnitKardex";
 import { CommercialCatalogModal } from "@/components/CommercialCatalogModal";
 import { CommercialSheetModal } from "@/components/CommercialSheetModal";
+import { WorkOrderModal } from "@/components/WorkOrderModal";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
   in_diagnosis: { label: "En Diagnóstico", color: "text-amber-700", bg: "bg-amber-100 border-amber-300", icon: Activity },
@@ -99,10 +100,6 @@ function UnitStatusSelect({
       toast.info("ℹ️ El estado 'Devuelta (RMA)' se asigna al procesar una devolución en el Módulo de Devoluciones.");
       return;
     }
-    if (currentStatus === "in_repair" && val === "available") {
-      toast.error("⚠️ La unidad está en taller técnico. Debe completar o cancelar la reparación en el módulo de Taller para liberarla.");
-      return;
-    }
     if (val !== currentStatus) {
       onStatusChange(val);
     }
@@ -115,7 +112,7 @@ function UnitStatusSelect({
           <Icon className="h-3.5 w-3.5 shrink-0" />
           <SelectValue placeholder={cfg.label}>{cfg.label}</SelectValue>
         </SelectTrigger>
-        <SelectContent align="end" className="w-56 font-sans z-50">
+        <SelectContent align="end" className="w-60 font-sans z-50">
           <SelectItem value="in_diagnosis" className="cursor-pointer">
             <div className="flex items-center gap-2">
               <Activity className="h-3.5 w-3.5 text-amber-600" />
@@ -131,9 +128,9 @@ function UnitStatusSelect({
           </SelectItem>
 
           <SelectItem value="available" className="cursor-pointer">
-            <div className="flex items-center gap-2 text-green-700">
-              <ShoppingBag className="h-3.5 w-3.5" />
-              <span>Disponible / Para Venta</span>
+            <div className="flex items-center gap-2 text-green-700 font-bold">
+              <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+              <span>{currentStatus === "in_repair" ? "✅ Ya Reparada (Para Venta)" : "Disponible / Para Venta"}</span>
             </div>
           </SelectItem>
 
@@ -229,7 +226,7 @@ export default function Units() {
   const [commercialSheetUnitId, setCommercialSheetUnitId] = useState<number | null>(null);
   const [isCommercialSheetOpen, setIsCommercialSheetOpen] = useState(false);
 
-  // Estados para Modal e Impresión de Traspaso a Taller
+  // Estados para Modal e Ingreso a Taller
   const [workshopUnit, setWorkshopUnit] = useState<any>(null);
   const [isWorkshopModalOpen, setIsWorkshopModalOpen] = useState(false);
   const [workshopReason, setWorkshopReason] = useState("");
@@ -241,7 +238,18 @@ export default function Units() {
     box: false,
   });
   const [workshopNotes, setWorkshopNotes] = useState("");
-  const [printedRepairReceipt, setPrintedRepairReceipt] = useState<any>(null);
+
+  // Estados para Orden de Trabajo (OT) generada al ingresar a taller
+  const [workOrderModalOpen, setWorkOrderModalOpen] = useState(false);
+  const [workOrderRepairId, setWorkOrderRepairId] = useState<number | null>(null);
+  const [workOrderUnitId, setWorkOrderUnitId] = useState<number | null>(null);
+
+  // Estados para Modal "Marcar como Ya Reparada"
+  const [isCompleteRepairOpen, setIsCompleteRepairOpen] = useState(false);
+  const [completingUnit, setCompletingUnit] = useState<any>(null);
+  const [completeNotes, setCompleteNotes] = useState("");
+  const [completeLaborCost, setCompleteLaborCost] = useState("");
+  const [completePartsCost, setCompletePartsCost] = useState("");
 
   const { data: unitsData, isLoading, refetch } = trpc.units.list.useQuery({
     search: search || undefined,
@@ -269,9 +277,21 @@ export default function Units() {
   });
 
   const createRepairMutation = trpc.repairs.create.useMutation({
+    onSuccess: (res: any) => {
+      refetch();
+      if (res?.repairId) {
+        setWorkOrderRepairId(res.repairId);
+      }
+      setWorkOrderModalOpen(true);
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const updateRepairMutation = trpc.repairs.update.useMutation({
     onSuccess: () => {
       refetch();
     },
+    onError: (err: any) => toast.error(err.message),
   });
 
   useEffect(() => {
@@ -371,6 +391,30 @@ export default function Units() {
     });
   };
 
+  const handleOpenCompleteRepair = (unit: any) => {
+    setCompletingUnit(unit);
+    setCompleteNotes("");
+    setCompleteLaborCost("");
+    setCompletePartsCost("");
+    setIsCompleteRepairOpen(true);
+  };
+
+  const handleConfirmCompleteRepair = () => {
+    if (!completingUnit) return;
+    const laborCents = completeLaborCost ? Math.round(parseFloat(completeLaborCost) * 100) : 0;
+    const partsCents = completePartsCost ? Math.round(parseFloat(completePartsCost) * 100) : 0;
+    const notesData = `Reparación finalizada — Equipo Listo y Disponible para Venta. ${completeNotes.trim() ? `Notas: ${completeNotes.trim()}` : ""}`;
+
+    changeStatusMutation.mutate({
+      unitId: completingUnit.id,
+      toStatus: "available",
+      notes: notesData,
+    });
+
+    setIsCompleteRepairOpen(false);
+    toast.success("✅ Equipo marcado como YA REPARADO y retornado a inventario disponible.");
+  };
+
   const handleStatusChangeRequest = (unit: any, newStatus: string) => {
     if (newStatus === "in_repair") {
       setWorkshopUnit(unit);
@@ -378,6 +422,8 @@ export default function Units() {
       setWorkshopNotes("");
       setWorkshopTechnician(user?.name || "");
       setIsWorkshopModalOpen(true);
+    } else if (unit.status === "in_repair" && newStatus === "available") {
+      handleOpenCompleteRepair(unit);
     } else {
       changeStatusMutation.mutate({ unitId: unit.id, toStatus: newStatus as any });
     }
@@ -396,146 +442,29 @@ export default function Units() {
 
     const repairNotesData = `Ingreso a Taller - Motivo: ${workshopReason.trim()} | Accesorios: ${accessoriesList} | Notas: ${workshopNotes.trim()}`;
 
+    // 1. Cambiar estado de unidad a in_repair
     changeStatusMutation.mutate({
       unitId: workshopUnit.id,
       toStatus: "in_repair",
       notes: repairNotesData,
     });
 
+    // 2. Crear OT en taller -> abrir WorkOrderModal
+    setWorkOrderUnitId(workshopUnit.id);
+    setWorkOrderRepairId(null);
     createRepairMutation.mutate({
       unitId: workshopUnit.id,
       notes: `Motivo: ${workshopReason.trim()} | Accesorios: ${accessoriesList}${workshopNotes ? ` | Obs: ${workshopNotes.trim()}` : ""}`,
     });
 
-    const receiptData = {
-      receiptNumber: `TRP-${Date.now().toString().slice(-6)}`,
-      date: new Date().toLocaleString("es-BO"),
-      unitCode: workshopUnit.code,
-      brand: workshopUnit.brand,
-      model: workshopUnit.model,
-      type: workshopUnit.type,
-      specs: workshopUnit.specs,
-      reason: workshopReason,
-      technician: workshopTechnician || user?.name || "Técnico asignado",
-      accessories: accessoriesList,
-      notes: workshopNotes,
-    };
-
-    setPrintedRepairReceipt(receiptData);
     setIsWorkshopModalOpen(false);
-
-    toast.success("✅ Traspaso a Taller Aprobado. Imprimiendo Hoja de Ingreso...");
-    setTimeout(() => {
-      window.print();
-    }, 400);
+    toast.success("✅ Traspaso a Taller Aprobado. Generando Orden de Trabajo...");
   };
 
   return (
     <>
-      {/* ═══════════ PRINT STYLES FOR REPAIR RECEIPT ═══════════ */}
-      <style>{`
-        @media print {
-          body > * { display: none !important; }
-          .print-workshop-root { display: block !important; }
-          .no-print { display: none !important; }
-
-          .workshop-receipt {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            color: #111;
-          }
-          .receipt-header {
-            text-align: center;
-            border-bottom: 2px solid #2563eb;
-            padding-bottom: 12px;
-            margin-bottom: 20px;
-          }
-          .receipt-header h1 { font-size: 20px; font-weight: 900; text-transform: uppercase; color: #1e3a8a; margin: 0; }
-          .receipt-header p { font-size: 11px; color: #555; margin-top: 4px; }
-          .receipt-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin-bottom: 16px;
-          }
-          .receipt-box {
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            padding: 12px;
-            background: #f8fafc;
-          }
-          .receipt-box-title {
-            font-size: 11px; font-weight: bold; text-transform: uppercase; color: #2563eb; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;
-          }
-          .receipt-row { font-size: 12px; margin-bottom: 4px; }
-          .receipt-label { font-weight: bold; color: #475569; }
-          .signatures-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 40px;
-            margin-top: 60px;
-            text-align: center;
-          }
-          .signature-line { border-top: 1px dashed #475569; padding-top: 6px; font-size: 11px; font-weight: bold; }
-        }
-        @media screen {
-          .print-workshop-root { display: none; }
-        }
-      `}</style>
-
-      {/* ═══════════ PRINT-ONLY: HOJA DE INGRESO A TALLER ═══════════ */}
-      {printedRepairReceipt && (
-        <div className="print-workshop-root">
-          <div className="workshop-receipt">
-            <div className="receipt-header">
-              <h1>Hoja de Ingreso y Traspaso a Taller Técnico</h1>
-              <p>Comprobante de Recepción · Orden N° <strong>{printedRepairReceipt.receiptNumber}</strong> · Fecha: {printedRepairReceipt.date}</p>
-            </div>
-
-            <div className="receipt-grid">
-              <div className="receipt-box">
-                <div className="receipt-box-title">Datos del Equipo</div>
-                <div className="receipt-row"><span className="receipt-label">Código Único:</span> {printedRepairReceipt.unitCode}</div>
-                <div className="receipt-row"><span className="receipt-label">Equipo:</span> {printedRepairReceipt.brand} {printedRepairReceipt.model}</div>
-                <div className="receipt-row"><span className="receipt-label">Tipo:</span> {printedRepairReceipt.type.toUpperCase()}</div>
-              </div>
-
-              <div className="receipt-box">
-                <div className="receipt-box-title">Datos del Servicio</div>
-                <div className="receipt-row"><span className="receipt-label">Técnico Receptor:</span> {printedRepairReceipt.technician}</div>
-                <div className="receipt-row"><span className="receipt-label">Accesorios Dejados:</span> {printedRepairReceipt.accessories}</div>
-                <div className="receipt-row"><span className="receipt-label">Estado Asignado:</span> EN TALLER</div>
-              </div>
-            </div>
-
-            <div className="receipt-box" style={{ marginBottom: "16px" }}>
-              <div className="receipt-box-title">Motivo de Ingreso / Falla Reportada</div>
-              <p style={{ fontSize: "12px", margin: "4px 0 0" }}>{printedRepairReceipt.reason}</p>
-            </div>
-
-            {printedRepairReceipt.notes && (
-              <div className="receipt-box" style={{ marginBottom: "16px" }}>
-                <div className="receipt-box-title">Observaciones Adicionales</div>
-                <p style={{ fontSize: "12px", margin: "4px 0 0" }}>{printedRepairReceipt.notes}</p>
-              </div>
-            )}
-
-            <div className="signatures-grid">
-              <div>
-                <div className="signature-line">Firma y Sello del Técnico Receptor</div>
-              </div>
-              <div>
-                <div className="signature-line">Firma del Responsable / Cliente</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ═══════════ SCREEN UI ═══════════ */}
-      <div className="no-print container mx-auto p-4 md:p-6 space-y-6">
+      <div className="container mx-auto p-4 md:p-6 space-y-6">
         {/* Encabezado y Barra de Escaneo */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -743,6 +672,16 @@ export default function Units() {
                       </Button>
                     </div>
 
+                    {unit.status === "in_repair" && (
+                      <Button
+                        size="sm"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 h-8 shadow-sm"
+                        onClick={() => handleOpenCompleteRepair(unit)}
+                      >
+                        <CheckCircle className="h-4 w-4" /> ✅ Marcar como Ya Reparada (Para Venta)
+                      </Button>
+                    )}
+
                     {/* Ficha Comercial de Venta */}
                     <Button
                       size="sm"
@@ -783,6 +722,90 @@ export default function Units() {
           open={isCommercialSheetOpen}
           onOpenChange={setIsCommercialSheetOpen}
         />
+
+        {/* Modal: Orden de Trabajo PDF / WhatsApp — generado al ingresar a taller */}
+        <WorkOrderModal
+          open={workOrderModalOpen}
+          onOpenChange={setWorkOrderModalOpen}
+          repairId={workOrderRepairId || undefined}
+          unitId={workOrderUnitId || undefined}
+        />
+
+        {/* Modal: Marcar como YA REPARADA y Disponible */}
+        <Dialog open={isCompleteRepairOpen} onOpenChange={setIsCompleteRepairOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-emerald-700 font-bold">
+                <CheckCircle className="h-6 w-6 text-emerald-600" />
+                Marcar Equipo como YA REPARADO
+              </DialogTitle>
+            </DialogHeader>
+
+            {completingUnit && (
+              <div className="space-y-4 py-2 text-sm">
+                <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-200">
+                  <div className="font-mono text-xs font-bold text-emerald-800">
+                    {completingUnit.code}
+                  </div>
+                  <div className="font-bold text-slate-900 text-base mt-0.5">
+                    {completingUnit.brand} {completingUnit.model}
+                  </div>
+                  <p className="text-xs text-emerald-700 mt-1">
+                    El equipo cambiará su estado a <strong>Disponible para Venta</strong> y quedará listo en el catálogo.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold block mb-1">Mano de Obra (Bs):</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={completeLaborCost}
+                      onChange={(e) => setCompleteLaborCost(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold block mb-1">Repuestos (Bs):</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={completePartsCost}
+                      onChange={(e) => setCompletePartsCost(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold block mb-1">
+                    Notas de Cierre / Trabajo Realizado (opcional):
+                  </label>
+                  <Textarea
+                    value={completeNotes}
+                    onChange={(e) => setCompleteNotes(e.target.value)}
+                    placeholder="Ej. Cambio de teclado completado, limpieza interna y pasta térmica nueva..."
+                    rows={2}
+                  />
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setIsCompleteRepairOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleConfirmCompleteRepair}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Confirmar: Ya Reparado (Disponible)
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Modal: Formulario de Traspaso a Taller */}
         <Dialog open={isWorkshopModalOpen} onOpenChange={setIsWorkshopModalOpen}>
