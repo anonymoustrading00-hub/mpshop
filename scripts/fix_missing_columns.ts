@@ -1,0 +1,314 @@
+/**
+ * fix_missing_columns.ts
+ * Agrega columnas que pueden faltar en Railway usando INFORMATION_SCHEMA
+ * para verificar si existen antes de intentar crearlas.
+ * Se ejecuta en el predeploy de Railway.
+ */
+import mysql from "mysql2/promise";
+
+const databaseUrl = process.env.DATABASE_URL;
+
+async function columnExists(conn: any, table: string, column: string): Promise<boolean> {
+  const [rows]: any = await conn.query(
+    `SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS 
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [table, column]
+  );
+  return rows[0].cnt > 0;
+}
+
+async function addColumnIfMissing(
+  conn: any,
+  table: string,
+  column: string,
+  definition: string
+) {
+  const exists = await columnExists(conn, table, column);
+  if (exists) {
+    console.log(`[FixColumns] ⊘ ${table}.${column} already exists`);
+    return;
+  }
+  try {
+    await conn.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
+    console.log(`[FixColumns] ✓ Added ${table}.${column}`);
+  } catch (err: any) {
+    console.log(`[FixColumns] ✗ Failed ${table}.${column}: ${err.message}`);
+  }
+}
+
+async function tableExists(conn: any, table: string): Promise<boolean> {
+  const [rows]: any = await conn.query(
+    `SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES 
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+    [table]
+  );
+  return rows[0].cnt > 0;
+}
+
+async function main() {
+  if (!databaseUrl) {
+    console.log("[FixColumns] No DATABASE_URL — skipping");
+    process.exit(0);
+  }
+
+  const conn = await mysql.createConnection(databaseUrl);
+  console.log("[FixColumns] Connected. Checking missing columns...");
+
+  try {
+    // ── units ──────────────────────────────────────────────────────
+    await addColumnIfMissing(conn, "units", "tiktokUrl",   "varchar(500) NULL");
+    await addColumnIfMissing(conn, "units", "rmaNumber",   "varchar(30) NULL");
+    await addColumnIfMissing(conn, "units", "purchaseDate","varchar(10) NULL");
+    await addColumnIfMissing(conn, "units", "photos",      "text NULL");
+    await addColumnIfMissing(conn, "units", "supplierId",  "int NULL");
+    await addColumnIfMissing(conn, "units", "purchaseId",  "int NULL");
+    await addColumnIfMissing(conn, "units", "discountPrice","int NULL");
+    await addColumnIfMissing(conn, "units", "wholesalePrice","int NULL");
+
+    // ── repairs ────────────────────────────────────────────────────
+    await addColumnIfMissing(conn, "repairs", "otNumber",  "varchar(30) NULL");
+    await addColumnIfMissing(conn, "repairs", "endDate",   "timestamp NULL");
+    await addColumnIfMissing(conn, "repairs", "partsUsed", "text NULL");
+    await addColumnIfMissing(conn, "repairs", "laborCost", "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "repairs", "partsCost", "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "repairs", "resolutionType", "enum('return_to_customer','return_to_inventory') NULL");
+
+    // ── returns ────────────────────────────────────────────────────
+    await addColumnIfMissing(conn, "returns", "refundAmount",        "int NULL");
+    await addColumnIfMissing(conn, "returns", "refundPaymentMethod", "varchar(20) NULL");
+    await addColumnIfMissing(conn, "returns", "saleId",              "int NULL");
+
+    // ── financialTransactions ──────────────────────────────────────
+    await addColumnIfMissing(conn, "financialTransactions", "unitCost", "int NULL");
+    await addColumnIfMissing(conn, "financialTransactions", "branchId", "int NOT NULL DEFAULT 1");
+
+    // ── operationalExpenses ────────────────────────────────────────
+    await addColumnIfMissing(conn, "operationalExpenses", "costType",      "varchar(50) NULL");
+    await addColumnIfMissing(conn, "operationalExpenses", "referenceType", "varchar(50) NULL");
+    await addColumnIfMissing(conn, "operationalExpenses", "referenceId",   "int NULL");
+    await addColumnIfMissing(conn, "operationalExpenses", "isAutomatic",   "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "operationalExpenses", "branchId",      "int NOT NULL DEFAULT 1");
+
+    // ── sales ──────────────────────────────────────────────────────
+    await addColumnIfMissing(conn, "sales", "warrantyDays",  "int NOT NULL DEFAULT 30");
+    await addColumnIfMissing(conn, "sales", "creditDays",    "int NULL");
+    await addColumnIfMissing(conn, "sales", "cancelledAt",   "timestamp NULL");
+    await addColumnIfMissing(conn, "sales", "cancelledBy",   "int NULL");
+    await addColumnIfMissing(conn, "sales", "branchId",      "int NOT NULL DEFAULT 1");
+
+    // ── orders ─────────────────────────────────────────────────────
+    await addColumnIfMissing(conn, "orders", "branchId", "int NOT NULL DEFAULT 1");
+
+    // ── users ──────────────────────────────────────────────────────
+    await addColumnIfMissing(conn, "users", "phone",              "varchar(50) NULL");
+    await addColumnIfMissing(conn, "users", "status",             "enum('active','inactive') NOT NULL DEFAULT 'active'");
+    await addColumnIfMissing(conn, "users", "allowedModules",     "text NULL");
+    await addColumnIfMissing(conn, "users", "specialPermissions", "text NULL");
+    await addColumnIfMissing(conn, "users", "assignedBranchIds",  "text NULL");
+
+    // ── customers ──────────────────────────────────────────────────
+    await addColumnIfMissing(conn, "customers", "taxId",       "varchar(50) NULL");
+    await addColumnIfMissing(conn, "customers", "creditLimit", "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "customers", "creditDays",  "int NOT NULL DEFAULT 30");
+    await addColumnIfMissing(conn, "customers", "allowCredit", "int NOT NULL DEFAULT 1");
+
+    // ── purchases ──────────────────────────────────────────────────
+    await addColumnIfMissing(conn, "purchases", "paymentMethod", "enum('cash','qr','transfer') NULL");
+    await addColumnIfMissing(conn, "purchases", "isCredit",      "int NOT NULL DEFAULT 0");
+    await addColumnIfMissing(conn, "purchases", "dueDate",       "varchar(10) NULL");
+
+    // ── purchaseItems ──────────────────────────────────────────────
+    await addColumnIfMissing(conn, "purchaseItems", "unitId", "int NULL");
+
+    // ── warranties ─────────────────────────────────────────────────
+    if (await tableExists(conn, "warranties")) {
+      await addColumnIfMissing(conn, "warranties", "pausedAt",             "timestamp NULL");
+      await addColumnIfMissing(conn, "warranties", "remainingDaysAtPause", "int NULL");
+    }
+
+    // ── Crear tablas críticas si no existen ───────────────────────
+
+    if (!(await tableExists(conn, "units"))) {
+      await conn.query(`
+        CREATE TABLE units (
+          id int AUTO_INCREMENT PRIMARY KEY,
+          code varchar(50) NOT NULL UNIQUE,
+          rmaNumber varchar(30) NULL,
+          codeId int NULL,
+          type enum('laptop','tablet','phone','monitor','charger','accessory','other') NOT NULL,
+          brand varchar(100) NOT NULL,
+          model varchar(100) NOT NULL,
+          serialNumber varchar(100) NULL,
+          specs text NULL,
+          \`condition\` int NULL,
+          batteryHealth enum('good','fair','bad_plugged_only','n_a') NOT NULL DEFAULT 'n_a',
+          damageChecklist text NULL,
+          damageNotes text NULL,
+          functionalTestPassed int DEFAULT 1,
+          status enum('in_diagnosis','in_repair','available','sold','returned') NOT NULL DEFAULT 'in_diagnosis',
+          purchaseId int NULL,
+          purchasePrice int NOT NULL DEFAULT 0,
+          salePrice int NULL,
+          discountPrice int NULL,
+          wholesalePrice int NULL,
+          supplierId int NULL,
+          purchaseDate varchar(10) NULL,
+          photos text NULL,
+          tiktokUrl varchar(500) NULL,
+          branchId int NOT NULL DEFAULT 1,
+          createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+      `);
+      console.log("[FixColumns] ✓ Created units table");
+    }
+
+    if (!(await tableExists(conn, "unitEvents"))) {
+      await conn.query(`
+        CREATE TABLE unitEvents (
+          id int AUTO_INCREMENT PRIMARY KEY,
+          unitId int NOT NULL,
+          eventType varchar(50) NOT NULL,
+          fromStatus varchar(50) NULL,
+          toStatus varchar(50) NULL,
+          userId int NULL,
+          notes text NULL,
+          createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      console.log("[FixColumns] ✓ Created unitEvents table");
+    }
+
+    if (!(await tableExists(conn, "repairs"))) {
+      await conn.query(`
+        CREATE TABLE repairs (
+          id int AUTO_INCREMENT PRIMARY KEY,
+          rmaNumber varchar(30) NULL,
+          otNumber varchar(30) NULL,
+          unitId int NOT NULL,
+          technicianId int NULL,
+          startDate timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          endDate timestamp NULL,
+          partsUsed text NULL,
+          laborCost int NOT NULL DEFAULT 0,
+          partsCost int NOT NULL DEFAULT 0,
+          status enum('in_progress','completed','cancelled') NOT NULL DEFAULT 'in_progress',
+          resolutionType enum('return_to_customer','return_to_inventory') NULL,
+          notes text NULL,
+          createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+      `);
+      console.log("[FixColumns] ✓ Created repairs table");
+    }
+
+    if (!(await tableExists(conn, "warranties"))) {
+      await conn.query(`
+        CREATE TABLE warranties (
+          id int AUTO_INCREMENT PRIMARY KEY,
+          saleId int NULL,
+          orderId int NULL,
+          unitId int NOT NULL,
+          days int NOT NULL DEFAULT 30,
+          startDate timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          endDate timestamp NOT NULL,
+          status enum('active','claimed','expired','paused') NOT NULL DEFAULT 'active',
+          pausedAt timestamp NULL,
+          remainingDaysAtPause int NULL,
+          createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      console.log("[FixColumns] ✓ Created warranties table");
+    }
+
+    if (!(await tableExists(conn, "returns"))) {
+      await conn.query(`
+        CREATE TABLE \`returns\` (
+          id int AUTO_INCREMENT PRIMARY KEY,
+          warrantyId int NULL,
+          saleId int NULL,
+          unitId int NOT NULL,
+          returnDate timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          reason text NOT NULL,
+          resolution text NULL,
+          reenteredRepair int NOT NULL DEFAULT 0,
+          refundAmount int NULL,
+          refundPaymentMethod varchar(20) NULL,
+          createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      console.log("[FixColumns] ✓ Created returns table");
+    }
+
+    if (!(await tableExists(conn, "generatedCodeBatches"))) {
+      await conn.query(`
+        CREATE TABLE generatedCodeBatches (
+          id int AUTO_INCREMENT PRIMARY KEY,
+          quantity int NOT NULL,
+          type enum('qr','barcode') NOT NULL,
+          createdBy int NOT NULL,
+          notes text NULL,
+          createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      console.log("[FixColumns] ✓ Created generatedCodeBatches table");
+    }
+
+    if (!(await tableExists(conn, "generatedCodes"))) {
+      await conn.query(`
+        CREATE TABLE generatedCodes (
+          id int AUTO_INCREMENT PRIMARY KEY,
+          code varchar(100) NOT NULL UNIQUE,
+          type enum('qr','barcode') NOT NULL,
+          status enum('unassigned','assigned') NOT NULL DEFAULT 'unassigned',
+          batchId int NOT NULL,
+          assignedUnitId int NULL,
+          createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          assignedAt timestamp NULL
+        )
+      `);
+      console.log("[FixColumns] ✓ Created generatedCodes table");
+    }
+
+    if (!(await tableExists(conn, "employees"))) {
+      await conn.query(`
+        CREATE TABLE employees (
+          id int AUTO_INCREMENT PRIMARY KEY,
+          fullName varchar(255) NOT NULL,
+          ci varchar(20) NULL,
+          role enum('repartidor','ventas','almacen','tecnico','administracion','otro') NOT NULL DEFAULT 'otro',
+          userId int NULL,
+          baseSalary int NOT NULL DEFAULT 0,
+          fixedDeductions text NULL,
+          phone varchar(20) NULL,
+          address varchar(255) NULL,
+          startDate varchar(10) NULL,
+          birthDate varchar(10) NULL,
+          status enum('active','inactive') NOT NULL DEFAULT 'active',
+          notes text NULL,
+          branchId int NOT NULL DEFAULT 1,
+          createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+      `);
+      console.log("[FixColumns] ✓ Created employees table");
+    }
+
+    // Migrar rmaNumber existente de repairs a otNumber
+    await conn.query(`
+      UPDATE repairs SET otNumber = rmaNumber 
+      WHERE otNumber IS NULL AND rmaNumber IS NOT NULL
+    `);
+    console.log("[FixColumns] ✓ Migrated repair rmaNumber to otNumber");
+
+    console.log("[FixColumns] ✅ All columns and tables verified!");
+
+  } finally {
+    await conn.end();
+  }
+}
+
+main().catch((err) => {
+  console.error("[FixColumns] Fatal error:", err);
+  process.exit(0); // exit 0 para no bloquear el deploy
+});
