@@ -246,9 +246,10 @@ export async function ensureTables() {
       CREATE TABLE IF NOT EXISTS orderItems (
         id int AUTO_INCREMENT NOT NULL,
         orderId int NOT NULL,
-        productId int NOT NULL,
-        pricingType enum('unit','wholesale','discount') NOT NULL DEFAULT 'unit',
-        quantity int NOT NULL,
+        unitId int NULL,
+        productId int NULL,
+        pricingType enum('unit','wholesale','discount') DEFAULT 'unit',
+        quantity int NOT NULL DEFAULT 1,
         price int NOT NULL,
         createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT orderItems_id PRIMARY KEY(id)
@@ -824,8 +825,10 @@ export async function ensureTables() {
     await runSQL("orders.cancellationReason", `ALTER TABLE orders ADD COLUMN cancellationReason text AFTER cancellationRequested`);
     await runSQL("orders.deliveredAt", `ALTER TABLE orders ADD COLUMN deliveredAt timestamp NULL AFTER updatedAt`);
 
-    // orderItems columns - ensure pricingType exists
-    await runSQL("orderItems.pricingType", `ALTER TABLE orderItems ADD COLUMN pricingType enum('unit','wholesale','discount') NOT NULL DEFAULT 'unit' AFTER productId`);
+    // orderItems columns - ensure unitId, nullable productId and pricingType exist
+    await runSQL("orderItems.unitId", `ALTER TABLE orderItems ADD COLUMN unitId INT NULL AFTER orderId`);
+    await runSQL("orderItems.productId nullable", `ALTER TABLE orderItems MODIFY COLUMN productId INT NULL`);
+    await runSQL("orderItems.pricingType", `ALTER TABLE orderItems ADD COLUMN pricingType enum('unit','wholesale','discount') DEFAULT 'unit'`);
 
     // customers profile columns
     await runSQL("customers.age", `ALTER TABLE customers ADD COLUMN age INT AFTER longitude`);

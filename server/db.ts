@@ -1263,7 +1263,41 @@ export async function createOrderItem(data: InsertOrderItem) {
     syncMocksToDisk();
     return { insertId: newId };
   }
-  return await db.insert(orderItems).values(data);
+
+  const payload: any = { ...data };
+  if (!payload.productId && payload.unitId) {
+    payload.productId = payload.unitId;
+  }
+  if (!payload.unitId && payload.productId) {
+    payload.unitId = payload.productId;
+  }
+
+  try {
+    return await db.insert(orderItems).values(payload);
+  } catch (err: any) {
+    // If unitId or productId column differences occur, try targeted insertion
+    if (err?.message?.includes("Unknown column 'unitId'") || err?.sqlMessage?.includes("Unknown column 'unitId'")) {
+      const fallback = {
+        orderId: payload.orderId,
+        productId: payload.productId || payload.unitId,
+        pricingType: payload.pricingType || "unit",
+        quantity: payload.quantity || 1,
+        price: payload.price,
+      };
+      return await db.insert(orderItems).values(fallback as any);
+    }
+    if (err?.message?.includes("productId") || err?.sqlMessage?.includes("productId")) {
+      const fallback = {
+        orderId: payload.orderId,
+        unitId: payload.unitId || payload.productId,
+        pricingType: payload.pricingType || "unit",
+        quantity: payload.quantity || 1,
+        price: payload.price,
+      };
+      return await db.insert(orderItems).values(fallback as any);
+    }
+    throw err;
+  }
 }
 
 export async function deleteOrderItems(orderId: number) {

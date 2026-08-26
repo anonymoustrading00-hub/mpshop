@@ -309,11 +309,13 @@ export const orders = mysqlTable("orders", {
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = typeof orders.$inferInsert;
 
-// Items del pedido (referenciando unidad única)
+// Items del pedido (referenciando unidad única o producto)
 export const orderItems = mysqlTable("orderItems", {
   id: int("id").autoincrement().primaryKey(),
   orderId: int("orderId").notNull().references(() => orders.id),
-  unitId: int("unitId").notNull().references(() => units.id),
+  unitId: int("unitId").references(() => units.id),
+  productId: int("productId"),
+  pricingType: mysqlEnum("pricingType", ["unit", "wholesale", "discount"]).default("unit"),
   quantity: int("quantity").notNull().default(1),
   price: int("price").notNull(), // Precio venta unitario en centavos
   createdAt: timestamp("createdAt").defaultNow().notNull(),
