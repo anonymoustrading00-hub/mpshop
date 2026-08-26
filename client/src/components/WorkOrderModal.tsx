@@ -66,11 +66,13 @@ export function WorkOrderModal({
     }
   );
 
+  const { data: companySettings } = trpc.settings.getCompanyConfig.useQuery(undefined, { enabled: open });
+
   const workOrder = orderData?.workOrder;
   const unit = orderData?.unit;
   const customer = orderData?.customer;
   const warranty = orderData?.warranty;
-  const company = orderData?.company || {
+  const company = {
     name: "HK EQUIPOS TECNOLÓGICOS",
     subName: "VITALIA - SERVICIO TÉCNICO ESPECIALIZADO",
     slogan: "Tecnología que conecta contigo · Soporte Especializado",
@@ -82,6 +84,8 @@ export function WorkOrderModal({
     taxId: "1234567890",
     logo: null as string | null,
     receiptFooterNotes: "El cliente declara que el equipo ingresa en las condiciones detalladas y acepta las políticas del taller.",
+    ...(orderData?.company || {}),
+    ...(companySettings || {}),
   };
 
   const specs = unit?.specs || {};

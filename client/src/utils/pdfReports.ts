@@ -13,41 +13,65 @@ export const formatBs = (cents: number | undefined | null) => {
 };
 
 // Función base para crear PDF
-export const createPDF = (title: string) => {
+export const createPDF = (title: string, companyConfig?: any) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  // Logo (si existe)
-  try {
-    // Intentamos cargar el logo desde el path público
-    // Nota: Para producción, es mejor pasar el logo como base64
-    doc.addImage("/logo.png", "PNG", 10, 10, 30, 30);
-  } catch (e) {
-    console.log("Logo not found or could not be loaded");
+  const companyName = companyConfig?.name || "HK EQUIPOS TECNOLÓGICOS";
+  const companyLogo = companyConfig?.logo;
+
+  // Logo de la empresa (si existe)
+  if (companyLogo) {
+    try {
+      const format = companyLogo.startsWith("data:image/jpeg") || companyLogo.startsWith("data:image/jpg") ? "JPEG" : "PNG";
+      doc.addImage(companyLogo, format, 14, 10, 24, 24);
+    } catch (e) {
+      console.log("Could not render companyConfig logo in PDF", e);
+      try {
+        doc.addImage("/logo.png", "PNG", 14, 10, 24, 24);
+      } catch (e2) {}
+    }
+  } else {
+    try {
+      doc.addImage("/logo.png", "PNG", 14, 10, 24, 24);
+    } catch (e) {}
   }
 
   // Header
-  doc.setFontSize(22);
-  doc.setTextColor(2, 62, 47); // Color verde oscuro de Vitalia
+  doc.setFontSize(18);
+  doc.setTextColor(15, 23, 42); // Slate 900
   doc.setFont("helvetica", "bold");
-  doc.text("VITALIA", pageWidth / 2, 20, { align: "center" });
+  doc.text(companyName.toUpperCase(), pageWidth / 2, 20, { align: "center" });
 
-  doc.setFontSize(14);
-  doc.setTextColor(100, 100, 100);
+  doc.setFontSize(12);
+  doc.setTextColor(71, 85, 105); // Slate 600
   doc.setFont("helvetica", "normal");
-  doc.text(title, pageWidth / 2, 30, { align: "center" });
+  doc.text(title, pageWidth / 2, 27, { align: "center" });
+
+  if (companyConfig?.address || companyConfig?.city || companyConfig?.phone || companyConfig?.whatsapp) {
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184); // Slate 400
+    const subtitle = [
+      companyConfig?.address,
+      companyConfig?.city,
+      companyConfig?.phone || companyConfig?.whatsapp ? `Tel: ${companyConfig.phone || companyConfig.whatsapp}` : ""
+    ].filter(Boolean).join(" · ");
+    if (subtitle) {
+      doc.text(subtitle, pageWidth / 2, 33, { align: "center" });
+    }
+  }
 
   // Línea separadora
   doc.setLineWidth(0.5);
-  doc.setDrawColor(2, 62, 47);
-  doc.line(20, 38, pageWidth - 20, 38);
+  doc.setDrawColor(37, 99, 235); // Azul 600
+  doc.line(14, 37, pageWidth - 14, 37);
 
   // Footer con fecha
   const now = new Date();
-  doc.setFontSize(10);
-  doc.setTextColor(100, 100, 100);
+  doc.setFontSize(8.5);
+  doc.setTextColor(148, 163, 184);
   doc.text(
-    `Generado: ${format(now, "dd 'de' MMMM 'de' yyyy HH:mm", { locale: es })}`,
+    `${companyName} · Generado: ${format(now, "dd 'de' MMMM 'de' yyyy HH:mm", { locale: es })}`,
     pageWidth / 2,
     doc.internal.pageSize.getHeight() - 10,
     { align: "center" }
@@ -60,22 +84,22 @@ export const createPDF = (title: string) => {
 export const getTableOptions = (startY: number) => ({
   startY,
   headStyles: {
-    fillColor: [2, 62, 47], // Verde Vitalia
+    fillColor: [37, 99, 235], // Azul
     textColor: 255,
     fontStyle: "bold",
   },
   bodyStyles: {
-    textColor: [40, 40, 40],
+    textColor: [30, 41, 59],
   },
   alternateRowStyles: {
-    fillColor: [245, 245, 245] as [number, number, number],
+    fillColor: [248, 250, 252] as [number, number, number],
   },
-  margin: { top: 10, left: 20, right: 20 },
+  margin: { top: 10, left: 14, right: 14 },
 });
 
 // 1. REPORTE DE PEDIDOS
-export const generateOrdersPDF = (orders: any[], filters: any) => {
-  const doc = createPDF("Reporte de Pedidos");
+export const generateOrdersPDF = (orders: any[], filters: any, companyConfig?: any) => {
+  const doc = createPDF("Reporte de Pedidos", companyConfig);
 
   let y = 45;
 
@@ -141,8 +165,8 @@ export const generateOrdersPDF = (orders: any[], filters: any) => {
 };
 
 // 2. REPORTE DE VENTAS
-export const generateSalesPDF = (sales: any[], filters: any) => {
-  const doc = createPDF("Reporte de Ventas");
+export const generateSalesPDF = (sales: any[], filters: any, companyConfig?: any) => {
+  const doc = createPDF("Reporte de Ventas", companyConfig);
 
   let y = 45;
 
@@ -207,8 +231,8 @@ export const generateSalesPDF = (sales: any[], filters: any) => {
 };
 
 // 3. REPORTE DE INVENTARIO
-export const generateInventoryPDF = (products: any[], inventory: any[]) => {
-  const doc = createPDF("Reporte de Inventario");
+export const generateInventoryPDF = (products: any[], inventory: any[], companyConfig?: any) => {
+  const doc = createPDF("Reporte de Inventario", companyConfig);
 
   let y = 45;
 
@@ -269,8 +293,8 @@ export const generateInventoryPDF = (products: any[], inventory: any[]) => {
 };
 
 // 4. REPORTE FINANCIERO
-export const generateFinancePDF = (transactions: any[], cashClosures: any[]) => {
-  const doc = createPDF("Reporte Financiero");
+export const generateFinancePDF = (transactions: any[], cashClosures: any[], companyConfig?: any) => {
+  const doc = createPDF("Reporte Financiero", companyConfig);
 
   let y = 45;
 
@@ -350,8 +374,8 @@ export const generateFinancePDF = (transactions: any[], cashClosures: any[]) => 
 };
 
 // 5. REPORTE DE CLIENTES
-export const generateCustomersPDF = (customers: any[]) => {
-  const doc = createPDF("Reporte de Clientes");
+export const generateCustomersPDF = (customers: any[], companyConfig?: any) => {
+  const doc = createPDF("Reporte de Clientes", companyConfig);
 
   let y = 45;
 
@@ -387,8 +411,8 @@ export const generateCustomersPDF = (customers: any[]) => {
 };
 
 // 6. REPORTE DE MOVIMIENTOS DE INVENTARIO
-export const generateInventoryMovementsPDF = (movements: any[], products: any[]) => {
-  const doc = createPDF("Reporte de Movimientos de Inventario");
+export const generateInventoryMovementsPDF = (movements: any[], products: any[], companyConfig?: any) => {
+  const doc = createPDF("Reporte de Movimientos de Inventario", companyConfig);
 
   let y = 45;
 
@@ -440,8 +464,8 @@ export const generateInventoryMovementsPDF = (movements: any[], products: any[])
 };
 
 // 7. REPORTE DE AUDITORÍA / HISTORIAL DE CAMBIOS
-export const generateAuditPDF = (logs: any[]) => {
-  const doc = createPDF("Historial de Cambios (Auditoría)");
+export const generateAuditPDF = (logs: any[], companyConfig?: any) => {
+  const doc = createPDF("Historial de Cambios (Auditoría)", companyConfig);
 
   let y = 45;
 
@@ -486,8 +510,8 @@ export const generateAuditPDF = (logs: any[]) => {
 };
 
 // 8. REPORTE DE ARQUEO DE CAJA
-export const generateArqueoPDF = (data: any) => {
-  const doc = createPDF("Comprobante de Arqueo y Cierre");
+export const generateArqueoPDF = (data: any, companyConfig?: any) => {
+  const doc = createPDF("Comprobante de Arqueo y Cierre", companyConfig);
 
   let y = 45;
 

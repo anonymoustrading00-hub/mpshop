@@ -58,6 +58,7 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
   const { data: productsData } = trpc.units.list.useQuery({ status: "available", limit: 200 } as any);
   const { data: customers } = trpc.customers.list.useQuery();
   const { data: quotationsList, isLoading } = trpc.quotations.list.useQuery();
+  const { data: companyConfig } = trpc.settings.getCompanyConfig.useQuery();
   const { data: nextQuotationData } = trpc.quotations.getNextNumber.useQuery();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -691,10 +692,15 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
                 <div ref={printRef} style={{ padding: '40px', fontFamily: 'sans-serif', color: '#111', background: 'white' }}>
                   <div style={{ borderBottom: '2px solid #111', paddingBottom: '20px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                      <img src={`${window.location.origin}/logo.png`} alt="Vitalia Logo" style={{ height: '60px', width: 'auto', objectFit: 'contain' }} />
+                      {companyConfig?.logo ? (
+                        <img src={companyConfig.logo} alt={companyConfig.name || "Logo"} style={{ height: '60px', width: 'auto', objectFit: 'contain' }} />
+                      ) : (
+                        <img src={`${window.location.origin}/logo.png`} alt="Logo" style={{ height: '60px', width: 'auto', objectFit: 'contain' }} />
+                      )}
                       <div>
-                        <h1 style={{ margin: 0, fontSize: '28px' }}>COTIZACIÓN</h1>
-                        <p style={{ margin: '5px 0 0 0', color: '#555' }}>Nº {detailQuery.data.quotation.quotationNumber}</p>
+                        <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{companyConfig?.name || "HK EQUIPOS TECNOLÓGICOS"}</div>
+                        <h1 style={{ margin: 0, fontSize: '26px' }}>COTIZACIÓN</h1>
+                        <p style={{ margin: '3px 0 0 0', color: '#555' }}>Nº {detailQuery.data.quotation.quotationNumber}</p>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>

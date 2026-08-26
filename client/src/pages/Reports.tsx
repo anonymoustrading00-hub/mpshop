@@ -43,6 +43,7 @@ export default function Reports() {
     endDate: dateRange.endDate,
     limit: 200,
   });
+  const { data: companyConfig } = trpc.settings.getCompanyConfig.useQuery();
 
   const isLoading = ordersQuery.isLoading ||
     salesQuery.isLoading ||
@@ -55,14 +56,14 @@ export default function Reports() {
   // Funciones de descarga
   const downloadOrdersReport = () => {
     if (ordersQuery.data) {
-      const doc = generateOrdersPDF(ordersQuery.data, dateRange);
+      const doc = generateOrdersPDF(ordersQuery.data, dateRange, companyConfig);
       doc.save(`reporte-pedidos-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     }
   };
 
   const downloadSalesReport = () => {
     if (salesQuery.data) {
-      const doc = generateSalesPDF(salesQuery.data, dateRange);
+      const doc = generateSalesPDF(salesQuery.data, dateRange, companyConfig);
       doc.save(`reporte-ventas-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     }
   };
@@ -71,7 +72,8 @@ export default function Reports() {
     if (inventoryQuery.data) {
       const doc = generateInventoryPDF(
         inventoryQuery.data.products,
-        inventoryQuery.data.inventory
+        inventoryQuery.data.inventory,
+        companyConfig
       );
       doc.save(`reporte-inventario-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     }
@@ -81,7 +83,8 @@ export default function Reports() {
     if (movementsQuery.data) {
       const doc = generateInventoryMovementsPDF(
         movementsQuery.data.movements,
-        movementsQuery.data.products
+        movementsQuery.data.products,
+        companyConfig
       );
       doc.save(`reporte-movimientos-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     }
@@ -91,7 +94,8 @@ export default function Reports() {
     if (financeQuery.data) {
       const doc = generateFinancePDF(
         financeQuery.data.transactions,
-        financeQuery.data.closures
+        financeQuery.data.closures,
+        companyConfig
       );
       doc.save(`reporte-financiero-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     }
@@ -99,14 +103,14 @@ export default function Reports() {
 
   const downloadCustomersReport = () => {
     if (customersQuery.data) {
-      const doc = generateCustomersPDF(customersQuery.data);
+      const doc = generateCustomersPDF(customersQuery.data, companyConfig);
       doc.save(`reporte-clientes-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     }
   };
 
   const downloadAuditReport = () => {
     if (auditQuery.data) {
-      const doc = generateAuditPDF(auditQuery.data);
+      const doc = generateAuditPDF(auditQuery.data, companyConfig);
       doc.save(`reporte-auditoria-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     }
   };

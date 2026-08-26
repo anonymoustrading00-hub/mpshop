@@ -278,9 +278,9 @@ export default function AppHeader() {
       <div className="flex md:hidden items-center justify-between w-full px-4 py-3">
         <Link href="/">
           <div className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="Vitalia" className="h-9 w-auto object-contain" />
+            <img src={companyConfig?.logo || "/logo.png"} alt={companyConfig?.name || "Logo"} className="h-9 w-auto object-contain" />
             <div className="flex flex-col">
-              <span className="text-[14px] font-extrabold text-slate-900 leading-tight tracking-tight">Vitalia</span>
+              <span className="text-[14px] font-extrabold text-slate-900 leading-tight tracking-tight">{companyConfig?.name || "Vitalia"}</span>
               <span className="text-[9px] font-bold uppercase tracking-widest text-primary/60 leading-none">
                 Op. diaria
               </span>
