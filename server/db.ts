@@ -2849,15 +2849,20 @@ function getSaleFinanceNote(saleNumber: string) {
   return `Venta ${saleNumber}`;
 }
 
-function mapSaleWithRelations(sale: any, usersList: any[], customersList: any[]) {
+function mapSaleWithRelations(sale: any, usersList: any[], customersList: any[], branchesList?: any[]) {
   const seller = usersList.find((user: any) => user.id === sale.soldBy);
   const customer = customersList.find((item: any) => item.id === sale.customerId);
+  const branch = branchesList?.find((b: any) => b.id === sale.branchId);
 
   return {
     ...sale,
     sellerName: seller?.name || "Desconocido",
     customerDisplayName: customer?.name || sale.customerName || "Anónimo",
     customerCode: customer?.clientNumber || null,
+    customerTaxId: customer?.taxId || (sale as any).customerTaxId || null,
+    customerPhone: customer?.phone || customer?.whatsapp || (sale as any).customerPhone || null,
+    customerAddress: customer?.address || null,
+    branchName: branch?.name || "GENERAL",
   };
 }
 
@@ -3405,14 +3410,15 @@ export async function getAllSales(branchId?: number) {
     rawSalesQuery = rawSalesQuery.where(eq(sales.branchId, branchId));
   }
 
-  const [rawSales, usersList, customersList] = await Promise.all([
+  const [rawSales, usersList, customersList, branchesList] = await Promise.all([
     rawSalesQuery,
     db.select({ id: users.id, name: users.name }).from(users),
     db.select({ id: customers.id, name: customers.name, clientNumber: customers.clientNumber }).from(customers),
+    db.select({ id: branches.id, name: branches.name }).from(branches),
   ]);
 
   return rawSales
-    .map((sale: any) => mapSaleWithRelations(sale, usersList, customersList))
+    .map((sale: any) => mapSaleWithRelations(sale, usersList, customersList, branchesList))
     .sort((a: any, b: any) => new Date(b.createdAt || Date.now()).getTime() - new Date(a.createdAt || Date.now()).getTime());
 }
 
@@ -3420,16 +3426,25 @@ export async function getSaleById(saleId: number) {
   const db = await getDb();
   if (!db) {
     const sale = MOCK_SALES.find((entry: any) => entry.id === saleId);
-    return sale ? mapSaleWithRelations(sale, MOCK_USERS, MOCK_CUSTOMERS) : null;
+    return sale ? mapSaleWithRelations(sale, MOCK_USERS, MOCK_CUSTOMERS, MOCK_BRANCHES) : null;
   }
 
-  const [result, usersList, customersList] = await Promise.all([
+  const [result, usersList, customersList, branchesList] = await Promise.all([
     db.select().from(sales).where(eq(sales.id, saleId)).limit(1),
     db.select({ id: users.id, name: users.name }).from(users),
-    db.select({ id: customers.id, name: customers.name, clientNumber: customers.clientNumber }).from(customers),
+    db.select({
+      id: customers.id,
+      name: customers.name,
+      clientNumber: customers.clientNumber,
+      phone: customers.phone,
+      whatsapp: customers.whatsapp,
+      taxId: customers.taxId,
+      address: customers.address
+    }).from(customers),
+    db.select({ id: branches.id, name: branches.name }).from(branches),
   ]);
 
-  return result[0] ? mapSaleWithRelations(result[0], usersList, customersList) : null;
+  return result[0] ? mapSaleWithRelations(result[0], usersList, customersList, branchesList) : null;
 }
 
 export async function getSaleItemsBySaleId(saleId: number) {
@@ -3441,20 +3456,30 @@ export async function getSaleItemsBySaleId(saleId: number) {
       const unit = MOCK_UNITS.find((u: any) => u.id === productRef);
       if (unit) {
         const name = `${unit.brand ?? ""} ${unit.model ?? ""}`.trim() || unit.code || `Unidad #${productRef}`;
-        return { ...item, productName: name, productCode: unit.code || "" };
+        return { ...item, productName: name, productCode: unit.code || "", unitType: "PZA" };
       }
-      const product = MOCK_PRODUCTS.find((p: any) => p.id === productRef);
-      if (product) {
-        return { ...item, productName: product.name, productCode: product.code || "" };
-      }
-      return { ...item, productName: `Producto #${productRef ?? "?"}`, productCode: "" };
+      return { ...item, productName: `Producto #${productRef ?? "?"}`, productCode: "", unitType: "PZA" };
     });
   }
   const items = await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
   return await Promise.all(items.map(async (item: any) => {
-    const unit = await db.select({ brand: units.brand, model: units.model, code: units.code }).from(units).where(eq(units.id, item.unitId)).limit(1);
-    const u = unit[0];
-    return { ...item, productName: u ? `${u.brand} ${u.model}` : `Unidad #${item.unitId}`, productCode: u?.code || '' };
+    let name = item.productName;
+    let code = item.productCode || "";
+    const uId = item.unitId ?? item.productId;
+    if (uId) {
+      const unit = await db.select({ brand: units.brand, model: units.model, code: units.code }).from(units).where(eq(units.id, uId)).limit(1);
+      const u = unit[0];
+      if (u) {
+        name = `${u.brand || ""} ${u.model || ""}`.trim() || u.code || `Unidad #${uId}`;
+        code = u.code || "";
+      }
+    }
+    return {
+      ...item,
+      productName: name || `Artículo #${item.id}`,
+      productCode: code,
+      unitType: "PZA",
+    };
   }));
 }
 

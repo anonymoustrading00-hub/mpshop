@@ -127,82 +127,467 @@ function paymentStatusLabel(status: PaymentStatus | string) {
   return status === "completed" ? "Pagada" : "Pendiente";
 }
 
-function printSaleTicket(detail: any) {
+function numeroALetras(montoCentavos: number): string {
+  const total = montoCentavos / 100;
+  const entero = Math.floor(total);
+  const centavos = Math.round((total - entero) * 100);
+  const centavosStr = String(centavos).padStart(2, "0") + "/100";
+
+  function unidades(num: number): string {
+    switch (num) {
+      case 1: return "UN";
+      case 2: return "DOS";
+      case 3: return "TRES";
+      case 4: return "CUATRO";
+      case 5: return "CINCO";
+      case 6: return "SEIS";
+      case 7: return "SIETE";
+      case 8: return "OCHO";
+      case 9: return "NUEVE";
+      default: return "";
+    }
+  }
+
+  function decenasY(strSin: string, numUnidades: number): string {
+    if (numUnidades > 0) return `${strSin} Y ${unidades(numUnidades)}`;
+    return strSin;
+  }
+
+  function decenas(num: number): string {
+    if (num < 10) return unidades(num);
+    if (num >= 11 && num <= 19) {
+      switch (num) {
+        case 11: return "ONCE";
+        case 12: return "DOCE";
+        case 13: return "TRECE";
+        case 14: return "CATORCE";
+        case 15: return "QUINCE";
+        case 16: return "DIECISEIS";
+        case 17: return "DIECISIETE";
+        case 18: return "DIECIOCHO";
+        case 19: return "DIECINUEVE";
+      }
+    }
+    const d = Math.floor(num / 10);
+    const u = num % 10;
+    switch (d) {
+      case 1: return "DIEZ";
+      case 2: return u === 0 ? "VEINTE" : `VEINTI${unidades(u)}`;
+      case 3: return decenasY("TREINTA", u);
+      case 4: return decenasY("CUARENTA", u);
+      case 5: return decenasY("CINCUENTA", u);
+      case 6: return decenasY("SESENTA", u);
+      case 7: return decenasY("SETENTA", u);
+      case 8: return decenasY("OCHENTA", u);
+      case 9: return decenasY("NOVENTA", u);
+      default: return "";
+    }
+  }
+
+  function centenas(num: number): string {
+    if (num === 100) return "CIEN";
+    if (num < 100) return decenas(num);
+    const c = Math.floor(num / 100);
+    const resto = num % 100;
+    let textoC = "";
+    switch (c) {
+      case 1: textoC = "CIENTO"; break;
+      case 2: textoC = "DOSCIENTOS"; break;
+      case 3: textoC = "TRESCIENTOS"; break;
+      case 4: textoC = "CUATROCIENTOS"; break;
+      case 5: textoC = "QUINIENTOS"; break;
+      case 6: textoC = "SEISCIENTOS"; break;
+      case 7: textoC = "SETECIENTOS"; break;
+      case 8: textoC = "OCHOCIENTOS"; break;
+      case 9: textoC = "NOVECIENTOS"; break;
+    }
+    return resto === 0 ? textoC : `${textoC} ${decenas(resto)}`;
+  }
+
+  function seccion(num: number, divisor: number, strSingular: string, strPlural: string): string {
+    const cientos = Math.floor(num / divisor);
+    if (cientos > 0) {
+      if (cientos > 1) {
+        return `${centenas(cientos)} ${strPlural}`;
+      } else {
+        return strSingular;
+      }
+    }
+    return "";
+  }
+
+  function miles(num: number): string {
+    const divisor = 1000;
+    const cientos = Math.floor(num / divisor);
+    const resto = num - cientos * divisor;
+    const strMiles = seccion(num, divisor, "UN MIL", "MIL");
+    const strCentenas = centenas(resto);
+    if (strMiles === "") return strCentenas;
+    return `${strMiles} ${strCentenas}`.trim();
+  }
+
+  function millones(num: number): string {
+    if (num === 0) return "CERO";
+    const divisor = 1000000;
+    const cientos = Math.floor(num / divisor);
+    const resto = num - cientos * divisor;
+    const strMillones = seccion(num, divisor, "UN MILLON", "MILLONES");
+    const strMiles = miles(resto);
+    if (strMillones === "") return strMiles;
+    return `${strMillones} ${strMiles}`.trim();
+  }
+
+  return `${millones(entero)} ${centavosStr} BOLIVIANOS`;
+}
+
+function printSaleTicket(detail: any, companyConfig?: any) {
   if (!detail?.sale) {
     toast.error("Abre el detalle de la venta antes de imprimir");
     return;
   }
 
-  const itemsRows = (detail.items || [])
-    .map((item: any) => `
-      <tr>
-        <td>${item.productName}</td>
-        <td style="text-align:center;">${item.quantity}</td>
-        <td style="text-align:right;">${formatCurrency(item.finalUnitPrice || item.basePrice)}</td>
-        <td style="text-align:right;">${formatCurrency(item.subtotal)}</td>
-      </tr>
-    `)
+  const sale = detail.sale;
+  const items = detail.items || [];
+  const totalQty = items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
+
+  const companyName = companyConfig?.name || "HK EQUIPOS TECNOLÓGICOS";
+  const companyCity = companyConfig?.city || "La Paz - Bolivia";
+  const companyPhone = companyConfig?.phone || companyConfig?.whatsapp || "";
+  const companyAddress = companyConfig?.address || "";
+  const logoHtml = companyConfig?.logo
+    ? `<img src="${companyConfig.logo}" style="max-height: 52px; max-width: 130px; object-fit: contain;" />`
+    : `<div style="display:inline-flex; align-items:center; gap:6px;">
+        <div style="width:34px; height:34px; border-radius:50%; background:#f59e0b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:bold;">💡</div>
+        <div>
+          <div style="font-size:11px; font-weight:900; color:#1e293b;">${companyName}</div>
+          <div style="font-size:9px; color:#64748b;">Crea tu Logo · tu idea, tu estilo</div>
+        </div>
+       </div>`;
+
+  const formattedDate = new Date(sale.createdAt).toLocaleDateString("es-BO", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+  const rowsHtml = items
+    .map((item: any, idx: number) => {
+      const pUnit = ((item.finalUnitPrice || item.basePrice || 0) / 100).toFixed(2);
+      const subtotal = ((item.subtotal || 0) / 100).toFixed(2);
+      const code = item.productCode || `0000${idx + 1}`;
+      const unitType = item.unitType || "PZA";
+      return `
+        <tr>
+          <td style="text-align:center; padding: 4px 2px;">${idx + 1}</td>
+          <td style="padding: 4px 6px; font-family: monospace; font-size: 10px;">${code}</td>
+          <td style="padding: 4px 6px; font-weight: bold; text-transform: uppercase;">${item.productName || "PRODUCTO GENERAL"}</td>
+          <td style="text-align:center; padding: 4px 2px;">${unitType}</td>
+          <td style="text-align:center; padding: 4px 2px; font-weight: bold;">${item.quantity || 1}</td>
+          <td style="text-align:right; padding: 4px 6px; font-family: monospace;">${pUnit}</td>
+          <td style="text-align:right; padding: 4px 6px; font-family: monospace; font-weight: bold;">${subtotal}</td>
+        </tr>
+      `;
+    })
     .join("");
 
-  const win = window.open("", "_blank", "width=420,height=720");
+  const totalAmountStr = ((sale.total || 0) / 100).toFixed(2);
+  const literalTotal = numeroALetras(sale.total || 0);
+
+  const notesText = sale.notes
+    ? sale.notes
+    : `VENTA EN ${paymentMethodLabel(sale.paymentMethod).toUpperCase()} · GARANTÍA ${sale.warrantyDays || 30} DÍAS`;
+
+  const win = window.open("", "_blank", "width=850,height=750");
   if (!win) {
-    toast.error("No se pudo abrir la ventana de impresión");
+    toast.error("El navegador bloqueó la ventana de impresión. Por favor permite ventanas emergentes.");
     return;
   }
 
   win.document.write(`
+    <!DOCTYPE html>
     <html>
       <head>
-        <title>Ticket ${detail.sale.saleNumber}</title>
+        <meta charset="utf-8" />
+        <title>Nota de Venta - ${sale.saleNumber}</title>
         <style>
-          body { font-family: Arial, sans-serif; padding: 20px; color: #111; }
-          h1, p { margin: 0; }
-          .header { text-align: center; margin-bottom: 16px; }
-          .meta { margin: 12px 0; font-size: 14px; }
-          .meta div { margin-bottom: 6px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-          th, td { border-bottom: 1px solid #ddd; padding: 8px 4px; font-size: 14px; }
-          th { text-transform: uppercase; font-size: 12px; color: #555; }
-          .summary { margin-top: 16px; font-size: 14px; }
-          .summary div { display: flex; justify-content: space-between; margin-bottom: 6px; }
-          .total { font-size: 18px; font-weight: 700; border-top: 2px solid #111; padding-top: 8px; }
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+            color: #111;
+            background: #fff;
+            padding: 24px;
+            font-size: 11px;
+            line-height: 1.35;
+          }
+          @media print {
+            body { padding: 8px; }
+            @page { margin: 8mm; size: auto; }
+          }
+          .voucher-box {
+            max-width: 780px;
+            margin: 0 auto;
+            border: 1px solid #cbd5e1;
+            padding: 20px;
+            border-radius: 8px;
+          }
+          @media print {
+            .voucher-box { border: none; padding: 0; }
+          }
+          .header-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+          }
+          .logo-col {
+            flex: 1.2;
+            min-width: 140px;
+          }
+          .company-col {
+            flex: 2;
+            text-align: center;
+            padding-top: 2px;
+          }
+          .company-col h2 {
+            font-size: 14px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: #0f172a;
+          }
+          .company-col p {
+            font-size: 11px;
+            color: #475569;
+            margin-top: 2px;
+          }
+          .doc-col {
+            flex: 1.3;
+            text-align: right;
+          }
+          .doc-title {
+            font-size: 16px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #0f172a;
+            margin-bottom: 6px;
+          }
+          .dashed-box {
+            display: inline-block;
+            border: 1.5px dashed #334155;
+            border-radius: 12px;
+            padding: 6px 14px;
+            text-align: left;
+            background: #f8fafc;
+          }
+          .dashed-box div {
+            font-size: 11px;
+            font-weight: bold;
+          }
+          .dashed-box span {
+            font-family: monospace;
+            font-weight: 800;
+          }
+          .info-block {
+            border-top: 1.5px dashed #64748b;
+            padding: 8px 2px;
+            margin-top: 8px;
+            font-size: 11px;
+          }
+          .info-line {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            gap: 12px;
+          }
+          .info-line div {
+            flex: 1;
+          }
+          .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+            font-size: 11px;
+          }
+          .items-table thead tr {
+            border-top: 1.5px dashed #334155;
+            border-bottom: 1.5px dashed #334155;
+          }
+          .items-table th {
+            padding: 6px 4px;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+            color: #0f172a;
+          }
+          .items-table tbody tr {
+            border-bottom: 1px dashed #e2e8f0;
+          }
+          .items-table tbody tr:last-child {
+            border-bottom: 1.5px dashed #334155;
+          }
+          .summary-block {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-top: 10px;
+            padding: 6px 2px;
+            font-size: 11px;
+          }
+          .summary-left {
+            flex: 1.6;
+            padding-right: 16px;
+          }
+          .summary-right {
+            flex: 1;
+            text-align: right;
+          }
+          .literal-text {
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+          }
+          .notes-text {
+            font-size: 10px;
+            color: #475569;
+          }
+          .total-box {
+            display: flex;
+            justify-content: flex-end;
+            align-items: baseline;
+            gap: 20px;
+            font-size: 11px;
+          }
+          .total-box .total-num {
+            font-size: 14px;
+            font-weight: 900;
+            font-family: monospace;
+            border-bottom: 1.5px dashed #0f172a;
+            padding: 2px 8px;
+          }
+          .signatures-block {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 48px;
+            padding: 0 16px;
+            text-align: center;
+          }
+          .sig-box {
+            width: 28%;
+          }
+          .sig-line {
+            border-top: 1.5px dashed #475569;
+            margin-bottom: 4px;
+          }
+          .sig-label {
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: #1e293b;
+          }
+          .sig-name {
+            font-size: 9px;
+            color: #64748b;
+            margin-top: 1px;
+          }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>Vitalia</h1>
-          <p>Ticket simple de venta</p>
+        <div class="voucher-box">
+          <div class="header-row">
+            <div class="logo-col">
+              ${logoHtml}
+            </div>
+            <div class="company-col">
+              <h2>${companyName}</h2>
+              <p>${companyCity}</p>
+              ${companyPhone ? `<p>Tel: ${companyPhone}</p>` : ""}
+            </div>
+            <div class="doc-col">
+              <div class="doc-title">NOTA DE VENTA</div>
+              <div class="dashed-box">
+                <div>Nro: <span>${sale.saleNumber}</span></div>
+                <div>Almacén: <span>${sale.branchName || "GENERAL"}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="info-block">
+            <div class="info-line">
+              <div><strong>Fecha:</strong> ${formattedDate}</div>
+              <div><strong>Dirección:</strong> ${sale.customerAddress || companyAddress || "La Paz - Bolivia"}</div>
+            </div>
+            <div class="info-line">
+              <div><strong>Cliente:</strong> ${sale.customerDisplayName || "Anónimo"}</div>
+              <div><strong>NIT/CI:</strong> ${sale.customerTaxId || "S/N"}</div>
+              <div><strong>Teléfono:</strong> ${sale.customerPhone || "S/N"}</div>
+            </div>
+          </div>
+
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th style="width: 5%; text-align: center;">Nº</th>
+                <th style="width: 16%;">CODIGO</th>
+                <th style="width: 44%;">DESCRIPCIÓN</th>
+                <th style="width: 8%; text-align: center;">UNIDAD</th>
+                <th style="width: 7%; text-align: center;">CANT.</th>
+                <th style="width: 10%; text-align: right;">P. UNIT.</th>
+                <th style="width: 10%; text-align: right;">IMPORTE</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <div class="summary-block">
+            <div class="summary-left">
+              <div class="literal-text"><strong>SON:</strong> ${literalTotal}</div>
+              <div class="notes-text"><strong>Nota/Ref.:</strong> ${notesText}</div>
+            </div>
+            <div class="summary-right">
+              <div class="total-box">
+                <div><strong>TOTAL:</strong> &nbsp; <span style="border-bottom: 1.5px dashed #0f172a; padding: 2px 6px; font-family: monospace; font-weight: bold;">${totalQty}.00</span></div>
+                <div class="total-num">${totalAmountStr}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="signatures-block">
+            <div class="sig-box">
+              <div class="sig-line"></div>
+              <div class="sig-label">VENDEDOR</div>
+              <div class="sig-name">${sale.sellerName || "—"}</div>
+            </div>
+            <div class="sig-box">
+              <div class="sig-line"></div>
+              <div class="sig-label">CLIENTE</div>
+              <div class="sig-name">${sale.customerDisplayName || "—"}</div>
+            </div>
+            <div class="sig-box">
+              <div class="sig-line"></div>
+              <div class="sig-label">RECEPCIÓN</div>
+              <div class="sig-name">&nbsp;</div>
+            </div>
+          </div>
         </div>
-        <div class="meta">
-          <div><strong>Venta:</strong> ${detail.sale.saleNumber}</div>
-          <div><strong>Fecha:</strong> ${new Date(detail.sale.createdAt).toLocaleString("es-BO")}</div>
-          <div><strong>Cliente:</strong> ${detail.sale.customerDisplayName || "Anónimo"}</div>
-          <div><strong>Vendedor:</strong> ${detail.sale.sellerName || "Sin nombre"}</div>
-          <div><strong>Pago:</strong> ${paymentMethodLabel(detail.sale.paymentMethod)}</div>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Cant.</th>
-              <th>P. Unit.</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>${itemsRows}</tbody>
-        </table>
-        <div class="summary">
-          <div><span>Subtotal</span><strong>${formatCurrency(detail.sale.subtotal)}</strong></div>
-          <div><span>Descuento global</span><strong>${formatCurrency(detail.sale.discountAmount || 0)}</strong></div>
-          <div class="total"><span>Total</span><strong>${formatCurrency(detail.sale.total)}</strong></div>
-        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 300);
+          };
+        </script>
       </body>
     </html>
   `);
 
   win.document.close();
-  win.focus();
-  win.print();
 }
 
 export default function Sales() {
@@ -214,6 +599,7 @@ export default function Sales() {
   const { data: closureStatus } = trpc.finance.hasPendingClosure.useQuery();
   const { data: salesList, isLoading } = trpc.sales.list.useQuery();
   const { data: nextSaleData } = trpc.sales.getNextSaleNumber.useQuery();
+  const { data: companyConfig } = trpc.settings.getCompanyConfig.useQuery();
 
   const [activeTab, setActiveTab] = useState("sales");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -1703,163 +2089,182 @@ export default function Sales() {
       </Dialog>
 
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-h-[92vh] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-[1.6rem] border-white/70 bg-white/95 p-4 sm:max-w-[min(960px,94vw)] sm:p-6">
-          <DialogHeader>
-            <DialogTitle>Formulario de venta</DialogTitle>
-            <DialogDescription>
-              Comprobante generado al momento de registrar la venta.
-            </DialogDescription>
+        <DialogContent className="max-h-[94vh] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-3xl border-slate-200 bg-slate-100/70 p-4 sm:max-w-[min(960px,94vw)] sm:p-6">
+          <DialogHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-200">
+            <div>
+              <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <FileText className="h-5 w-5 text-emerald-600" />
+                Nota de Venta
+                {detail?.sale?.saleNumber && (
+                  <Badge className="bg-slate-900 text-emerald-400 font-mono text-xs ml-1 border-none">
+                    #{detail.sale.saleNumber}
+                  </Badge>
+                )}
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
+                Comprobante oficial de venta y entrega de mercadería.
+              </DialogDescription>
+            </div>
+            {detail?.sale && (
+              <Button
+                onClick={() => printSaleTicket(detail, companyConfig)}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1.5 shadow-md"
+              >
+                <Printer className="h-4 w-4" />
+                Imprimir Nota de Venta
+              </Button>
+            )}
           </DialogHeader>
 
           {!detail ? (
-            <div className="py-10 text-center text-muted-foreground">Cargando detalle...</div>
+            <div className="py-12 text-center text-slate-400 text-sm">Cargando datos de la venta...</div>
           ) : (
-            <div className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Venta</CardTitle>
-                  </CardHeader>
-                  <CardContent className="font-bold">{detail.sale.saleNumber}</CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Cliente</CardTitle>
-                  </CardHeader>
-                  <CardContent className="font-bold">{detail.sale.customerDisplayName || "Anónimo"}</CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Estado</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Badge variant={detail.sale.status === "cancelled" ? "destructive" : "default"}>
-                      {detail.sale.status === "cancelled" ? "Anulada" : "Activa"}
-                    </Badge>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Pago</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-1">
-                    <div>{paymentMethodLabel(detail.sale.paymentMethod)}</div>
-                    <Badge variant={detail.sale.paymentStatus === "completed" ? "outline" : "secondary"}>
-                      {detail.sale.paymentStatus === "completed" ? "Pagada" : "Pendiente"}
-                    </Badge>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {isMobile ? (
-                <div className="space-y-3">
-                  {(detail.items || []).map((item: any) => (
-                    <div key={item.id} className="rounded-[1.3rem] border border-white/70 bg-white/85 p-4 shadow-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-slate-900">{item.productName}</p>
-                          <p className="text-xs text-muted-foreground">{item.productCode}</p>
-                        </div>
-                        <Badge variant="outline" className="rounded-full">
-                          x{item.quantity}
-                        </Badge>
+            <div className="space-y-5">
+              
+              {/* Documento Visual NOTA DE VENTA (Papel / Preview) */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-xs font-sans space-y-4">
+                
+                {/* Cabecera del Documento */}
+                <div className="flex flex-col sm:flex-row items-start justify-between gap-4 border-b border-dashed border-slate-300 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    {companyConfig?.logo ? (
+                      <img src={companyConfig.logo} alt="Logo" className="max-h-12 max-w-28 object-contain" />
+                    ) : (
+                      <div className="h-10 w-10 rounded-full bg-amber-500 text-white flex items-center justify-center text-xl font-bold shadow-xs">
+                        💡
                       </div>
-                      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                        <div className="rounded-xl border border-white/70 bg-slate-50/80 px-3 py-3">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Base</p>
-                          <p className="mt-1 font-semibold">{formatCurrency(item.basePrice)}</p>
-                        </div>
-                        <div className="rounded-xl border border-white/70 bg-slate-50/80 px-3 py-3">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Final</p>
-                          <p className="mt-1 font-semibold">{formatCurrency(item.finalUnitPrice || item.basePrice)}</p>
-                        </div>
-                        <div className="rounded-xl border border-white/70 bg-slate-50/80 px-3 py-3">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Descuento</p>
-                          <p className="mt-1 font-semibold">{formatCurrency(item.discountAmount || 0)}</p>
-                        </div>
-                        <div className="rounded-xl border border-white/70 bg-slate-50/80 px-3 py-3">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Subtotal</p>
-                          <p className="mt-1 font-bold text-slate-900">{formatCurrency(item.subtotal)}</p>
-                        </div>
+                    )}
+                    <div>
+                      <h2 className="font-black text-sm text-slate-900 uppercase tracking-tight">
+                        {companyConfig?.name || "HK EQUIPOS TECNOLÓGICOS"}
+                      </h2>
+                      <p className="text-[10px] text-slate-500 font-medium">
+                        {companyConfig?.city || "La Paz - Bolivia"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right sm:self-center">
+                    <div className="text-base font-black uppercase tracking-wider text-slate-900 mb-1">
+                      NOTA DE VENTA
+                    </div>
+                    <div className="inline-block border border-dashed border-slate-400 rounded-xl px-3 py-1 bg-slate-50 text-left">
+                      <div className="text-[11px] font-bold text-slate-800">
+                        Nro: <span className="font-mono font-black">{detail.sale.saleNumber}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-600">
+                        Almacén: <span className="font-bold">{detail.sale.branchName || "GENERAL"}</span>
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Producto</TableHead>
-                      <TableHead className="text-center">Cantidad</TableHead>
-                      <TableHead className="text-right">Base</TableHead>
-                      <TableHead className="text-right">Final</TableHead>
-                      <TableHead className="text-right">Desc.</TableHead>
-                      <TableHead className="text-right">Subtotal</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(detail.items || []).map((item: any) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <div className="font-medium">{item.productName}</div>
-                          <div className="text-xs text-muted-foreground">{item.productCode}</div>
-                        </TableCell>
-                        <TableCell className="text-center">{item.quantity}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.basePrice)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.finalUnitPrice || item.basePrice)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.discountAmount || 0)}</TableCell>
-                        <TableCell className="text-right font-semibold">{formatCurrency(item.subtotal)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
 
-              <div className="grid gap-6 md:grid-cols-[1fr,320px]">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Notas y auditoría</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-sm">
-                    <div><strong>Vendedor:</strong> {detail.sale.sellerName || "Sin nombre"}</div>
-                    <div><strong>Fecha:</strong> {new Date(detail.sale.createdAt).toLocaleString("es-BO")}</div>
-                    <div><strong>Canal:</strong> {detail.sale.saleChannel === "delivery" ? "Entrega" : "Local"}</div>
-                    {detail.sale.notes ? <div><strong>Notas:</strong> {detail.sale.notes}</div> : null}
-                    {detail.sale.cancelReason ? <div><strong>Motivo de anulación:</strong> {detail.sale.cancelReason}</div> : null}
-                  </CardContent>
-                </Card>
+                {/* Metadatos del Cliente y Transacción */}
+                <div className="border-b border-dashed border-slate-300 pb-3 space-y-1.5 text-[11px]">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div><strong>Fecha:</strong> {new Date(detail.sale.createdAt).toLocaleDateString("es-BO")} {new Date(detail.sale.createdAt).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" })}</div>
+                    <div><strong>Dirección:</strong> {detail.sale.customerAddress || companyConfig?.address || "La Paz - Bolivia"}</div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div><strong>Cliente:</strong> {detail.sale.customerDisplayName || "Anónimo"}</div>
+                    <div><strong>NIT/CI:</strong> {detail.sale.customerTaxId || "S/N"}</div>
+                    <div><strong>Teléfono:</strong> {detail.sale.customerPhone || "S/N"}</div>
+                  </div>
+                </div>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Totales</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <strong>{formatCurrency(detail.sale.subtotal)}</strong>
+                {/* Tabla de Items */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-y border-dashed border-slate-400 text-[10px] uppercase font-black text-slate-700 bg-slate-50/50">
+                        <th className="py-2 px-1 text-center w-8">Nº</th>
+                        <th className="py-2 px-2 w-28">CODIGO</th>
+                        <th className="py-2 px-2">DESCRIPCIÓN</th>
+                        <th className="py-2 px-1 text-center w-14">UNIDAD</th>
+                        <th className="py-2 px-1 text-center w-12">CANT.</th>
+                        <th className="py-2 px-2 text-right w-20">P. UNIT.</th>
+                        <th className="py-2 px-2 text-right w-24">IMPORTE</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-dashed divide-slate-200">
+                      {(detail.items || []).map((item: any, idx: number) => (
+                        <tr key={item.id} className="hover:bg-slate-50/60">
+                          <td className="py-2 px-1 text-center font-bold text-slate-500">{idx + 1}</td>
+                          <td className="py-2 px-2 font-mono text-[11px] text-slate-600">{item.productCode || `0000${idx + 1}`}</td>
+                          <td className="py-2 px-2 font-bold text-slate-900">{item.productName}</td>
+                          <td className="py-2 px-1 text-center text-slate-600">{item.unitType || "PZA"}</td>
+                          <td className="py-2 px-1 text-center font-bold text-slate-900">{item.quantity}</td>
+                          <td className="py-2 px-2 text-right font-mono">{formatCurrency(item.finalUnitPrice || item.basePrice)}</td>
+                          <td className="py-2 px-2 text-right font-mono font-bold text-slate-900">{formatCurrency(item.subtotal)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Resumen Final, Son en Letras y Totales */}
+                <div className="border-t border-dashed border-slate-400 pt-3 flex flex-col sm:flex-row items-start justify-between gap-3">
+                  <div className="space-y-1 sm:max-w-[65%]">
+                    <div className="text-[11px] font-bold text-slate-800 uppercase">
+                      <strong>SON:</strong> {numeroALetras(detail.sale.total)}
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Descuento global</span>
-                      <strong>{formatCurrency(detail.sale.discountAmount || 0)}</strong>
+                    <div className="text-[10px] text-slate-500">
+                      <strong>Nota/Ref.:</strong> {detail.sale.notes || `Pago: ${paymentMethodLabel(detail.sale.paymentMethod)} · Garantía: ${detail.sale.warrantyDays || 30} días`}
                     </div>
-                    <div className="flex items-center justify-between border-t pt-3 text-lg">
-                      <span className="font-semibold">Total</span>
-                      <strong>{formatCurrency(detail.sale.total)}</strong>
+                  </div>
+
+                  <div className="text-right sm:self-end">
+                    <div className="flex items-baseline gap-4 justify-end">
+                      <span className="text-xs font-bold text-slate-600">
+                        TOTAL: <span className="font-mono">{detail.items?.reduce((s: number, i: any) => s + i.quantity, 0) || 1}.00</span>
+                      </span>
+                      <span className="text-base font-black text-slate-900 font-mono border-b-2 border-dashed border-slate-900 pb-0.5">
+                        {formatCurrency(detail.sale.total)}
+                      </span>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
+
+                {/* Firmas: VENDEDOR, CLIENTE, RECEPCIÓN */}
+                <div className="pt-10 grid grid-cols-3 gap-6 text-center text-[10px]">
+                  <div>
+                    <div className="border-t border-dashed border-slate-400 pt-1 font-bold text-slate-700 uppercase">
+                      VENDEDOR
+                    </div>
+                    <div className="text-slate-400 text-[9px] truncate">{detail.sale.sellerName || "—"}</div>
+                  </div>
+                  <div>
+                    <div className="border-t border-dashed border-slate-400 pt-1 font-bold text-slate-700 uppercase">
+                      CLIENTE
+                    </div>
+                    <div className="text-slate-400 text-[9px] truncate">{detail.sale.customerDisplayName || "—"}</div>
+                  </div>
+                  <div>
+                    <div className="border-t border-dashed border-slate-400 pt-1 font-bold text-slate-700 uppercase">
+                      RECEPCIÓN
+                    </div>
+                    <div className="text-slate-400 text-[9px]">&nbsp;</div>
+                  </div>
+                </div>
+
               </div>
 
-              <div className="flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
+              {/* Acciones de Auditoría / Admin */}
+              <div className="flex flex-col gap-3 pt-2 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" className="gap-2" onClick={() => printSaleTicket(detail)}>
+                  <Button
+                    variant="outline"
+                    className="gap-2 bg-white"
+                    onClick={() => printSaleTicket(detail, companyConfig)}
+                  >
                     <Printer className="h-4 w-4" />
-                    Imprimir ticket
+                    Imprimir Nota de Venta
                   </Button>
+
                   {user?.role === "admin" && detail.sale.paymentStatus === "pending" && detail.sale.status !== "cancelled" ? (
                     <Button
                       variant="outline"
-                      className="gap-2"
+                      className="gap-2 bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50"
                       onClick={() => markPaidMutation.mutate({ saleId: detail.sale.id })}
                       disabled={markPaidMutation.isPending}
                     >
@@ -1870,17 +2275,17 @@ export default function Sales() {
                 </div>
 
                 {user?.role === "admin" && detail.sale.status !== "cancelled" ? (
-                  <div className="w-full space-y-2 md:w-[420px]">
-                    <Label>Anular venta</Label>
+                  <div className="w-full space-y-1.5 md:w-[380px]">
                     <div className="flex gap-2">
                       <Input
                         value={cancelReason}
                         onChange={(event) => setCancelReason(event.target.value)}
-                        placeholder="Motivo de la anulación"
+                        placeholder="Motivo para anular venta..."
+                        className="h-9 text-xs bg-white"
                       />
                       <Button
                         variant="destructive"
-                        className="gap-2"
+                        className="gap-1.5 h-9 text-xs"
                         onClick={() => cancelSaleMutation.mutate({ saleId: detail.sale.id, reason: cancelReason })}
                         disabled={cancelSaleMutation.isPending || (cancelReason || "").trim().length < 3}
                       >
