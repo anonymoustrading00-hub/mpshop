@@ -1251,22 +1251,24 @@ export default function Sales() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Campo 4: NIT / CI - siempre visible */}
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold text-slate-600">
+                      NIT / CI:
+                    </Label>
+                    <Input
+                      value={anonymousCustomerTaxId}
+                      onChange={(e) => setAnonymousCustomerTaxId(e.target.value)}
+                      placeholder="CI o NIT (opcional)"
+                      className="h-9 text-sm"
+                    />
+                  </div>
                 </div>
 
-                {/* Si es venta a crédito, mostrar campo de NIT/CI en fila compacta */}
+                {/* Si es venta a crédito, mostrar días de crédito */}
                 {paymentMethod === "credit" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
-                    <div className="space-y-1">
-                      <Label className="text-[11px] font-bold text-amber-800">
-                        NIT / CI del Cliente * (Requerido para crédito):
-                      </Label>
-                      <Input
-                        value={anonymousCustomerTaxId}
-                        onChange={(e) => setAnonymousCustomerTaxId(e.target.value)}
-                        placeholder="Número de CI o NIT..."
-                        className="h-9 text-sm border-amber-300 focus:border-amber-500"
-                      />
-                    </div>
+                  <div className="pt-2 border-t border-slate-100">
                     <div className="space-y-1">
                       <Label className="text-[11px] font-bold text-amber-800">
                         Días de Crédito:
@@ -1275,7 +1277,7 @@ export default function Sales() {
                         type="number"
                         value={creditDays}
                         onChange={(e) => setCreditDays(parseInt(e.target.value) || 30)}
-                        className="h-9 text-sm border-amber-300"
+                        className="h-9 text-sm border-amber-300 w-40"
                       />
                     </div>
                   </div>
@@ -1284,53 +1286,10 @@ export default function Sales() {
 
               <Card className={isMobile ? "" : "border-slate-100 shadow-sm hover:shadow-md transition-shadow"}>
                 <CardHeader className="pb-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Package className="h-4 w-4 text-slate-400" />
-                      Productos
-                    </CardTitle>
-
-                    {/* Selector de Nivel de Precio de Venta */}
-                    <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 gap-1">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight px-1.5 hidden sm:inline">Precio:</span>
-                      <button
-                        type="button"
-                        onClick={() => handlePricingModeChange("unit")}
-                        className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                          currentPricingMode === "unit"
-                            ? "bg-blue-600 text-white shadow-sm"
-                            : "text-slate-600 hover:bg-white/80"
-                        }`}
-                        title="Precio de Venta Sugerido (Unitario)"
-                      >
-                        💰 Unit.
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handlePricingModeChange("discount")}
-                        className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                          currentPricingMode === "discount"
-                            ? "bg-amber-600 text-white shadow-sm"
-                            : "text-slate-600 hover:bg-white/80"
-                        }`}
-                        title="Precio con Descuento"
-                      >
-                        🏷️ Desc.
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handlePricingModeChange("wholesale")}
-                        className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                          currentPricingMode === "wholesale"
-                            ? "bg-emerald-600 text-white shadow-sm"
-                            : "text-slate-600 hover:bg-white/80"
-                        }`}
-                        title="Precio por Mayor"
-                      >
-                        📦 Mayor
-                      </button>
-                    </div>
-                  </div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Package className="h-4 w-4 text-slate-400" />
+                    Productos
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="relative">
