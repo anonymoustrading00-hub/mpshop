@@ -15,7 +15,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Cell, PieChart, Pie, Legend,
 } from "recharts";
-import { TrendingUp, Wrench, DollarSign, ShoppingBag, Package, Users, BarChart3 } from "lucide-react";
+import { TrendingUp, Wrench, DollarSign, ShoppingBag, Package, Users, BarChart3, Clock } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 const PIE_COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#3b82f6","#ec4899","#06b6d4","#84cc16"];
@@ -278,6 +278,106 @@ export default function AnalyticsPage() {
               )}
             </SectionCard>
           </div>
+
+          {/* ── LISTADO DE TIEMPO DE REPARACIÓN POR CADA EQUIPO ── */}
+          <SectionCard
+            title="Horas de Reparación por Equipo (Detalle de Taller)"
+            description="Historial detallado con las horas invertidas en cada orden de trabajo y laptop reparada"
+            icon={Clock}
+          >
+            {repairT.isLoading ? (
+              <div className="h-48 animate-pulse bg-slate-50 rounded-xl" />
+            ) : !((repairT.data as any)?.repairsList?.length) ? (
+              <div className="text-center py-10 text-slate-400">
+                <Wrench className="h-10 w-10 mx-auto mb-2 opacity-40 text-slate-400" />
+                <p className="text-sm font-medium">No se encontraron reparaciones finalizadas en el período seleccionado</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-100">
+                <Table>
+                  <TableHeader className="bg-slate-50">
+                    <TableRow>
+                      <TableHead className="font-bold text-slate-700">Equipo / Laptop</TableHead>
+                      <TableHead className="font-bold text-slate-700">OT / RMA</TableHead>
+                      <TableHead className="font-bold text-slate-700">Técnico</TableHead>
+                      <TableHead className="font-bold text-slate-700">Fecha Ingreso</TableHead>
+                      <TableHead className="font-bold text-slate-700">Fecha Finalización</TableHead>
+                      <TableHead className="font-bold text-slate-700 text-right">Horas en Taller</TableHead>
+                      <TableHead className="font-bold text-slate-700 text-right">Costos</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {((repairT.data as any)?.repairsList || []).map((r: any) => {
+                      const totalCost = ((r.laborCost || 0) + (r.partsCost || 0));
+                      return (
+                        <TableRow key={r.id} className="hover:bg-slate-50/70 transition-colors">
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-900">{r.unitBrand} {r.unitModel}</span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                {r.unitCode && (
+                                  <Badge variant="outline" className="font-mono text-[10px] bg-slate-50 border-slate-200">
+                                    {r.unitCode}
+                                  </Badge>
+                                )}
+                                {r.unitSerialNumber && (
+                                  <span className="text-[11px] text-slate-400">S/N: {r.unitSerialNumber}</span>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <Badge variant="outline" className="font-mono text-[10px] bg-blue-50 text-blue-700 border-blue-200 w-fit">
+                                {r.otNumber}
+                              </Badge>
+                              {r.rmaNumber && (
+                                <Badge variant="outline" className="font-mono text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 w-fit">
+                                  {r.rmaNumber}
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm font-semibold text-slate-700">{r.techName}</span>
+                            {r.notes && (
+                              <p className="text-[11px] text-slate-400 line-clamp-1 max-w-[200px] mt-0.5">{r.notes}</p>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                            {r.startDate ? new Date(r.startDate).toLocaleDateString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                            {r.endDate ? new Date(r.endDate).toLocaleDateString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="inline-flex flex-col items-end">
+                              <span className={`font-black text-xs px-2.5 py-1 rounded-lg ${r.hours > 48 ? 'bg-red-50 text-red-700 border border-red-200' : r.hours > 24 ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+                                ⏱️ {r.hours} hrs
+                              </span>
+                              {r.days >= 1 && (
+                                <span className="text-[10px] text-slate-400 font-medium mt-0.5">({r.days} días)</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right whitespace-nowrap">
+                            {totalCost > 0 ? (
+                              <div className="text-xs">
+                                <span className="font-bold text-slate-800">{fmt(totalCost)}</span>
+                                <div className="text-[10px] text-slate-400">M.O.: {fmt(r.laborCost || 0)} | Rep: {fmt(r.partsCost || 0)}</div>
+                              </div>
+                            ) : (
+                              <span className="text-slate-300 text-xs">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </SectionCard>
         </TabsContent>
 
         {/* ── FINANCIERO ── */}

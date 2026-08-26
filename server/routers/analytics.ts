@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Analytics Router â€” KPIs secundarios con filtros de fecha/marca/modelo/tÃ©cnico/vendedor
  * Pantalla de investigaciÃ³n â€” puede ser mÃ¡s lento que Dashboard.
  * Todos los cÃ¡lculos son solo-lectura sobre tablas existentes.
@@ -314,7 +314,7 @@ export const analyticsRouter = router({
   // TALLER / CALIDAD
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  /** Tiempo promedio en taller, agrupable por tÃ©cnico */
+  /** Tiempo promedio en taller, agrupable por técnico y con listado detallado de equipos */
   repairTimes: protectedProcedure.input(dateRangeInput).query(async ({ ctx, input }) => {
     if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
     const { from, to } = getRange(input);
@@ -322,41 +322,105 @@ export const analyticsRouter = router({
 
     if (!db) {
       const byTech = new Map<string, {hours:number;count:number}>();
+      const repairsList: any[] = [];
       for (const r of MOCK_REPAIRS as any[]) {
         if (r.status !== "completed" || !r.startDate || !r.endDate) continue;
         if (!inRange(r.endDate, from, to)) continue;
         if (input?.technicianId && r.technicianId !== input.technicianId) continue;
-        const hours = Math.max(0, (new Date(r.endDate).getTime()-new Date(r.startDate).getTime())/(1000*3600));
-        const tech = (MOCK_USERS as any[]).find((u:any)=>u.id===r.technicianId)?.name || `TÃ©cnico ${r.technicianId}`;
+        const ms = new Date(r.endDate).getTime() - new Date(r.startDate).getTime();
+        const hours = Math.max(0, Math.round((ms / (1000 * 3600)) * 10) / 10);
+        const days = Math.max(0, Math.round((ms / (1000 * 3600 * 24)) * 10) / 10);
+        const tech = (MOCK_USERS as any[]).find((u:any)=>u.id===r.technicianId)?.name || `Técnico #${r.technicianId}`;
+        const u = (MOCK_UNITS as any[]).find((unit:any)=>unit.id===r.unitId);
+
         const prev = byTech.get(tech) || {hours:0,count:0};
         prev.hours += hours; prev.count++;
         byTech.set(tech, prev);
+
+        repairsList.push({
+          id: r.id,
+          otNumber: r.otNumber || `OT-#${r.id}`,
+          rmaNumber: r.rmaNumber,
+          unitId: r.unitId,
+          unitCode: u?.code || "—",
+          unitBrand: u?.brand || "—",
+          unitModel: u?.model || "—",
+          unitSerialNumber: u?.serialNumber,
+          techName: tech,
+          startDate: r.startDate,
+          endDate: r.endDate,
+          hours,
+          days,
+          laborCost: r.laborCost || 0,
+          partsCost: r.partsCost || 0,
+          notes: r.notes,
+        });
       }
       const byTechArr = Array.from(byTech.entries()).map(([tech,v])=>({tech, count:v.count, avgHours: Math.round(v.hours/v.count*10)/10}));
       const total = byTechArr.reduce((s,r)=>s+r.count*r.avgHours,0);
       const cnt = byTechArr.reduce((s,r)=>s+r.count,0);
-      return { avgHours: cnt>0 ? Math.round(total/cnt*10)/10 : 0, byTechnician: byTechArr };
+      return { avgHours: cnt>0 ? Math.round(total/cnt*10)/10 : 0, byTechnician: byTechArr, repairsList };
     }
 
     const reps = await db.select({
-      startDate: repairs.startDate, endDate: repairs.endDate,
-      technicianId: repairs.technicianId, techName: users.name,
+      id: repairs.id,
+      otNumber: repairs.otNumber,
+      rmaNumber: repairs.rmaNumber,
+      unitId: repairs.unitId,
+      unitCode: units.code,
+      unitBrand: units.brand,
+      unitModel: units.model,
+      unitSerialNumber: units.serialNumber,
+      startDate: repairs.startDate,
+      endDate: repairs.endDate,
+      technicianId: repairs.technicianId,
+      techName: users.name,
+      notes: repairs.notes,
+      laborCost: repairs.laborCost,
+      partsCost: repairs.partsCost,
     }).from(repairs)
+      .leftJoin(units, eq(repairs.unitId, units.id))
       .leftJoin(users, eq(repairs.technicianId, users.id))
       .where(and(eq(repairs.status,"completed"), isNotNull(repairs.endDate), gte(repairs.endDate, from), lte(repairs.endDate, to)));
 
     const filtered = (reps as any[]).filter((r:any) => !input?.technicianId || r.technicianId === input.technicianId);
     const byTech = new Map<string,{hours:number;count:number}>();
+    const repairsList: any[] = [];
+
     for (const r of filtered) {
-      const h = Math.max(0,(new Date(r.endDate).getTime()-new Date(r.startDate).getTime())/(1000*3600));
-      const k = r.techName || `#${r.technicianId}`;
+      const ms = new Date(r.endDate).getTime() - new Date(r.startDate).getTime();
+      const h = Math.max(0, Math.round((ms / (1000 * 3600)) * 10) / 10);
+      const days = Math.max(0, Math.round((ms / (1000 * 3600 * 24)) * 10) / 10);
+      const k = r.techName || (r.technicianId ? `#${r.technicianId}` : "Sin técnico");
       const p = byTech.get(k)||{hours:0,count:0};
       p.hours+=h; p.count++; byTech.set(k,p);
+
+      repairsList.push({
+        id: r.id,
+        otNumber: r.otNumber || `OT-#${r.id}`,
+        rmaNumber: r.rmaNumber,
+        unitId: r.unitId,
+        unitCode: r.unitCode || "—",
+        unitBrand: r.unitBrand || "—",
+        unitModel: r.unitModel || "—",
+        unitSerialNumber: r.unitSerialNumber,
+        techName: k,
+        startDate: r.startDate,
+        endDate: r.endDate,
+        hours: h,
+        days,
+        laborCost: r.laborCost || 0,
+        partsCost: r.partsCost || 0,
+        notes: r.notes,
+      });
     }
+
+    repairsList.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+
     const byTechArr = Array.from(byTech.entries()).map(([tech,v])=>({tech,count:v.count,avgHours:Math.round(v.hours/v.count*10)/10}));
     const total = byTechArr.reduce((s,r)=>s+r.count*r.avgHours,0);
     const cnt = byTechArr.reduce((s,r)=>s+r.count,0);
-    return { avgHours: cnt>0?Math.round(total/cnt*10)/10:0, byTechnician: byTechArr };
+    return { avgHours: cnt>0?Math.round(total/cnt*10)/10:0, byTechnician: byTechArr, repairsList };
   }),
 
   /** % unidades que pasaron por taller + tasa de devoluciÃ³n por tÃ©cnico */
