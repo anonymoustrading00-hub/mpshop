@@ -25,12 +25,15 @@ import {
   Battery,
   Calendar,
   Sparkles,
-  Wrench
+  Wrench,
+  Grid,
+  List,
 } from "lucide-react";
 
 export default function Warranties() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "expiring_soon" | "expired" | "claimed">("all");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // RMA Dialog state
   const [isRmaOpen, setIsRmaOpen] = useState(false);
@@ -253,6 +256,25 @@ export default function Warranties() {
           >
             Devueltas ({stats.claimed})
           </Button>
+          {/* Toggle vista */}
+          <div className="ml-auto flex rounded-md border overflow-hidden shrink-0">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium transition-colors ${viewMode === "grid" ? "bg-primary text-primary-foreground" : "bg-white text-muted-foreground hover:bg-muted"}`}
+              title="Vista tarjetas"
+            >
+              <Grid className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Tarjetas</span>
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium transition-colors ${viewMode === "list" ? "bg-primary text-primary-foreground" : "bg-white text-muted-foreground hover:bg-muted"}`}
+              title="Vista lista"
+            >
+              <List className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Lista</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -269,7 +291,115 @@ export default function Warranties() {
             </p>
           </CardContent>
         </Card>
+      ) : viewMode === "list" ? (
+        /* ── VISTA LISTA ──────────────────────────────────────── */
+        <div className="overflow-x-auto rounded-2xl border bg-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Código / Equipo</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Cliente / Venta</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Specs</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Fechas / Días</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Tiempo Restante</th>
+                <th className="px-4 py-3 text-center font-semibold text-slate-700">Estado</th>
+                <th className="px-4 py-3 text-center font-semibold text-slate-700">Acción</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredItems.map((w: any) => {
+                const specs = w.unitSpecs || {};
+                const batteryLabel =
+                  w.unitBatteryHealth === "plugged_only" || w.unitBatteryHealth === "bad_plugged_only"
+                    ? "Solo conectada"
+                    : w.unitBatteryHealth === "good"
+                    ? "100%"
+                    : w.unitBatteryHealth === "fair"
+                    ? "70%"
+                    : /^\d+$/.test(w.unitBatteryHealth || "")
+                    ? `${w.unitBatteryHealth}%`
+                    : (w.unitBatteryHealth || "N/D");
+                return (
+                  <tr key={w.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-4 py-3">
+                      <Badge variant="outline" className="font-mono text-[10px] bg-background text-primary border-primary/30 font-bold mb-1">
+                        {w.unitCode}
+                      </Badge>
+                      <p className="font-semibold text-slate-800 text-xs">{w.unitBrand} {w.unitModel}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-slate-800 flex items-center gap-1 text-xs">
+                        <User className="h-3 w-3 text-primary shrink-0" /> {w.customerName}
+                      </p>
+                      {w.customerPhone && (
+                        <p className="text-[11px] text-slate-400 flex items-center gap-1">
+                          <Phone className="h-3 w-3 text-emerald-500" /> {w.customerPhone}
+                        </p>
+                      )}
+                      {w.saleNumber && (
+                        <p className="text-[11px] text-slate-400 font-mono">#{w.saleNumber}</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-[11px] text-slate-500">
+                      <p className="flex items-center gap-1"><Cpu className="h-3 w-3 text-blue-400" /> {specs.cpu || "N/D"}</p>
+                      <p className="flex items-center gap-1"><HardDrive className="h-3 w-3 text-indigo-400" /> {specs.ram || "N/D"} | {specs.storage || "N/D"}</p>
+                      <p className="flex items-center gap-1"><Battery className="h-3 w-3 text-amber-400" /> {batteryLabel}</p>
+                    </td>
+                    <td className="px-4 py-3 text-[11px] text-slate-500 whitespace-nowrap">
+                      <p>Inicio: {new Date(w.startDate).toLocaleDateString("es-BO")}</p>
+                      <p>Vence: {new Date(w.endDate).toLocaleDateString("es-BO")}</p>
+                      <p className="font-semibold text-slate-700">{w.days} días totales</p>
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {w.isClaimed ? (
+                        <span className="text-slate-500 font-medium">Devolución definitiva</span>
+                      ) : w.isPaused ? (
+                        <span className="text-amber-700 font-bold">En taller</span>
+                      ) : w.isExpired ? (
+                        <span className="text-red-600 font-bold">VENCIDA</span>
+                      ) : (
+                        <span className={w.daysLeft <= 5 ? "text-amber-700 font-bold" : "text-emerald-700 font-bold"}>
+                          {w.daysLeft}d {w.hoursLeft}h
+                        </span>
+                      )}
+                      {/* mini progress bar */}
+                      <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
+                        <div
+                          className={`h-full ${w.isClaimed ? "bg-purple-400" : w.isExpired ? "bg-red-400" : w.daysLeft <= 5 ? "bg-amber-400" : "bg-emerald-400"}`}
+                          style={{ width: `${100 - w.progressPercent}%` }}
+                        />
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {w.isClaimed ? (
+                        <Badge variant="secondary" className="text-[10px]">RMA cerrado</Badge>
+                      ) : w.isExpired ? (
+                        <Badge variant="secondary" className="text-[10px] bg-slate-200 text-slate-600">Vencida</Badge>
+                      ) : w.daysLeft <= 5 ? (
+                        <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-800 border-amber-300 animate-pulse">Por vencer</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] bg-emerald-100 text-emerald-800 border-emerald-300">Activa</Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={w.isClaimed || w.isExpired}
+                        onClick={() => handleOpenRma(w)}
+                        className="h-7 px-2 text-[10px] gap-1 border-purple-200 text-purple-700 hover:bg-purple-50 font-bold"
+                      >
+                        <RefreshCw className="h-3 w-3" /> RMA
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
+        /* ── VISTA TARJETAS ──────────────────────────────────────── */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredItems.map((w: any) => {
             const specs = w.unitSpecs || {};

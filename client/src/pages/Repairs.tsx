@@ -36,6 +36,8 @@ import {
   Camera,
   Printer,
   FileText,
+  Grid,
+  List,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { WorkOrderModal } from "@/components/WorkOrderModal";
@@ -537,6 +539,7 @@ function CompleteRepairDialog({
 
 export default function Repairs() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [unitCodeInput, setUnitCodeInput] = useState("");
   const [foundUnit, setFoundUnit] = useState<any>(null);
@@ -721,6 +724,25 @@ export default function Repairs() {
             <SelectItem value="cancelled">Canceladas</SelectItem>
           </SelectContent>
         </Select>
+        {/* Toggle vista */}
+        <div className="flex rounded-md border overflow-hidden shrink-0">
+          <button
+            onClick={() => setViewMode("grid")}
+            className={`px-3 py-2 flex items-center gap-1.5 text-sm font-medium transition-colors ${viewMode === "grid" ? "bg-primary text-primary-foreground" : "bg-white text-muted-foreground hover:bg-muted"}`}
+            title="Vista tarjetas"
+          >
+            <Grid className="h-4 w-4" />
+            <span className="hidden sm:inline">Tarjetas</span>
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            className={`px-3 py-2 flex items-center gap-1.5 text-sm font-medium transition-colors ${viewMode === "list" ? "bg-primary text-primary-foreground" : "bg-white text-muted-foreground hover:bg-muted"}`}
+            title="Vista lista"
+          >
+            <List className="h-4 w-4" />
+            <span className="hidden sm:inline">Lista</span>
+          </button>
+        </div>
       </div>
 
       {/* Lista de Reparaciones */}
@@ -733,7 +755,117 @@ export default function Repairs() {
             <h3 className="text-lg font-semibold">No hay reparaciones en registro</h3>
           </CardContent>
         </Card>
+      ) : viewMode === "list" ? (
+        /* ── VISTA LISTA ────────────────────────────────────────── */
+        <div className="overflow-x-auto rounded-2xl border bg-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">OT / RMA</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Equipo</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Técnico / Falla</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Fechas</th>
+                <th className="px-4 py-3 text-right font-semibold text-slate-700">Costos</th>
+                <th className="px-4 py-3 text-center font-semibold text-slate-700">Estado</th>
+                <th className="px-4 py-3 text-center font-semibold text-slate-700">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {repairsData.items.map((ot: any) => {
+                const otLabel = ot.otNumber || `OT-#${ot.id}`;
+                const totalCost = ((ot.laborCost || 0) + (ot.partsCost || 0)) / 100;
+                return (
+                  <tr key={ot.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        <Badge variant="outline" className="font-mono text-[10px] border-blue-300 text-blue-700 bg-blue-50 w-fit">
+                          {otLabel}
+                        </Badge>
+                        {(ot.unitRmaNumber || ot.rmaNumber) && (
+                          <Badge variant="outline" className="font-mono text-[10px] border-emerald-300 text-emerald-700 bg-emerald-50 w-fit">
+                            {ot.unitRmaNumber || ot.rmaNumber}
+                          </Badge>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-slate-800">{ot.unitBrand} {ot.unitModel}</p>
+                      {ot.unitCode && <p className="text-[11px] text-slate-400 font-mono">{ot.unitCode}</p>}
+                      {ot.unitSerialNumber && <p className="text-[11px] text-slate-400">S/N: {ot.unitSerialNumber}</p>}
+                    </td>
+                    <td className="px-4 py-3 max-w-[220px]">
+                      {ot.technicianName && (
+                        <p className="text-xs font-medium text-slate-700 mb-0.5">
+                          <span className="text-slate-400">Técnico:</span> {ot.technicianName}
+                        </p>
+                      )}
+                      {ot.notes && (
+                        <p className="text-xs text-slate-500 line-clamp-2">{ot.notes}</p>
+                      )}
+                      {ot.reportedIssue && (
+                        <p className="text-xs text-slate-500 line-clamp-2">{ot.reportedIssue}</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                      <p>Inicio: {ot.startDate ? new Date(ot.startDate).toLocaleDateString("es-BO") : "—"}</p>
+                      <p>Fin: {ot.endDate ? new Date(ot.endDate).toLocaleDateString("es-BO") : "en curso"}</p>
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      {totalCost > 0 ? (
+                        <div className="text-xs">
+                          <p className="text-slate-500">M.O.: {formatCurrency(ot.laborCost / 100)}</p>
+                          <p className="text-slate-500">Rep.: {formatCurrency(ot.partsCost / 100)}</p>
+                          <p className="font-bold text-slate-800">{formatCurrency(totalCost)}</p>
+                        </div>
+                      ) : (
+                        <span className="text-slate-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <Badge
+                        variant={ot.status === "completed" ? "default" : ot.status === "in_progress" ? "destructive" : "secondary"}
+                        className="text-[10px]"
+                      >
+                        {ot.status === "in_progress" ? "En Proceso" : ot.status === "completed" ? "Completado" : "Cancelado"}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1 justify-center">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[10px] gap-1 border-blue-200 text-blue-700 hover:bg-blue-50"
+                          onClick={() => handleOpenWorkOrder(ot.id, ot.unitId)}
+                        >
+                          <Printer className="h-3 w-3" /> OT
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[10px] gap-1"
+                          onClick={() => handleOpenDetails(ot)}
+                        >
+                          <Eye className="h-3 w-3" /> Kardex
+                        </Button>
+                        {ot.status === "in_progress" && (
+                          <Button
+                            size="sm"
+                            className="h-7 px-2 text-[10px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                            onClick={() => handleOpenComplete(ot)}
+                          >
+                            <CheckCircle className="h-3 w-3" /> Finalizar
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
+        /* ── VISTA TARJETAS ──────────────────────────────────────── */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {(() => {
             // ── Agrupar OTs por unitId ──────────────────────────────────────
