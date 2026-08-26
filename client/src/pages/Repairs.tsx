@@ -82,9 +82,17 @@ function RepairDetailsDialog({
     : [];
 
   const batteryLabel: Record<string, string> = {
-    good: "Buena",
-    fair: "Aceptable",
-    bad_plugged_only: "Mala (solo enchufado)",
+    "100": "100%",
+    "90": "90%",
+    "80": "80%",
+    "70": "70%",
+    "60": "60%",
+    "50": "50%",
+    "40": "40%",
+    plugged_only: "Solo conectada",
+    bad_plugged_only: "Solo conectada",
+    good: "100%",
+    fair: "70%",
     n_a: "N/A",
   };
 

@@ -342,7 +342,7 @@ export default function Warranties() {
                         <Activity className="h-3 w-3 text-green-500 shrink-0" /> Estado: {w.unitCondition ? `${w.unitCondition}/10` : "N/D"}
                       </div>
                       <div className="flex items-center gap-1">
-                        <Battery className="h-3 w-3 text-amber-500 shrink-0" /> Bat: {w.unitBatteryHealth || "N/D"}
+                        <Battery className="h-3 w-3 text-amber-500 shrink-0" /> Bat: {w.unitBatteryHealth === "plugged_only" || w.unitBatteryHealth === "bad_plugged_only" ? "Solo conectada" : w.unitBatteryHealth === "good" ? "100%" : w.unitBatteryHealth === "fair" ? "70%" : /^\d+$/.test(w.unitBatteryHealth || "") ? `${w.unitBatteryHealth}%` : (w.unitBatteryHealth || "N/D")}
                       </div>
                     </div>
 

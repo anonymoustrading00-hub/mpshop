@@ -194,7 +194,7 @@ export function WorkOrderModal({
             </div>
             <div>
               <div><strong>Estado Físico:</strong> ${unit.condition === "new" ? "Nuevo" : unit.condition === "like_new" ? "Como nuevo" : "Usado / Regular"}</div>
-              <div><strong>Salud Batería:</strong> ${unit.batteryHealth === "good" ? "Buena" : unit.batteryHealth === "fair" ? "Aceptable" : "Solo conectada"}</div>
+              <div><strong>Salud Batería:</strong> ${unit.batteryHealth === "plugged_only" || unit.batteryHealth === "bad_plugged_only" ? "Solo conectada" : unit.batteryHealth === "good" ? "100%" : unit.batteryHealth === "fair" ? "70%" : /^\d+$/.test(unit.batteryHealth) ? `${unit.batteryHealth}%` : (unit.batteryHealth || "—")}</div>
               <div><strong>Cargador:</strong> ${damageChecklist.chargerIncluded ? "✅ Sí incluye" : "❌ No entregó"}</div>
             </div>
           </div>
@@ -600,7 +600,7 @@ Te avisaremos apenas tengamos el diagnóstico listo. Puedes consultar el estado 
                   </div>
                   <div className="space-y-0.5">
                     <p><strong>Pantalla:</strong> {specs.screen || "—"}</p>
-                    <p><strong>Salud Batería:</strong> {unit.batteryHealth === "good" ? "Buena" : unit.batteryHealth === "fair" ? "Aceptable" : "Solo conectada"}</p>
+                    <p><strong>Salud Batería:</strong> {unit.batteryHealth === "plugged_only" || unit.batteryHealth === "bad_plugged_only" ? "Solo conectada" : unit.batteryHealth === "good" ? "100%" : unit.batteryHealth === "fair" ? "70%" : /^\d+$/.test(unit.batteryHealth) ? `${unit.batteryHealth}%` : (unit.batteryHealth || "—")}</p>
                     <p><strong>Cargador:</strong> {damageChecklist.chargerIncluded ? "✅ Sí entregó cargador" : "❌ Sin cargador"}</p>
                   </div>
                 </div>

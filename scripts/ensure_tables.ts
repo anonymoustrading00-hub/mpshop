@@ -830,6 +830,9 @@ export async function ensureTables() {
     await runSQL("orderItems.productId nullable", `ALTER TABLE orderItems MODIFY COLUMN productId INT NULL`);
     await runSQL("orderItems.pricingType", `ALTER TABLE orderItems ADD COLUMN pricingType enum('unit','wholesale','discount') DEFAULT 'unit'`);
 
+    // units batteryHealth enum upgrade to percentages and plugged_only
+    await runSQL("units.batteryHealth enum upgrade", `ALTER TABLE units MODIFY COLUMN batteryHealth enum('100','90','80','70','60','50','40','plugged_only','good','fair','bad_plugged_only','n_a') NOT NULL DEFAULT 'n_a'`);
+
     // customers profile columns
     await runSQL("customers.age", `ALTER TABLE customers ADD COLUMN age INT AFTER longitude`);
     await runSQL("customers.gender", `ALTER TABLE customers ADD COLUMN gender VARCHAR(30) AFTER age`);
@@ -930,7 +933,7 @@ export async function ensureTables() {
         serialNumber varchar(100),
         specs text,
         condition int,
-        batteryHealth enum('good','fair','bad_plugged_only','n_a') NOT NULL DEFAULT 'n_a',
+        batteryHealth enum('100','90','80','70','60','50','40','plugged_only','n_a') NOT NULL DEFAULT 'n_a',
         damageChecklist text,
         damageNotes text,
         functionalTestPassed int DEFAULT 1,

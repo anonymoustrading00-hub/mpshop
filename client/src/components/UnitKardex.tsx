@@ -215,7 +215,19 @@ export function UnitKardex({ unitId, open, onOpenChange }: UnitKardexProps) {
                   )}
                   {(unit as any).batteryHealth && (unit as any).batteryHealth !== "n_a" && (
                     <Field label="Estado Batería" value={
-                      ({ good: "Buena", fair: "Aceptable", bad_plugged_only: "Solo enchufado" } as Record<string, string>)[(unit as any).batteryHealth] || (unit as any).batteryHealth
+                      ({
+                        "100": "100%",
+                        "90": "90%",
+                        "80": "80%",
+                        "70": "70%",
+                        "60": "60%",
+                        "50": "50%",
+                        "40": "40%",
+                        plugged_only: "Solo conectada",
+                        bad_plugged_only: "Solo conectada",
+                        good: "100%",
+                        fair: "70%",
+                      } as Record<string, string>)[(unit as any).batteryHealth] || `${(unit as any).batteryHealth}%`
                     } />
                   )}
                   {/* ── Fechas de control de tiempos ──────────────────────── */}

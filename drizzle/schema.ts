@@ -177,7 +177,7 @@ export const units = mysqlTable("units", {
   serialNumber: varchar("serialNumber", { length: 100 }), // IMEI para phones/tablets, S/N para laptops
   specs: text("specs"), // JSON libre: cpu, ram, storage, gpu, screenSize, resolution, batteryDuration, etc.
   condition: int("condition"), // 1-10 (nullable para accesorios/cargadores)
-  batteryHealth: mysqlEnum("batteryHealth", ["good", "fair", "bad_plugged_only", "n_a"]).default("n_a").notNull(),
+  batteryHealth: mysqlEnum("batteryHealth", ["100", "90", "80", "70", "60", "50", "40", "plugged_only", "n_a"]).default("n_a").notNull(),
   damageChecklist: text("damageChecklist"), // JSON: ver checklist por tipo en /client/src/pages/RegisterUnit.tsx
   damageNotes: text("damageNotes"),
   functionalTestPassed: int("functionalTestPassed").default(1), // 1=true, 0=false (para accesorios)

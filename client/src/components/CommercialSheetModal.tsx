@@ -361,7 +361,7 @@ export function CommercialSheetModal({
                     )}
                     {unit.batteryHealth && unit.batteryHealth !== "n_a" && (
                       <span className="text-xs font-bold bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-md">
-                        🔋 Batería: {unit.batteryHealth === "good" ? "Excelente / Buena" : "Aceptable"}
+                        🔋 Batería: {unit.batteryHealth === "plugged_only" || unit.batteryHealth === "bad_plugged_only" ? "Solo conectada" : unit.batteryHealth === "good" ? "100%" : unit.batteryHealth === "fair" ? "70%" : /^\d+$/.test(unit.batteryHealth) ? `${unit.batteryHealth}%` : unit.batteryHealth}
                       </span>
                     )}
                   </div>
@@ -792,7 +792,7 @@ function CommercialSheetPrintable({
                 fontWeight: 800,
               }}
             >
-              🔋 Salud de Batería: {unit.batteryHealth === "good" ? "Excelente / Buena" : "Aceptable"}
+              🔋 Salud de Batería: {unit.batteryHealth === "plugged_only" || unit.batteryHealth === "bad_plugged_only" ? "Solo conectada" : unit.batteryHealth === "good" ? "100%" : unit.batteryHealth === "fair" ? "70%" : /^\d+$/.test(unit.batteryHealth) ? `${unit.batteryHealth}%` : unit.batteryHealth}
             </span>
           )}
         </div>

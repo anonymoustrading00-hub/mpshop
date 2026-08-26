@@ -132,7 +132,7 @@ export default function RegisterUnit() {
   const [model, setModel] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
   const [condition, setCondition] = useState("8");
-  const [batteryHealth, setBatteryHealth] = useState<"good" | "fair" | "bad_plugged_only" | "n_a">("good");
+  const [batteryHealth, setBatteryHealth] = useState<string>("100");
   const [purchasePrice, setPurchasePrice] = useState("");
   const [salePrice, setSalePrice] = useState("");
   const [discountPrice, setDiscountPrice] = useState("");
@@ -282,7 +282,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     if (!TYPES_WITH_BATTERY.has(type)) {
       setBatteryHealth("n_a");
     } else {
-      setBatteryHealth("good");
+      setBatteryHealth("100");
     }
   }, [type, initialSpecs]);
 
@@ -403,7 +403,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
       serialNumber: serialNumber.trim() || undefined,
       specs: specsObj,
       condition: TYPES_WITH_BATTERY.has(type) ? (parseInt(condition) || 8) : undefined,
-      batteryHealth,
+      batteryHealth: batteryHealth as any,
       damageChecklist,
       damageNotes,
       purchasePrice: pPriceCents,
@@ -677,9 +677,14 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="good">Buena (Sostiene carga normal)</SelectItem>
-                      <SelectItem value="fair">Regular (Duración reducida)</SelectItem>
-                      <SelectItem value="bad_plugged_only">Solo conectada a cargador</SelectItem>
+                      <SelectItem value="100">100%</SelectItem>
+                      <SelectItem value="90">90%</SelectItem>
+                      <SelectItem value="80">80%</SelectItem>
+                      <SelectItem value="70">70%</SelectItem>
+                      <SelectItem value="60">60%</SelectItem>
+                      <SelectItem value="50">50%</SelectItem>
+                      <SelectItem value="40">40%</SelectItem>
+                      <SelectItem value="plugged_only">Solo conectada</SelectItem>
                       <SelectItem value="n_a">N/A</SelectItem>
                     </SelectContent>
                   </Select>

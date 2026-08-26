@@ -83,6 +83,28 @@ const CHECKLIST_BY_TYPE: Record<string, Record<string, string>> = {
   },
 };
 
+const BATTERY_HEALTH_LABELS: Record<string, string> = {
+  "100": "100%",
+  "90": "90%",
+  "80": "80%",
+  "70": "70%",
+  "60": "60%",
+  "50": "50%",
+  "40": "40%",
+  plugged_only: "Solo conectada",
+  bad_plugged_only: "Solo conectada",
+  good: "100%",
+  fair: "70%",
+  n_a: "N/A",
+};
+
+function formatBatteryHealth(val?: string | null): string {
+  if (!val || val === "n_a") return "N/D";
+  if (BATTERY_HEALTH_LABELS[val]) return BATTERY_HEALTH_LABELS[val];
+  if (/^\d+$/.test(val)) return `${val}%`;
+  return val;
+}
+
 /* ─── Interactive Status Selector ────────────────────────────────── */
 function UnitStatusSelect({
   currentStatus,
@@ -185,7 +207,7 @@ export default function Units() {
   const [editBrand, setEditBrand] = useState("");
   const [editModel, setEditModel] = useState("");
   const [editCondition, setEditCondition] = useState("8");
-  const [editBatteryHealth, setEditBatteryHealth] = useState<"good" | "fair" | "bad_plugged_only" | "n_a">("n_a");
+  const [editBatteryHealth, setEditBatteryHealth] = useState<string>("n_a");
   const [editDamageNotes, setEditDamageNotes] = useState("");
   const [editDamageChecklist, setEditDamageChecklist] = useState<Record<string, boolean>>({
     keyboard: false, screen: false, hinges: false, trackpad: false, cosmetic: false, other: false,
@@ -425,7 +447,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
       brand: editBrand,
       model: editModel,
       condition: parseInt(editCondition) || 8,
-      batteryHealth: editBatteryHealth,
+      batteryHealth: editBatteryHealth as any,
       damageNotes: editDamageNotes,
       damageChecklist: editDamageChecklist,
       specs: specsObj,
@@ -872,7 +894,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                             <Activity className="h-3 w-3" /> Estado: {unit.condition ? `${unit.condition}/10` : "N/D"}
                           </div>
                           <div className="flex items-center gap-1">
-                            <Battery className="h-3 w-3" /> Bat: {unit.batteryHealth || "N/D"}
+                            <Battery className="h-3 w-3" /> Bat: {formatBatteryHealth(unit.batteryHealth)}
                           </div>
                         </div>
                       ) : (
@@ -1339,12 +1361,17 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                     </div>
                     <div>
                       <label className="text-xs font-semibold block mb-1">Estado de Batería:</label>
-                      <Select value={editBatteryHealth} onValueChange={(v) => setEditBatteryHealth(v as any)}>
+                      <Select value={editBatteryHealth} onValueChange={(v) => setEditBatteryHealth(v)}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="good">Buena</SelectItem>
-                          <SelectItem value="fair">Regular</SelectItem>
-                          <SelectItem value="bad_plugged_only">Solo con cargador</SelectItem>
+                          <SelectItem value="100">100%</SelectItem>
+                          <SelectItem value="90">90%</SelectItem>
+                          <SelectItem value="80">80%</SelectItem>
+                          <SelectItem value="70">70%</SelectItem>
+                          <SelectItem value="60">60%</SelectItem>
+                          <SelectItem value="50">50%</SelectItem>
+                          <SelectItem value="40">40%</SelectItem>
+                          <SelectItem value="plugged_only">Solo conectada</SelectItem>
                           <SelectItem value="n_a">N/A</SelectItem>
                         </SelectContent>
                       </Select>

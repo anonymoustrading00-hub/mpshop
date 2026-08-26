@@ -31,9 +31,17 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 };
 
 const BATTERY_LABEL: Record<string, string> = {
-  good: "🔋 Buena",
-  fair: "🔋 Regular",
-  bad_plugged_only: "⚡ Solo cargada",
+  "100": "🔋 100%",
+  "90": "🔋 90%",
+  "80": "🔋 80%",
+  "70": "🔋 70%",
+  "60": "🔋 60%",
+  "50": "🔋 50%",
+  "40": "🔋 40%",
+  plugged_only: "⚡ Solo conectada",
+  bad_plugged_only: "⚡ Solo conectada",
+  good: "🔋 100%",
+  fair: "🔋 70%",
   n_a: "—",
 };
 
