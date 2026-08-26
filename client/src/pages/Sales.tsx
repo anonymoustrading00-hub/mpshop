@@ -1367,7 +1367,8 @@ export default function Sales() {
                     </div>
                   </div>
 
-                  {groupedProducts.length > 0 ? (
+                  {productSearch.length > 0 ? (
+                    groupedProducts.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-slate-200">
                       {groupedProducts.map((group) => {
                         const u = group.representative;
@@ -1438,18 +1439,27 @@ export default function Sales() {
                         );
                       })}
                     </div>
-                  ) : productSearch.length > 0 ? (
+                    ) : (
                     <div className="py-8 text-center rounded-2xl border-2 border-dashed border-slate-100 bg-slate-50/50">
                       <Search className="h-8 w-8 text-slate-300 mx-auto mb-2" />
                       <p className="text-sm text-slate-500 font-medium">No se encontraron productos para "{productSearch}"</p>
                     </div>
+                    )
                   ) : totalAvailable === 0 ? (
                     <div className="py-8 text-center rounded-2xl border-2 border-dashed border-emerald-100 bg-emerald-50/30">
                       <Package className="h-8 w-8 text-emerald-300 mx-auto mb-2" />
                       <p className="text-sm text-emerald-700 font-semibold">Sin equipos disponibles</p>
                       <p className="text-xs text-slate-400 mt-1">Marca unidades como <strong>Disponible</strong> desde el Catálogo</p>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="py-6 text-center rounded-2xl border-2 border-dashed border-slate-100 bg-slate-50/30">
+                      <Search className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500 font-semibold">Escribe en el buscador para encontrar productos</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {totalAvailable} equipo{totalAvailable !== 1 ? "s" : ""} disponible{totalAvailable !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                  )}
 
                   {isMobile ? (
                     <div className="space-y-2">
