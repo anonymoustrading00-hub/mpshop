@@ -1451,15 +1451,7 @@ export default function Sales() {
                       <p className="text-sm text-emerald-700 font-semibold">Sin equipos disponibles</p>
                       <p className="text-xs text-slate-400 mt-1">Marca unidades como <strong>Disponible</strong> desde el Catálogo</p>
                     </div>
-                  ) : (
-                    <div className="py-6 text-center rounded-2xl border-2 border-dashed border-slate-100 bg-slate-50/30">
-                      <Search className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                      <p className="text-sm text-slate-500 font-semibold">Escribe en el buscador para encontrar productos</p>
-                      <p className="text-xs text-slate-400 mt-1">
-                        {totalAvailable} equipo{totalAvailable !== 1 ? "s" : ""} disponible{totalAvailable !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                  )}
+                  ) : null}
 
                   {isMobile ? (
                     <div className="space-y-2">
