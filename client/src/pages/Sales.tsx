@@ -1094,7 +1094,34 @@ export default function Sales() {
   };
 
   const detail = detailQuery.data;
-  const totalSalesAmount = filteredSales.reduce((sum: number, sale: any) => sum + sale.total, 0);
+
+  const activeFilteredSales = useMemo(() => {
+    return filteredSales.filter((s: any) => s.status !== "cancelled");
+  }, [filteredSales]);
+
+  const totalSalesAmount = useMemo(() => {
+    return activeFilteredSales.reduce((sum: number, sale: any) => sum + (sale.total || 0), 0);
+  }, [activeFilteredSales]);
+
+  const pendingSalesCount = useMemo(() => {
+    return filteredSales.filter((sale: any) => sale.paymentStatus === "pending" && sale.status !== "cancelled").length;
+  }, [filteredSales]);
+
+  const dateRangeDescription = useMemo(() => {
+    if (historyDateFrom && historyDateTo) {
+      if (historyDateFrom === historyDateTo) {
+        return `DEL ${new Date(historyDateFrom + "T12:00:00").toLocaleDateString("es-BO")}`;
+      }
+      return `DEL ${new Date(historyDateFrom + "T12:00:00").toLocaleDateString("es-BO")} AL ${new Date(historyDateTo + "T12:00:00").toLocaleDateString("es-BO")}`;
+    }
+    if (historyDateFrom) {
+      return `DESDE EL ${new Date(historyDateFrom + "T12:00:00").toLocaleDateString("es-BO")}`;
+    }
+    if (historyDateTo) {
+      return `HASTA EL ${new Date(historyDateTo + "T12:00:00").toLocaleDateString("es-BO")}`;
+    }
+    return "TOTAL ACUMULADO";
+  }, [historyDateFrom, historyDateTo]);
 
   // Auto-refetch catalog and auto-focus product search when modal opens (for barcode scanner support)
   useEffect(() => {
@@ -1180,13 +1207,15 @@ export default function Sales() {
           <Card className="bg-white border-slate-100 shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">Ventas registradas</CardTitle>
-              <div className="min-h-full bg-slate-50 flex items-center justify-center p-4 rounded-lg">
+              <div className="min-h-full bg-slate-50 flex items-center justify-center p-3 rounded-lg">
                 <ShoppingBag className="h-4 w-4 text-slate-400" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-black text-slate-900">{salesList?.length || 0}</div>
-              <p className="text-[10px] text-slate-400 font-bold mt-1">TOTAL ACUMULADO</p>
+              <div className="text-3xl font-black text-slate-900">{filteredSales.length}</div>
+              <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-tight truncate" title={dateRangeDescription}>
+                {dateRangeDescription}
+              </p>
             </CardContent>
           </Card>
           <Card className="bg-white border-slate-100 shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
@@ -1198,7 +1227,9 @@ export default function Sales() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-black text-emerald-600">{formatCurrency(totalSalesAmount)}</div>
-              <p className="text-[10px] text-emerald-500/70 font-bold mt-1">INGRESOS BRUTOS</p>
+              <p className="text-[10px] text-emerald-600/80 font-bold mt-1 uppercase tracking-tight truncate" title={dateRangeDescription}>
+                {dateRangeDescription === "TOTAL ACUMULADO" ? "INGRESOS BRUTOS" : dateRangeDescription}
+              </p>
             </CardContent>
           </Card>
           <Card className="bg-white border-slate-100 shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
@@ -1210,9 +1241,11 @@ export default function Sales() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-black text-amber-600">
-                {(salesList as any[] | undefined)?.filter((sale: any) => sale.paymentStatus === "pending" && sale.status !== "cancelled").length || 0}
+                {pendingSalesCount}
               </div>
-              <p className="text-[10px] text-amber-500/70 font-bold mt-1">POR REGULARIZAR</p>
+              <p className="text-[10px] text-amber-600/80 font-bold mt-1 uppercase tracking-tight truncate" title={dateRangeDescription}>
+                {dateRangeDescription === "TOTAL ACUMULADO" ? "POR REGULARIZAR" : dateRangeDescription}
+              </p>
             </CardContent>
           </Card>
           <Card className="bg-white border-slate-100 shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
