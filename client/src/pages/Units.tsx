@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   Laptop, HardDrive, QrCode, Search, Wrench, Shield, ArrowRightLeft, Plus, Cpu, Battery,
-  Activity, ShoppingBag, CheckCircle, Package, Printer, Pencil, Trash2, X, BookOpen, Video,
+  Activity, ShoppingBag, ShoppingCart, CheckCircle, Package, Printer, Pencil, Trash2, X, BookOpen, Video,
   ExternalLink, Play, FileText, Sparkles, Camera, ImagePlus,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Boxes, Layers, Table, Grid, List
 } from "lucide-react";
@@ -548,19 +548,13 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              onClick={() => setIsCommercialCatalogOpen(true)}
-              className="gap-2 bg-slate-900 hover:bg-black text-white font-bold shadow-md shadow-slate-300"
-            >
-              <FileText className="h-4 w-4 text-blue-400" /> Catálogo Comercial
-            </Button>
-            <a href="/catalog">
-              <Button variant="outline" className="gap-2">
-                <Package className="h-4 w-4" /> Catálogo Visual
+            <a href="/purchases">
+              <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm">
+                <ShoppingCart className="h-4 w-4" /> Compras
               </Button>
             </a>
             <a href="/register-unit">
-              <Button className="gap-2 bg-blue-600 hover:bg-blue-700">
+              <Button className="gap-2 bg-blue-600 hover:bg-blue-700 font-bold shadow-sm">
                 <Plus className="h-4 w-4" /> Registrar Unidad
               </Button>
             </a>
