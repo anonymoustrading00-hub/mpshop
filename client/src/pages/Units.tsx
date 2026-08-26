@@ -199,7 +199,7 @@ export default function Units() {
   // ── Paginación, vista y modo ──────────────────────────────────────────────
   const [page, setPage]           = useState(1);
   const [pageSize, setPageSize]   = useState<number>(24);
-  const [viewMode, setViewMode]   = useState<"grid" | "table" | "grouped">("grid");
+  const [viewMode, setViewMode]   = useState<"grid" | "table" | "grouped">("table");
   // Resetear página cuando cambian filtros
   const handleSearchChange = (v: string) => { setSearch(v); setPage(1); };
   const handleTypeChange   = (v: string) => { setTypeFilter(v); setPage(1); };

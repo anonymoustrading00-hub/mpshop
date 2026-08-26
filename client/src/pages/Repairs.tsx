@@ -539,7 +539,7 @@ function CompleteRepairDialog({
 
 export default function Repairs() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [unitCodeInput, setUnitCodeInput] = useState("");
   const [foundUnit, setFoundUnit] = useState<any>(null);

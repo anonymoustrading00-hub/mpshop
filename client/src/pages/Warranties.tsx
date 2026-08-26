@@ -33,7 +33,7 @@ import {
 export default function Warranties() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "expiring_soon" | "expired" | "claimed">("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
 
   // RMA Dialog state
   const [isRmaOpen, setIsRmaOpen] = useState(false);
