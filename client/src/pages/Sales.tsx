@@ -414,6 +414,22 @@ export default function Sales() {
       .slice(0, 50);
   }, [unitsList, productSearch]);
 
+  // Grouped products: group available units by brand+model+salePrice so we show
+  // one card per product type with an available count badge
+  const groupedProducts = useMemo(() => {
+    const groups = new Map<string, { representative: any; units: any[]; count: number }>();
+    for (const u of filteredProducts) {
+      const key = `${u.brand}|${u.model}|${u.salePrice ?? 0}`;
+      if (!groups.has(key)) {
+        groups.set(key, { representative: u, units: [], count: 0 });
+      }
+      const g = groups.get(key)!;
+      g.units.push(u);
+      g.count += 1;
+    }
+    return Array.from(groups.values());
+  }, [filteredProducts]);
+
   // Map a raw unit item to the product shape used in the cart
   const toProductShape = (u: any) => ({
     id: u.id,
@@ -555,6 +571,20 @@ export default function Sales() {
 
     setProductSearch("");
     productSearchRef.current?.focus();
+  };
+
+  // Add a unit from a grouped product card — picks the first unit not already in cart
+  const addGroupToCart = (
+    group: { representative: any; units: any[]; count: number },
+    forcedPricingType?: "unit" | "discount" | "wholesale"
+  ) => {
+    const alreadyInCart = new Set(cartItems.map((i) => i.productId));
+    const nextUnit = group.units.find((u: any) => !alreadyInCart.has(u.id));
+    if (!nextUnit) {
+      toast.error("Todos los equipos de este tipo ya están en el carrito");
+      return;
+    }
+    addProductToCart(toProductShape(nextUnit), forcedPricingType);
   };
 
   const updateCartItem = (productId: number, changes: Partial<CartItem>) => {
@@ -1337,19 +1367,30 @@ export default function Sales() {
                     </div>
                   </div>
 
-                  {filteredProducts.length > 0 ? (
+                  {groupedProducts.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-slate-200">
-                      {filteredProducts.map((u: any) => {
-                        const activePrice = 
+                      {groupedProducts.map((group) => {
+                        const u = group.representative;
+                        const activePrice =
                           currentPricingMode === "discount" ? (u.discountPrice || u.salePrice || 0) :
                           currentPricingMode === "wholesale" ? (u.wholesalePrice || u.salePrice || 0) :
                           (u.salePrice || 0);
 
+                        // How many of this group are already in the cart
+                        const alreadyInCart = cartItems.filter((ci) =>
+                          group.units.some((gu: any) => gu.id === ci.productId)
+                        ).length;
+                        const remaining = group.count - alreadyInCart;
+
                         return (
                           <div
-                            key={u.id}
-                            className="group relative flex flex-col p-3 rounded-2xl border border-slate-100 bg-white hover:border-emerald-200 hover:bg-emerald-50/20 transition-all text-left shadow-sm hover:shadow-md cursor-pointer"
-                            onClick={() => addProductToCart(toProductShape(u))}
+                            key={`${u.brand}|${u.model}|${u.salePrice}`}
+                            className={`group relative flex flex-col p-3 rounded-2xl border transition-all text-left shadow-sm cursor-pointer ${
+                              remaining <= 0
+                                ? "opacity-50 cursor-not-allowed border-slate-100 bg-slate-50"
+                                : "border-slate-100 bg-white hover:border-emerald-200 hover:bg-emerald-50/20 hover:shadow-md"
+                            }`}
+                            onClick={() => remaining > 0 && addGroupToCart(group)}
                           >
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center group-hover:bg-emerald-100 transition-colors shrink-0">
@@ -1357,32 +1398,37 @@ export default function Sales() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="font-bold text-slate-900 truncate text-sm">{u.brand} {u.model}</div>
-                                <div className="text-[10px] text-slate-500 font-mono font-bold uppercase tracking-tight">{u.code}</div>
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  {group.count} unidad{group.count !== 1 ? "es" : ""} disponible{group.count !== 1 ? "s" : ""}
+                                  {alreadyInCart > 0 && (
+                                    <span className="ml-1 text-amber-600">· {alreadyInCart} en carrito</span>
+                                  )}
+                                </div>
                               </div>
                               <div className="text-right shrink-0">
                                 <div className="font-black text-slate-900 text-sm">{formatCurrency(activePrice)}</div>
-                                <div className="text-[10px] font-bold text-emerald-600">
-                                  Disponible
+                                <div className={`text-[10px] font-bold ${remaining > 0 ? "text-emerald-600" : "text-slate-400"}`}>
+                                  {remaining > 0 ? `${remaining} disponible${remaining !== 1 ? "s" : ""}` : "Agotado"}
                                 </div>
                               </div>
                             </div>
 
                             {/* 3 Precios Desglosados */}
                             <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold">
-                              <span 
-                                onClick={(e) => { e.stopPropagation(); addProductToCart(toProductShape(u), "unit"); }}
+                              <span
+                                onClick={(e) => { e.stopPropagation(); remaining > 0 && addGroupToCart(group, "unit"); }}
                                 className={`px-1.5 py-0.5 rounded ${currentPricingMode === "unit" ? "bg-blue-100 text-blue-800 font-black" : "text-slate-500 hover:bg-slate-100"}`}
                               >
                                 Unit: {formatCurrency(u.salePrice || 0)}
                               </span>
-                              <span 
-                                onClick={(e) => { e.stopPropagation(); addProductToCart(toProductShape(u), "discount"); }}
+                              <span
+                                onClick={(e) => { e.stopPropagation(); remaining > 0 && addGroupToCart(group, "discount"); }}
                                 className={`px-1.5 py-0.5 rounded ${currentPricingMode === "discount" ? "bg-amber-100 text-amber-800 font-black" : "text-slate-500 hover:bg-slate-100"}`}
                               >
                                 Desc: {formatCurrency(u.discountPrice || u.salePrice || 0)}
                               </span>
-                              <span 
-                                onClick={(e) => { e.stopPropagation(); addProductToCart(toProductShape(u), "wholesale"); }}
+                              <span
+                                onClick={(e) => { e.stopPropagation(); remaining > 0 && addGroupToCart(group, "wholesale"); }}
                                 className={`px-1.5 py-0.5 rounded ${currentPricingMode === "wholesale" ? "bg-emerald-100 text-emerald-800 font-black" : "text-slate-500 hover:bg-slate-100"}`}
                               >
                                 Mayor: {formatCurrency(u.wholesalePrice || u.salePrice || 0)}
