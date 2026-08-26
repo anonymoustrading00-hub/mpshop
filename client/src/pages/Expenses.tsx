@@ -112,7 +112,6 @@ export default function Expenses() {
   };
 
   const { data: expenses, isLoading, refetch } = trpc.expenses.list.useQuery(queryFilters);
-  const { data: totals } = trpc.expenses.totals.useQuery(queryFilters);
 
   const tabDef = TABS.find(t => t.id === activeTab) ?? TABS[0];
   const filtered = (expenses as any[] | undefined)?.filter((e: any) => {
@@ -122,9 +121,6 @@ export default function Expenses() {
 
   const { data: closureStatus } = trpc.finance.hasPendingClosure.useQuery();
   const isLockedByPending = closureStatus?.hasPending;
-
-  // byType del servidor
-  const byType: Record<string, number> = ((totals as any)?.byType as Record<string, number>) || {};
 
   const resetFilters = () => {
     setPeriod("month");
@@ -287,14 +283,6 @@ export default function Expenses() {
         </CardContent>
       </Card>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Por Pagar (Pendientes)" value={((totals as any)?.totalPending || 0) * 100} sub={`${(totals as any)?.countPending ?? 0} pendientes`} accent="red" icon={AlertTriangle} />
-        <KpiCard label="COGS / Compra Equipos" value={(byType["direct_cost"] ?? 0) * 100} sub="Costo mercadería vendida" accent="violet" icon={DollarSign} />
-        <KpiCard label="Costos Taller & Garantías" value={((byType["repair_cost"] ?? 0) + (byType["warranty_cost"] ?? 0)) * 100} sub="Repuestos y mano de obra" accent="orange" icon={Wrench} />
-        <KpiCard label="Gastos Operativos Período" value={((byType["operational_expense"] ?? 0) + (byType["admin_expense"] ?? 0)) * 100} sub="Alquiler, sueldos, servicios" accent="blue" icon={Receipt} />
-      </div>
-
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-center justify-between flex-wrap gap-3 no-print">
@@ -352,40 +340,6 @@ export default function Expenses() {
         <ExpenseDialog open={!!editingExpense} expense={editingExpense} onClose={() => setEditingExpense(null)} onSave={refetch} />
       )}
     </div>
-  );
-}
-
-// ─────────────────────────────────────────────
-// KPI Card
-// ─────────────────────────────────────────────
-const ACCENT: Record<string, string> = {
-  red:    "bg-red-500",
-  violet: "bg-violet-500",
-  orange: "bg-orange-500",
-  blue:   "bg-blue-500",
-};
-const ACCENT_ICON: Record<string, string> = {
-  red:    "bg-red-50 text-red-600",
-  violet: "bg-violet-50 text-violet-600",
-  orange: "bg-orange-50 text-orange-600",
-  blue:   "bg-blue-50 text-blue-600",
-};
-
-function KpiCard({ label, value, sub, accent, icon: Icon }: { label: string; value: number; sub: string; accent: string; icon: any }) {
-  return (
-    <Card className="relative overflow-hidden border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[2rem] bg-white">
-      <div className={`absolute top-0 left-0 w-full h-1.5 ${ACCENT[accent]}`} />
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between mb-3">
-          <div className={`p-2.5 rounded-2xl ${ACCENT_ICON[accent]}`}>
-            <Icon className="h-5 w-5" />
-          </div>
-        </div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{label}</p>
-        <p className="text-xl font-black text-slate-900 tracking-tighter">{formatCurrency(value)}</p>
-        <p className="text-xs text-slate-500 font-medium mt-0.5">{sub}</p>
-      </CardContent>
-    </Card>
   );
 }
 
