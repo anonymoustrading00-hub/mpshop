@@ -637,9 +637,11 @@ export type InsertAuditLog = typeof auditLog.$inferInsert;
 export const quotations = mysqlTable("quotations", {
   id: int("id").autoincrement().primaryKey(),
   quotationNumber: varchar("quotationNumber", { length: 50 }).notNull().unique(),
+  branchId: int("branchId").notNull().default(1),
   customerId: int("customerId").references(() => customers.id),
   customerName: varchar("customerName", { length: 255 }),
-  status: mysqlEnum("status", ["pending", "accepted", "rejected"]).notNull().default("pending"),
+  status: mysqlEnum("status", ["pending", "accepted", "rejected", "draft", "sent", "expired", "converted"]).notNull().default("pending"),
+  convertedSaleId: int("convertedSaleId"),
   subtotal: int("subtotal").notNull(),
   discountType: mysqlEnum("discountType", ["none", "percentage", "fixed"]).notNull().default("none"),
   discountValue: int("discountValue").notNull().default(0),
@@ -660,7 +662,9 @@ export type InsertQuotation = typeof quotations.$inferInsert;
 export const quotationItems = mysqlTable("quotationItems", {
   id: int("id").autoincrement().primaryKey(),
   quotationId: int("quotationId").notNull().references(() => quotations.id),
-  unitId: int("unitId").notNull().references(() => units.id),
+  unitId: int("unitId").references(() => units.id),
+  productId: int("productId"),
+  pricingType: mysqlEnum("pricingType", ["unit", "wholesale", "discount"]).notNull().default("unit"),
   quantity: int("quantity").notNull().default(1),
   basePrice: int("basePrice").notNull(),
   discountType: mysqlEnum("discountType", ["none", "percentage", "fixed"]).notNull().default("none"),

@@ -3685,14 +3685,16 @@ export async function getQuotationItemsByQuotationId(quotationId: number) {
       });
   }
 
-  return await db.select({
-    ...quotationItems,
-    productName: sql<string>`CONCAT(${units.brand}, ' ', ${units.model})`,
-    productCode: units.code,
-  })
-    .from(quotationItems)
-    .leftJoin(units, eq(quotationItems.unitId, units.id))
-    .where(eq(quotationItems.quotationId, quotationId));
+  const items = await db.select().from(quotationItems).where(eq(quotationItems.quotationId, quotationId));
+  return await Promise.all(items.map(async (item: any) => {
+    const unit = item.unitId ? await db.select({ brand: units.brand, model: units.model, code: units.code }).from(units).where(eq(units.id, item.unitId)).limit(1) : [];
+    const u = unit[0];
+    return {
+      ...item,
+      productName: u ? `${u.brand} ${u.model}`.trim() : `Unidad #${item.unitId || item.productId || "?"}`,
+      productCode: u?.code || "N/A"
+    };
+  }));
 }
 
 export async function updateQuotationStatus(quotationId: number, status: "pending" | "accepted" | "rejected") {

@@ -636,9 +636,10 @@ export async function ensureTables() {
       CREATE TABLE IF NOT EXISTS quotationItems (
         id int AUTO_INCREMENT NOT NULL,
         quotationId int NOT NULL,
-        productId int NOT NULL,
+        unitId int NULL,
+        productId int NULL,
         pricingType enum('unit','wholesale','discount') NOT NULL DEFAULT 'unit',
-        quantity int NOT NULL,
+        quantity int NOT NULL DEFAULT 1,
         basePrice int NOT NULL,
         discountType enum('none','percentage','fixed') NOT NULL DEFAULT 'none',
         discountValue int NOT NULL DEFAULT 0,
@@ -1177,6 +1178,31 @@ export async function ensureTables() {
     // orders: branchId (si falta)
     await runSQL("orders.branchId column", `
       ALTER TABLE orders ADD COLUMN branchId int NOT NULL DEFAULT 1 AFTER orderNumber
+    `);
+
+    // quotationItems: ensure unitId, productId nullable, pricingType
+    await runSQL("quotationItems.unitId column", `
+      ALTER TABLE quotationItems ADD COLUMN unitId int NULL AFTER quotationId
+    `);
+    await runSQL("quotationItems.productId nullable", `
+      ALTER TABLE quotationItems MODIFY COLUMN productId int NULL
+    `);
+    await runSQL("quotationItems.pricingType column", `
+      ALTER TABLE quotationItems ADD COLUMN pricingType enum('unit','wholesale','discount') NOT NULL DEFAULT 'unit' AFTER unitId
+    `);
+
+    // quotations: ensure branchId, customerName, convertedSaleId, status
+    await runSQL("quotations.branchId column", `
+      ALTER TABLE quotations ADD COLUMN branchId int NOT NULL DEFAULT 1 AFTER quotationNumber
+    `);
+    await runSQL("quotations.customerName column", `
+      ALTER TABLE quotations ADD COLUMN customerName varchar(255) NULL AFTER customerId
+    `);
+    await runSQL("quotations.convertedSaleId column", `
+      ALTER TABLE quotations ADD COLUMN convertedSaleId int NULL AFTER status
+    `);
+    await runSQL("quotations.status enum", `
+      ALTER TABLE quotations MODIFY COLUMN status enum('pending','accepted','rejected','draft','sent','expired','converted') NOT NULL DEFAULT 'pending'
     `);
 
     console.log("\n[EnsureTables] ✅ All tables verified and all columns ensured! v2");

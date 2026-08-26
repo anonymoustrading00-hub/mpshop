@@ -917,7 +917,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
               <label className="text-xs font-semibold block">Información de Compra:</label>
 
               {/* Saldos disponibles por caja */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {/* Caja Efectivo */}
                 <button
                   type="button"
