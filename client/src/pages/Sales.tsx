@@ -1099,59 +1099,80 @@ export default function Sales() {
         <DialogContent
           className={
             isMobile
-              ? "max-h-[94vh] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-[1.6rem] border-white/70 bg-white/95 p-4 sm:max-w-[calc(100vw-1.5rem)] sm:p-6"
-              : "flex flex-col h-[92vh] w-[min(1360px,96vw)] sm:max-w-[min(1360px,96vw)] overflow-hidden rounded-[1.8rem] border-slate-200/60 bg-white shadow-2xl shadow-slate-900/10 p-0"
+              ? "max-h-[94vh] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-3xl border-slate-200 bg-white p-4 sm:max-w-[calc(100vw-1.5rem)] sm:p-5"
+              : "flex flex-col h-[88vh] max-h-[840px] w-[min(1380px,96vw)] sm:max-w-[min(1380px,96vw)] overflow-hidden rounded-3xl border-slate-200/90 bg-slate-100/70 shadow-2xl p-0"
           }
         >
           {/* Success overlay */}
           {showSuccess && (
-            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/95 rounded-[1.8rem]">
-              <div className="flex flex-col items-center gap-4 text-center">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
-                  <CheckCircle2 className="h-10 w-10 text-emerald-600" />
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/95 rounded-3xl backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                  <CheckCircle2 className="h-8 w-8" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-slate-900">¡Venta registrada!</p>
-                  <p className="mt-1 text-muted-foreground">{lastSaleNumber ? `Comprobante #${lastSaleNumber}` : ""}</p>
+                  <p className="text-xl font-bold text-slate-900">¡Venta registrada con éxito!</p>
+                  <p className="text-sm text-slate-500 mt-0.5">{lastSaleNumber ? `Comprobante #${lastSaleNumber}` : ""}</p>
                 </div>
-                <p className="text-sm text-muted-foreground">Redirigiendo...</p>
+                <p className="text-xs text-slate-400">Actualizando datos...</p>
               </div>
             </div>
           )}
 
-          <DialogHeader className={isMobile ? "" : "border-b border-slate-100 px-8 pt-6 pb-4 bg-gradient-to-r from-slate-50/80 to-white"}>
-            <DialogTitle className="flex items-center gap-3 text-lg">
-              <div className="h-9 w-9 rounded-xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/20">
-                <ShoppingBag className="h-4.5 w-4.5 text-white" />
+          {/* Header Ultra-Compacto */}
+          <div className="px-5 py-2.5 bg-slate-900 text-white flex items-center justify-between shrink-0 border-b border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="h-7 w-7 rounded-lg bg-emerald-500 flex items-center justify-center shadow-sm">
+                <ShoppingBag className="h-3.5 w-3.5 text-white" />
               </div>
-              <div>
-                <span className="font-black text-slate-900">Nueva Venta</span>
-                {nextSaleData?.saleNumber && (
-                  <span className="ml-2 text-sm font-bold text-slate-400">#{nextSaleData.saleNumber}</span>
-                )}
-              </div>
-            </DialogTitle>
-            <DialogDescription className="text-slate-500">
-              Registra una venta con productos, descuentos y método de pago.
-            </DialogDescription>
-          </DialogHeader>
+              <span className="font-bold text-sm text-white">Nueva Venta</span>
+              {nextSaleData?.saleNumber && (
+                <Badge className="bg-slate-800 text-emerald-400 font-mono text-[10px] px-2 py-0 border border-slate-700">
+                  #{nextSaleData.saleNumber}
+                </Badge>
+              )}
+              {user?.role === "admin" && (
+                <Badge className="bg-blue-900/60 text-blue-300 border-none text-[9px] px-1.5 py-0 hidden sm:inline-flex">
+                  Admin
+                </Badge>
+              )}
+            </div>
 
-          <div className={isMobile ? "mt-6 space-y-6" : "grid min-h-0 flex-1 overflow-hidden gap-0 lg:grid-cols-[minmax(0,1.1fr)_420px]"}>
-            <div className={isMobile ? "space-y-6" : "min-h-0 space-y-5 overflow-y-auto px-8 py-6"}>
-              {/* ─── Cliente y condiciones (Diseño Compacto Unificado) ─── */}
-              <Card className="border-slate-100 shadow-sm p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                    <UserRound className="h-3.5 w-3.5 text-slate-400" />
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                {computedCart.items.reduce((sum, i) => sum + i.quantity, 0)} artículo{computedCart.items.reduce((sum, i) => sum + i.quantity, 0) !== 1 ? "s" : ""}
+              </span>
+              <button
+                type="button"
+                onClick={() => { setIsCreateOpen(false); resetForm(); }}
+                className="h-6 w-6 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+                title="Cerrar"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Cuerpo Principal del POS (2 Columnas sin scroll general) */}
+          <div className={isMobile ? "p-4 space-y-4" : "grid grid-cols-12 gap-3 p-3 flex-1 min-h-0 overflow-hidden"}>
+            
+            {/* ─── Columna Izquierda: Cliente, Buscador & Carrito (7 Cols) ─── */}
+            <div className={isMobile ? "space-y-4" : "col-span-7 flex flex-col gap-2.5 min-h-0 overflow-hidden"}>
+              
+              {/* 1. Barra de Cliente & Condiciones (Ultra-compacta) */}
+              <div className="bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs shrink-0">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                    <UserRound className="h-3 w-3 text-slate-400" />
                     Cliente y Condiciones
                   </span>
-                  {selectedCustomerId ? (
-                    <div className="flex items-center gap-1.5">
-                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold py-0 h-5">
-                        ✓ Cliente Registrado
+                  {selectedCustomerId && (
+                    <div className="flex items-center gap-1">
+                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[9px] font-bold py-0 h-4">
+                        ✓ Registrado
                       </Badge>
                       {selectedCustomerType === "wholesale" && (
-                        <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[10px] font-bold py-0 h-5">
+                        <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[9px] font-bold py-0 h-4">
                           Mayorista
                         </Badge>
                       )}
@@ -1160,58 +1181,52 @@ export default function Sales() {
                         size="sm"
                         variant="ghost"
                         onClick={handleClearCustomer}
-                        className="h-5 px-1.5 text-[11px] text-slate-400 hover:text-red-600 gap-1"
+                        className="h-4 px-1 text-[9px] text-slate-400 hover:text-red-600"
                         title="Cambiar cliente"
                       >
-                        <X className="h-3 w-3" />
-                        <span className="text-[10px]">Cambiar</span>
+                        <X className="h-2.5 w-2.5" />
                       </Button>
                     </div>
-                  ) : null}
+                  )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-start">
-                  {/* Campo 1: Nombre / Buscador de Cliente */}
-                  <div className="relative space-y-1 sm:col-span-1 lg:col-span-2">
-                    <Label className="text-[11px] font-semibold text-slate-600">
-                      Cliente (Escribe o busca):
-                    </Label>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-start">
+                  {/* Cliente / Buscador con Dropdown Flotante */}
+                  <div className="relative sm:col-span-1">
                     <div className="relative">
-                      <UserRound className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                      <UserRound className="absolute left-2 top-2 h-3.5 w-3.5 text-slate-400" />
                       <Input
                         value={anonymousCustomerName}
                         onChange={(e) => {
                           setAnonymousCustomerName(e.target.value);
                           if (selectedCustomerId) setSelectedCustomerId(null);
                         }}
-                        placeholder="Nombre del cliente o busca registrado..."
-                        className="pl-8 h-9 text-sm focus:border-blue-500"
+                        placeholder="Cliente / Buscar..."
+                        className="pl-7 h-8 text-xs focus:border-blue-500"
                       />
                     </div>
-
-                    {/* Dropdown flotante de clientes encontrados */}
+                    {/* Menú flotante de clientes encontrados */}
                     {filteredCustomers.length > 0 && !selectedCustomerId && (
-                      <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-xl border border-slate-200 bg-white shadow-xl overflow-hidden max-h-48 overflow-y-auto">
-                        <div className="px-2.5 py-1 bg-slate-50 border-b text-[10px] font-bold text-slate-400 uppercase">
-                          Clientes Registrados Encontrados
+                      <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-xl border border-slate-200 bg-white shadow-xl overflow-hidden max-h-40 overflow-y-auto">
+                        <div className="px-2 py-0.5 bg-slate-50 border-b text-[9px] font-bold text-slate-400 uppercase">
+                          Sugeridos
                         </div>
                         {filteredCustomers.map((customer: any) => (
                           <button
                             key={customer.id}
                             type="button"
-                            className="flex items-center justify-between w-full px-3 py-2 text-left text-xs border-b last:border-b-0 hover:bg-blue-50 transition-colors"
+                            className="flex items-center justify-between w-full px-2.5 py-1.5 text-left text-xs border-b last:border-b-0 hover:bg-blue-50 transition-colors"
                             onClick={() => handleSelectCustomer(customer)}
                           >
-                            <div>
-                              <p className="font-bold text-slate-800">{customer.name}</p>
-                              <p className="text-[10px] text-slate-500">
-                                {customer.phone ? `📞 ${customer.phone}` : "Sin teléfono"}
-                                {customer.taxId ? ` · CI/NIT: ${customer.taxId}` : ""}
+                            <div className="truncate">
+                              <p className="font-bold text-slate-800 text-[11px] truncate">{customer.name}</p>
+                              <p className="text-[9px] text-slate-400 truncate">
+                                {customer.phone ? `📞 ${customer.phone}` : ""} {customer.taxId ? `· CI: ${customer.taxId}` : ""}
                               </p>
                             </div>
                             {customer.customerType === "wholesale" && (
-                              <Badge className="bg-amber-100 text-amber-800 text-[9px] py-0 h-4 border-none">
-                                Mayorista
+                              <Badge className="bg-amber-100 text-amber-800 text-[8px] py-0 h-3.5 border-none shrink-0 ml-1">
+                                Mayor
                               </Badge>
                             )}
                           </button>
@@ -1220,29 +1235,33 @@ export default function Sales() {
                     )}
                   </div>
 
-                  {/* Campo 2: Teléfono / WhatsApp (en la misma fila) */}
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold text-slate-600">
-                      Teléfono / WhatsApp:
-                    </Label>
+                  {/* Teléfono */}
+                  <div>
                     <div className="relative">
-                      <Phone className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                      <Phone className="absolute left-2 top-2 h-3.5 w-3.5 text-slate-400" />
                       <Input
                         value={anonymousCustomerPhone}
                         onChange={(e) => setAnonymousCustomerPhone(e.target.value)}
-                        placeholder="ej. 70012345 (opcional)"
-                        className="pl-8 h-9 text-sm"
+                        placeholder="Tel / WhatsApp..."
+                        className="pl-7 h-8 text-xs"
                       />
                     </div>
                   </div>
 
-                  {/* Campo 3: Canal de Venta */}
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold text-slate-600">
-                      Canal:
-                    </Label>
+                  {/* NIT / CI */}
+                  <div>
+                    <Input
+                      value={anonymousCustomerTaxId}
+                      onChange={(e) => setAnonymousCustomerTaxId(e.target.value)}
+                      placeholder="NIT / CI (opcional)..."
+                      className="h-8 text-xs"
+                    />
+                  </div>
+
+                  {/* Canal */}
+                  <div>
                     <Select value={saleChannel} onValueChange={(value: "local" | "delivery") => setSaleChannel(value)}>
-                      <SelectTrigger className="h-9 text-sm">
+                      <SelectTrigger className="h-8 text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1251,648 +1270,435 @@ export default function Sales() {
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {/* Campo 4: NIT / CI - siempre visible */}
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold text-slate-600">
-                      NIT / CI:
-                    </Label>
-                    <Input
-                      value={anonymousCustomerTaxId}
-                      onChange={(e) => setAnonymousCustomerTaxId(e.target.value)}
-                      placeholder="CI o NIT (opcional)"
-                      className="h-9 text-sm"
-                    />
-                  </div>
                 </div>
+              </div>
 
-                {/* Si es venta a crédito, mostrar días de crédito */}
-                {paymentMethod === "credit" && (
-                  <div className="pt-2 border-t border-slate-100">
-                    <div className="space-y-1">
-                      <Label className="text-[11px] font-bold text-amber-800">
-                        Días de Crédito:
-                      </Label>
-                      <Input
-                        type="number"
-                        value={creditDays}
-                        onChange={(e) => setCreditDays(parseInt(e.target.value) || 30)}
-                        className="h-9 text-sm border-amber-300 w-40"
-                      />
-                    </div>
-                  </div>
-                )}
-              </Card>
-
-              <Card className={isMobile ? "" : "border-slate-100 shadow-sm hover:shadow-md transition-shadow"}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Package className="h-4 w-4 text-slate-400" />
-                    Productos
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <div className="flex gap-2">
-                      <div className="relative flex-1 group">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-slate-900 transition-colors" />
-                        <Input
-                          ref={productSearchRef}
-                          autoFocus
-                          value={productSearch}
-                          onChange={(event) => setProductSearch(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" && filteredProducts.length > 0) {
-                              addProductToCart(toProductShape(filteredProducts[0]));
-                            }
-                          }}
-                          placeholder="Buscar producto (Ctrl+B)..."
-                          className="pl-9 pr-16 h-12 rounded-2xl border-white/70 bg-white/75"
-                        />
-                        <kbd className="absolute right-2 top-3 hidden rounded border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground sm:block">
-                          Ctrl+B
-                        </kbd>
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        className="h-12 w-12 rounded-2xl bg-white/75 border-white/70 shadow-sm"
-                        onClick={() => setProductSearch("")}
-                        title="Ver Catálogo"
-                      >
-                        <Grid className="h-5 w-5 text-slate-600" />
-                      </Button>
-                    </div>
+              {/* 2. Buscador & Carrito de Productos */}
+              <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex-1 min-h-0 flex flex-col overflow-hidden">
+                
+                {/* Buscador de productos */}
+                <div className="relative mb-2 shrink-0">
+                  <div className="relative flex-1 group">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 group-focus-within:text-slate-900 transition-colors" />
+                    <Input
+                      ref={productSearchRef}
+                      autoFocus
+                      value={productSearch}
+                      onChange={(event) => setProductSearch(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && groupedProducts.length > 0) {
+                          addGroupToCart(groupedProducts[0]);
+                        }
+                      }}
+                      placeholder="Buscar producto por código, marca, modelo... (Ctrl+B)"
+                      className="pl-8 pr-14 h-8.5 text-xs rounded-xl border-slate-200 bg-slate-50/70 focus:bg-white"
+                    />
+                    <kbd className="absolute right-2 top-2 hidden rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] text-slate-400 sm:block">
+                      Ctrl+B
+                    </kbd>
                   </div>
 
-                  {productSearch.length > 0 ? (
-                    groupedProducts.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-slate-200">
-                      {groupedProducts.map((group) => {
-                        const u = group.representative;
-                        const activePrice =
-                          currentPricingMode === "discount" ? (u.discountPrice || u.salePrice || 0) :
-                          currentPricingMode === "wholesale" ? (u.wholesalePrice || u.salePrice || 0) :
-                          (u.salePrice || 0);
+                  {/* Resultados de búsqueda flotantes/desplegables */}
+                  {productSearch.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-40 rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden max-h-52 overflow-y-auto p-2">
+                      {groupedProducts.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {groupedProducts.map((group) => {
+                            const u = group.representative;
+                            const activePrice =
+                              currentPricingMode === "discount" ? (u.discountPrice || u.salePrice || 0) :
+                              currentPricingMode === "wholesale" ? (u.wholesalePrice || u.salePrice || 0) :
+                              (u.salePrice || 0);
 
-                        // How many of this group are already in the cart
-                        const alreadyInCart = cartItems.filter((ci) =>
-                          group.units.some((gu: any) => gu.id === ci.productId)
-                        ).length;
-                        const remaining = group.count - alreadyInCart;
+                            const alreadyInCart = cartItems.filter((ci) =>
+                              group.units.some((gu: any) => gu.id === ci.productId)
+                            ).length;
+                            const remaining = group.count - alreadyInCart;
 
-                        return (
-                          <div
-                            key={`${u.brand}|${u.model}|${u.salePrice}`}
-                            className={`group relative flex flex-col p-3 rounded-2xl border transition-all text-left shadow-sm cursor-pointer ${
-                              remaining <= 0
-                                ? "opacity-50 cursor-not-allowed border-slate-100 bg-slate-50"
-                                : "border-slate-100 bg-white hover:border-emerald-200 hover:bg-emerald-50/20 hover:shadow-md"
-                            }`}
-                            onClick={() => remaining > 0 && addGroupToCart(group)}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center group-hover:bg-emerald-100 transition-colors shrink-0">
-                                <Package className="h-5 w-5 text-slate-500 group-hover:text-emerald-600" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="font-bold text-slate-900 truncate text-sm">{u.brand} {u.model}</div>
-                                <div className="text-[10px] text-slate-400 mt-0.5">
-                                  {group.count} unidad{group.count !== 1 ? "es" : ""} disponible{group.count !== 1 ? "s" : ""}
-                                  {alreadyInCart > 0 && (
-                                    <span className="ml-1 text-amber-600">· {alreadyInCart} en carrito</span>
-                                  )}
+                            return (
+                              <div
+                                key={`${u.brand}|${u.model}|${u.salePrice}`}
+                                className={`flex items-center justify-between p-2 rounded-xl border transition-all text-left cursor-pointer ${
+                                  remaining <= 0
+                                    ? "opacity-50 cursor-not-allowed border-slate-100 bg-slate-50"
+                                    : "border-slate-100 bg-slate-50 hover:border-emerald-300 hover:bg-emerald-50/30 shadow-xs"
+                                }`}
+                                onClick={() => remaining > 0 && addGroupToCart(group)}
+                              >
+                                <div className="min-w-0 flex-1 pr-2">
+                                  <p className="font-bold text-slate-900 text-xs truncate">{u.brand} {u.model}</p>
+                                  <p className="text-[10px] text-slate-400">
+                                    {remaining > 0 ? `${remaining} disp.` : "Agotado"}
+                                    {alreadyInCart > 0 && <span className="text-amber-600 ml-1">({alreadyInCart} en carrito)</span>}
+                                  </p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <span className="font-black text-slate-900 text-xs block">{formatCurrency(activePrice)}</span>
+                                  <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                    + Agregar
+                                  </span>
                                 </div>
                               </div>
-                              <div className="text-right shrink-0">
-                                <div className="font-black text-slate-900 text-sm">{formatCurrency(activePrice)}</div>
-                                <div className={`text-[10px] font-bold ${remaining > 0 ? "text-emerald-600" : "text-slate-400"}`}>
-                                  {remaining > 0 ? `${remaining} disponible${remaining !== 1 ? "s" : ""}` : "Agotado"}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 3 Precios Desglosados */}
-                            <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold">
-                              <span
-                                onClick={(e) => { e.stopPropagation(); remaining > 0 && addGroupToCart(group, "unit"); }}
-                                className={`px-1.5 py-0.5 rounded ${currentPricingMode === "unit" ? "bg-blue-100 text-blue-800 font-black" : "text-slate-500 hover:bg-slate-100"}`}
-                              >
-                                Unit: {formatCurrency(u.salePrice || 0)}
-                              </span>
-                              <span
-                                onClick={(e) => { e.stopPropagation(); remaining > 0 && addGroupToCart(group, "discount"); }}
-                                className={`px-1.5 py-0.5 rounded ${currentPricingMode === "discount" ? "bg-amber-100 text-amber-800 font-black" : "text-slate-500 hover:bg-slate-100"}`}
-                              >
-                                Desc: {formatCurrency(u.discountPrice || u.salePrice || 0)}
-                              </span>
-                              <span
-                                onClick={(e) => { e.stopPropagation(); remaining > 0 && addGroupToCart(group, "wholesale"); }}
-                                className={`px-1.5 py-0.5 rounded ${currentPricingMode === "wholesale" ? "bg-emerald-100 text-emerald-800 font-black" : "text-slate-500 hover:bg-slate-100"}`}
-                              >
-                                Mayor: {formatCurrency(u.wholesalePrice || u.salePrice || 0)}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    ) : (
-                    <div className="py-8 text-center rounded-2xl border-2 border-dashed border-slate-100 bg-slate-50/50">
-                      <Search className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                      <p className="text-sm text-slate-500 font-medium">No se encontraron productos para "{productSearch}"</p>
-                    </div>
-                    )
-                  ) : totalAvailable === 0 ? (
-                    <div className="py-8 text-center rounded-2xl border-2 border-dashed border-emerald-100 bg-emerald-50/30">
-                      <Package className="h-8 w-8 text-emerald-300 mx-auto mb-2" />
-                      <p className="text-sm text-emerald-700 font-semibold">Sin equipos disponibles</p>
-                      <p className="text-xs text-slate-400 mt-1">Marca unidades como <strong>Disponible</strong> desde el Catálogo</p>
-                    </div>
-                  ) : null}
-
-                  {isMobile ? (
-                    <div className="space-y-2">
-                      {computedCart.items.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-10 text-center">
-                          <Package className="mb-3 h-10 w-10 text-muted-foreground/40" />
-                          <p className="text-sm text-muted-foreground">Agrega productos para comenzar.</p>
+                            );
+                          })}
                         </div>
                       ) : (
-                        computedCart.items.map((item) => (
-                          <div key={item.productId} className="flex items-center gap-3 rounded-xl border bg-white px-3 py-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium">{item.productName}</p>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                 <Badge variant={item.pricingType === "unit" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "unit", basePrice: products?.find((p: any) => p.id === item.productId)?.salePrice || item.basePrice })}>U</Badge>
-                                <Badge variant={item.pricingType === "discount" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "discount", basePrice: products?.find((p: any) => p.id === item.productId)?.discountPrice || item.basePrice })}>D</Badge>
-                                <Badge variant={item.pricingType === "wholesale" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "wholesale", basePrice: products?.find((p: any) => p.id === item.productId)?.wholesalePrice || item.basePrice })}>M</Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1">{formatCurrency(item.basePrice)} c/u</p>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => updateCartItem(item.productId, { quantity: Math.max(1, item.quantity - 1) })}
-                              >
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <span className="w-8 text-center text-sm font-semibold">{item.quantity}</span>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => updateCartItem(item.productId, { quantity: Math.min(item.stock, item.quantity + 1) })}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </div>
-                            <div className="w-20 text-right">
-                              <p className="text-sm font-semibold">{formatCurrency(item.subtotal)}</p>
-                            </div>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => removeCartItem(item.productId)}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                      {computedCart.items.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 text-center rounded-3xl border-2 border-dashed border-slate-100 bg-slate-50/30">
-                          <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-                            <ShoppingBag className="h-8 w-8 text-slate-300" />
-                          </div>
-                          <p className="text-slate-500 font-bold">Carrito vacío</p>
-                          <p className="text-xs text-slate-400 mt-1 max-w-[200px]">Empieza buscando productos para agregarlos a la venta</p>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="mt-6 rounded-xl border-slate-200 text-slate-600 font-bold h-9"
-                            onClick={() => productSearchRef.current?.focus()}
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Buscar Productos
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between px-1">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Lista de Artículos</h3>
-                            <Button variant="ghost" size="sm" onClick={clearCart} className="h-7 text-[10px] font-black text-red-500 uppercase hover:bg-red-50 hover:text-red-600">
-                              <RotateCcw className="h-3 w-3 mr-1" /> Vaciado rápido
-                            </Button>
-                          </div>
-                          {computedCart.items.map((item) => (
-                            <div key={item.productId} className="group relative flex items-center gap-4 p-4 rounded-3xl border border-slate-100 bg-white hover:border-slate-200 transition-all shadow-sm">
-                              <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-100 group-hover:scale-105 transition-transform">
-                                <Package className="h-6 w-6 text-slate-400" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-bold text-slate-900 truncate">{item.productName}</p>
-                                <div className="flex items-center gap-3 mt-1">
-                                  <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                                    <button 
-                                      onClick={() => updateCartItem(item.productId, { pricingType: "unit", basePrice: products?.find((p: any) => p.id === item.productId)?.salePrice || 0 })}
-                                      className={`px-2 py-0.5 rounded-md text-[9px] font-black transition-all ${item.pricingType === "unit" ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
-                                    >
-                                      UNIT.
-                                    </button>
-                                    <button 
-                                      onClick={() => updateCartItem(item.productId, { pricingType: "discount", basePrice: products?.find((p: any) => p.id === item.productId)?.discountPrice || 0 })}
-                                      className={`px-2 py-0.5 rounded-md text-[9px] font-black transition-all ${item.pricingType === "discount" ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
-                                    >
-                                      DESC.
-                                    </button>
-                                    <button 
-                                      onClick={() => updateCartItem(item.productId, { pricingType: "wholesale", basePrice: products?.find((p: any) => p.id === item.productId)?.wholesalePrice || 0 })}
-                                      className={`px-2 py-0.5 rounded-md text-[9px] font-black transition-all ${item.pricingType === "wholesale" ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
-                                    >
-                                      MAYOR.
-                                    </button>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-black text-slate-500">{formatCurrency(item.basePrice)}</span>
-                                    {item.discountAmount > 0 && (
-                                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-100 text-[10px] h-4 px-1.5 font-black">
-                                        - {formatCurrency(item.discountAmount)}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 rounded-xl hover:bg-white hover:shadow-sm transition-all"
-                                  onClick={() => updateCartItem(item.productId, { quantity: Math.max(1, item.quantity - 1) })}
-                                >
-                                  <Minus className="h-3 w-3 text-slate-600" />
-                                </Button>
-                                <Input
-                                   type="number"
-                                   min="1"
-                                   step="any"
-                                   onFocus={(e) => e.target.select()}
-                                   max={item.stock}
-                                   value={item.quantity}
-                                   onChange={(event) => updateCartItem(item.productId, { quantity: Math.max(1, parseInt(event.target.value || "1", 10)) })}
-                                   className="h-8 w-12 text-center text-sm font-black bg-transparent border-none focus-visible:ring-0"
-                                 />
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 rounded-xl hover:bg-white hover:shadow-sm transition-all"
-                                  onClick={() => updateCartItem(item.productId, { quantity: Math.min(item.stock, item.quantity + 1) })}
-                                >
-                                  <Plus className="h-3 w-3 text-slate-600" />
-                                </Button>
-                              </div>
-                              <div className="w-24 text-right">
-                                <p className="font-black text-slate-900">{formatCurrency(item.subtotal)}</p>
-                              </div>
-                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-red-300 hover:text-red-500 hover:bg-red-50 transition-colors" onClick={() => removeCartItem(item.productId)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
+                        <div className="py-4 text-center text-slate-400 text-xs">
+                          No se encontraron productos para "{productSearch}"
                         </div>
                       )}
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+
+                {/* Lista de Artículos en el Carrito */}
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 shrink-0">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Artículos en Carrito ({computedCart.items.reduce((s, i) => s + i.quantity, 0)})
+                    </span>
+                    {computedCart.items.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={clearCart}
+                        className="text-[10px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1 hover:underline"
+                      >
+                        <RotateCcw className="h-2.5 w-2.5" /> Vaciar
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-h-0 overflow-y-auto py-1 space-y-1.5 pr-1 scrollbar-thin">
+                    {computedCart.items.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center py-6 text-center text-slate-400">
+                        <ShoppingBag className="h-8 w-8 text-slate-200 mb-1" />
+                        <p className="text-xs font-semibold text-slate-500">Carrito vacío</p>
+                        <p className="text-[10px] text-slate-400">Usa el buscador superior para agregar productos</p>
+                      </div>
+                    ) : (
+                      computedCart.items.map((item) => (
+                        <div
+                          key={item.productId}
+                          className="flex items-center justify-between gap-2 p-2 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-50 text-xs transition-colors"
+                        >
+                          {/* Info Producto */}
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-slate-800 truncate">{item.productName}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {/* Selector de Precio Unit / Desc / Mayor */}
+                              <div className="flex bg-slate-200/80 p-0.5 rounded text-[9px] font-bold">
+                                <button
+                                  type="button"
+                                  onClick={() => updateCartItem(item.productId, { pricingType: "unit", basePrice: products?.find((p: any) => p.id === item.productId)?.salePrice || item.basePrice })}
+                                  className={`px-1.5 py-0.2 rounded ${item.pricingType === "unit" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"}`}
+                                >
+                                  U
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateCartItem(item.productId, { pricingType: "discount", basePrice: products?.find((p: any) => p.id === item.productId)?.discountPrice || item.basePrice })}
+                                  className={`px-1.5 py-0.2 rounded ${item.pricingType === "discount" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"}`}
+                                >
+                                  D
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateCartItem(item.productId, { pricingType: "wholesale", basePrice: products?.find((p: any) => p.id === item.productId)?.wholesalePrice || item.basePrice })}
+                                  className={`px-1.5 py-0.2 rounded ${item.pricingType === "wholesale" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"}`}
+                                >
+                                  M
+                                </button>
+                              </div>
+                              <span className="text-slate-500 font-mono text-[11px]">{formatCurrency(item.basePrice)}</span>
+                            </div>
+                          </div>
+
+                          {/* Cantidad */}
+                          <div className="flex items-center gap-1 bg-white px-1 py-0.5 rounded-lg border border-slate-200">
+                            <button
+                              type="button"
+                              className="h-5 w-5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-600"
+                              onClick={() => updateCartItem(item.productId, { quantity: Math.max(1, item.quantity - 1) })}
+                            >
+                              <Minus className="h-2.5 w-2.5" />
+                            </button>
+                            <input
+                              type="number"
+                              min="1"
+                              max={item.stock}
+                              value={item.quantity}
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) => updateCartItem(item.productId, { quantity: Math.max(1, parseInt(e.target.value || "1", 10)) })}
+                              className="w-7 text-center font-bold text-xs bg-transparent border-none p-0 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              className="h-5 w-5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-600"
+                              onClick={() => updateCartItem(item.productId, { quantity: Math.min(item.stock, item.quantity + 1) })}
+                            >
+                              <Plus className="h-2.5 w-2.5" />
+                            </button>
+                          </div>
+
+                          {/* Subtotal */}
+                          <div className="w-20 text-right shrink-0">
+                            <span className="font-bold text-slate-900 text-xs block">{formatCurrency(item.subtotal)}</span>
+                          </div>
+
+                          {/* Eliminar */}
+                          <button
+                            type="button"
+                            onClick={() => removeCartItem(item.productId)}
+                            className="h-6 w-6 rounded-md hover:bg-red-50 text-slate-300 hover:text-red-500 flex items-center justify-center shrink-0"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className={isMobile ? "space-y-6" : "min-h-0 space-y-5 overflow-y-auto border-t border-slate-100 pt-6 lg:border-t-0 lg:border-l lg:border-slate-100 lg:bg-gradient-to-b lg:from-slate-50/80 lg:to-white lg:px-6 lg:py-6"}>              
-              <div className="space-y-4">
-                {/* Resumen tipo ticket */}
-                <div className="rounded-[2.2rem] border-2 border-slate-900 bg-white shadow-xl overflow-hidden relative">
-                   {/* Decorative circle for punch-hole effect */}
-                   <div className="absolute left-[-10px] top-[140px] h-5 w-5 rounded-full bg-slate-50 border-2 border-slate-900 z-10" />
-                   <div className="absolute right-[-10px] top-[140px] h-5 w-5 rounded-full bg-slate-50 border-2 border-slate-900 z-10" />
-                   
-                  <div className="bg-slate-900 px-6 py-5 text-white">
-                    <div className="flex items-center justify-between">
+            {/* ─── Columna Derecha: Cobro, Liquidación & Resumen (5 Cols) ─── */}
+            <div className={isMobile ? "space-y-4" : "col-span-5 flex flex-col gap-2.5 min-h-0 overflow-hidden"}>
+              
+              {/* Card 1: Métodos de Pago & Configuración */}
+              <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs space-y-2.5 shrink-0">
+                
+                {/* Métodos de Pago en 4 botones compactos */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                      <Wallet className="h-3 w-3 text-slate-400" />
+                      Forma de Pago
+                    </span>
+                    <span className="text-[10px] font-semibold text-slate-500">
+                      {paymentMethod === "cash" ? "Efectivo al instante" :
+                       paymentMethod === "qr" ? "Cobro con QR" :
+                       paymentMethod === "credit" ? "Cuenta por cobrar" : "Transferencia"}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {(["cash", "qr", "transfer", "credit"] as PaymentMethod[]).map((method) => {
+                      const isActive = paymentMethod === method;
+                      const colors = method === "cash"
+                        ? isActive ? "bg-emerald-600 text-white shadow-sm font-bold border-emerald-600" : "bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200"
+                        : method === "qr"
+                        ? isActive ? "bg-violet-600 text-white shadow-sm font-bold border-violet-600" : "bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200"
+                        : method === "credit"
+                        ? isActive ? "bg-amber-600 text-white shadow-sm font-bold border-amber-600" : "bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200"
+                        : isActive ? "bg-blue-600 text-white shadow-sm font-bold border-blue-600" : "bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200";
+
+                      return (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() => {
+                            setPaymentMethod(method);
+                            if (method === "credit") setPaymentStatus("pending");
+                          }}
+                          className={`h-9 rounded-xl border text-xs flex items-center justify-center gap-1 transition-all ${colors}`}
+                        >
+                          {method === "cash" && <Banknote className="h-3.5 w-3.5" />}
+                          {method === "qr" && <QrCode className="h-3.5 w-3.5" />}
+                          {method === "transfer" && <ArrowLeftRight className="h-3.5 w-3.5" />}
+                          {method === "credit" && <CreditCard className="h-3.5 w-3.5" />}
+                          <span>{method === "cash" ? "Efectivo" : method === "qr" ? "QR" : method === "credit" ? "Crédito" : "Transf."}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Si es crédito: Plazo y Alerta compacta */}
+                  {paymentMethod === "credit" && (
+                    <div className="mt-2 p-2 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 text-amber-900 font-bold">
+                        <CreditCard className="h-3.5 w-3.5 text-amber-600" />
+                        <span>Plazo:</span>
+                      </div>
                       <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center">
-                          <Receipt className="h-4 w-4" />
-                        </div>
-                        <span className="font-black uppercase tracking-widest text-xs">Venta Directa</span>
+                        <Select value={String(creditDays)} onValueChange={(val) => setCreditDays(Number(val))}>
+                          <SelectTrigger className="h-7 w-28 text-xs bg-white border-amber-300 font-semibold">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="7">7 Días</SelectItem>
+                            <SelectItem value="15">15 Días</SelectItem>
+                            <SelectItem value="30">30 Días</SelectItem>
+                            <SelectItem value="45">45 Días</SelectItem>
+                            <SelectItem value="60">60 Días</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <Badge className="bg-emerald-500 hover:bg-emerald-500 text-white border-none font-black text-[10px]">OFICIAL</Badge>
                     </div>
-                    <div className="mt-4">
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Comprobante No.</p>
-                      <p className="text-lg font-black font-mono tracking-tighter">
-                        {nextSaleData?.saleNumber ? nextSaleData.saleNumber : "VTA-000"}
-                      </p>
+                  )}
+
+                  {/* Alerta de caja si no está abierta */}
+                  {(!openingStatus?.hasActive && user?.role !== "admin" && paymentMethod !== "credit") && (
+                    <div className="mt-1.5 p-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold flex items-center gap-1.5">
+                      <XCircle className="h-3 w-3 shrink-0" />
+                      <span>Caja de {paymentMethodLabel(paymentMethod)} no abierta en Finanzas.</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Fila compacta de Descuento & Garantía */}
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+                  {/* Descuento Global */}
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                      <BadgeDollarSign className="h-3 w-3 text-emerald-600" />
+                      Desc. Global
+                    </Label>
+                    <div className="flex gap-1">
+                      <Select value={globalDiscountType} onValueChange={(value: DiscountType) => {
+                        setGlobalDiscountType(value);
+                        setGlobalDiscountValue(0);
+                      }}>
+                        <SelectTrigger className="h-7 w-20 text-[11px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin</SelectItem>
+                          <SelectItem value="percentage">%</SelectItem>
+                          <SelectItem value="fixed">Bs</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        disabled={globalDiscountType === "none"}
+                        value={globalDiscountType === "fixed" ? globalDiscountValue / 100 : globalDiscountValue}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          if (globalDiscountType === "fixed") {
+                            setGlobalDiscountValue(parsePrice(e.target.value || "0"));
+                            return;
+                          }
+                          setGlobalDiscountValue(Math.max(0, Math.round(parseFloat(e.target.value || "0"))));
+                        }}
+                        placeholder="0"
+                        className="h-7 text-[11px] flex-1"
+                      />
                     </div>
                   </div>
 
-                  <div className="bg-emerald-600 px-6 py-6 text-white border-b border-white/10 relative overflow-hidden">
-                    {/* Background pattern */}
-                    <div className="absolute top-[-20%] right-[-10%] h-32 w-32 rounded-full bg-white/10 blur-2xl" />
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100 mb-1">Total Final</p>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-black">{formatCurrency(computedCart.total).split(' ')[1]}</span>
-                      <span className="text-sm font-bold opacity-80">Bs.</span>
-                    </div>
-                  </div>
-
-                  <div className="px-6 py-5 space-y-3 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Artículos</span>
-                      <span className="font-black text-slate-900">{computedCart.items.reduce((sum, i) => sum + i.quantity, 0)} uds.</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Subtotal</span>
-                      <span className="font-bold text-slate-900">{formatCurrency(computedCart.subtotal)}</span>
-                    </div>
-                    
-                    {/* Dashed line */}
-                    <div className="py-2">
-                      <div className="border-t border-dashed border-slate-200 w-full" />
-                    </div>
-
-                    {(computedCart.globalDiscountAmount > 0 || computedCart.items.reduce((sum, i) => sum + i.discountAmount, 0) > 0) && (
-                      <div className="flex items-center justify-between text-emerald-600 bg-emerald-50/50 p-2 rounded-xl border border-emerald-100">
-                        <div className="flex items-center gap-1.5">
-                          <BadgeDollarSign className="h-3.5 w-3.5" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">Ahorro total</span>
-                        </div>
-                        <span className="font-black">-{formatCurrency(computedCart.globalDiscountAmount + computedCart.items.reduce((sum, i) => sum + i.discountAmount, 0))}</span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Fecha</span>
-                      <span className="font-medium text-slate-600">{new Date().toLocaleDateString('es-BO')}</span>
-                    </div>
-                  </div>
-                  <div className="px-6 pb-6 pt-2">
-                    <div className="flex items-center justify-center min-h-full text-[9px] text-slate-300 font-bold uppercase tracking-widest">
-                      <div className="h-1 w-1 rounded-full bg-slate-200" />
-                      Gracias por su preferencia
-                      <div className="h-1 w-1 rounded-full bg-slate-200" />
-                    </div>
+                  {/* Garantía */}
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                      <Shield className="h-3 w-3 text-blue-600" />
+                      Garantía
+                    </Label>
+                    <Select value={String(warrantyDays)} onValueChange={(val) => setWarrantyDays(parseInt(val))}>
+                      <SelectTrigger className="h-7 text-[11px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="15">15 Días</SelectItem>
+                        <SelectItem value="30">30 Días (Recomendado)</SelectItem>
+                        <SelectItem value="60">60 Días</SelectItem>
+                        <SelectItem value="90">90 Días</SelectItem>
+                        <SelectItem value="180">180 Días</SelectItem>
+                        <SelectItem value="0">Sin Garantía</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
-                {/* Descuento global */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <BadgeDollarSign className="h-4 w-4 text-emerald-600" />
-                      Descuento global
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Select value={globalDiscountType} onValueChange={(value: DiscountType) => {
-                      setGlobalDiscountType(value);
-                      setGlobalDiscountValue(0);
-                    }}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin descuento</SelectItem>
-                        <SelectItem value="percentage">Porcentaje (%)</SelectItem>
-                        <SelectItem value="fixed">Monto fijo (Bs)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <div className="relative">
-                      <Input
-                         type="number"
-                         min="0"
-                         step="any"
-                         onFocus={(e) => e.target.select()}
-                         disabled={globalDiscountType === "none"}
-                         value={globalDiscountType === "fixed" ? globalDiscountValue / 100 : globalDiscountValue}
-                         onChange={(event) => {
-                           if (globalDiscountType === "fixed") {
-                             setGlobalDiscountValue(parsePrice(event.target.value || "0"));
-                             return;
-                           }
-                           setGlobalDiscountValue(Math.max(0, Math.round(parseFloat(event.target.value || "0"))));
-                         }}
-                         className="pr-12"
-                         placeholder={globalDiscountType === "percentage" ? "Ej: 10" : "Ej: 5.00"}
-                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                        {globalDiscountType === "percentage" ? "%" : "Bs"}
+                {/* Observaciones (1 sola fila compacta) */}
+                <div className="pt-1 border-t border-slate-100">
+                  <Input
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Observaciones / notas opcionales..."
+                    className="h-7 text-[11px]"
+                  />
+                </div>
+              </div>
+
+              {/* Card 2: Resumen Financiero & Botón de Acción Principal */}
+              <div className="bg-slate-900 text-white p-3.5 rounded-2xl shadow-lg flex flex-col justify-between flex-1 min-h-0">
+                
+                {/* Desglose */}
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span className="text-[11px]">Subtotal:</span>
+                    <span className="font-semibold">{formatCurrency(computedCart.subtotal)}</span>
+                  </div>
+
+                  {(computedCart.globalDiscountAmount > 0 || computedCart.items.reduce((s, i) => s + i.discountAmount, 0) > 0) && (
+                    <div className="flex items-center justify-between text-emerald-400 text-xs">
+                      <span>Descuentos aplicados:</span>
+                      <span className="font-bold">
+                        -{formatCurrency(computedCart.globalDiscountAmount + computedCart.items.reduce((s, i) => s + i.discountAmount, 0))}
                       </span>
                     </div>
-                    {computedCart.globalDiscountAmount > 0 && (
-                      <p className="text-xs text-emerald-600 font-medium">
-                        Ahorro: {formatCurrency(computedCart.globalDiscountAmount)}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
+                  )}
 
-                {/* Método de pago destacado */}
-                <Card className={isMobile ? "" : "border-slate-100 shadow-sm"}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Wallet className="h-4 w-4 text-slate-400" />
-                      Forma de pago
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-4 gap-2">
-                      {(["cash", "qr", "transfer", "credit"] as PaymentMethod[]).map((method) => {
-                        const isActive = paymentMethod === method;
-                        const icon = method === "cash" ? <Banknote className="h-5 w-5" /> : method === "qr" ? <QrCode className="h-5 w-5" /> : method === "credit" ? <CreditCard className="h-5 w-5" /> : <ArrowLeftRight className="h-5 w-5" />;
-                        const colors = method === "cash"
-                          ? isActive ? "border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/25" : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:bg-emerald-50/50"
-                          : method === "qr"
-                          ? isActive ? "border-violet-500 bg-violet-500 text-white shadow-lg shadow-violet-500/25" : "border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:bg-violet-50/50"
-                          : method === "credit"
-                          ? isActive ? "border-amber-500 bg-amber-500 text-white shadow-lg shadow-amber-500/25" : "border-slate-200 bg-white text-slate-600 hover:border-amber-300 hover:bg-amber-50/50"
-                          : isActive ? "border-blue-500 bg-blue-500 text-white shadow-lg shadow-blue-500/25" : "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50/50";
-                        return (
-                          <button
-                            key={method}
-                            type="button"
-                            onClick={() => {
-                              setPaymentMethod(method);
-                              if (method === "credit") setPaymentStatus("pending");
-                            }}
-                            className={`flex flex-col items-center gap-1.5 rounded-2xl border-2 px-2 py-3 text-center text-xs font-bold transition-all duration-200 ${colors}`}
-                          >
-                            {icon}
-                            {method === "cash" ? "Efectivo" : method === "qr" ? "QR" : method === "credit" ? "Crédito" : "Transfer."}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {paymentMethod === "cash" && (
-                      <p className="mt-3 text-[11px] text-center text-slate-400 font-medium">
-                        Pago en efectivo al momento de la venta
-                      </p>
-                    )}
-                    {paymentMethod === "qr" && (
-                      <p className="mt-3 text-[11px] text-center text-slate-400 font-medium">
-                        Pago mediante código QR
-                      </p>
-                    )}
-                    {paymentMethod === "transfer" && (
-                      <p className="mt-3 text-[11px] text-center text-slate-400 font-medium">
-                        Pago por transferencia bancaria
-                      </p>
-                    )}
-                    {paymentMethod === "credit" && (
-                      <div className="mt-3 p-3 rounded-2xl bg-amber-50/90 border border-amber-200 space-y-3">
-                        <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
-                          <CreditCard className="h-4 w-4 text-amber-600 shrink-0" />
-                          <span>Configuración de Venta a Crédito</span>
-                        </div>
-                        
-                        <div className="space-y-1">
-                          <Label className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
-                            Plazo de Pago (Días)
-                          </Label>
-                          <Select value={String(creditDays)} onValueChange={(val) => setCreditDays(Number(val))}>
-                            <SelectTrigger className="bg-white rounded-xl h-9 text-xs border-amber-300 font-semibold">
-                              <SelectValue placeholder="Seleccionar plazo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="7">7 Días (1 Semana)</SelectItem>
-                              <SelectItem value="15">15 Días (Quincenal)</SelectItem>
-                              <SelectItem value="30">30 Días (1 Mes - Estándar)</SelectItem>
-                              <SelectItem value="45">45 Días</SelectItem>
-                              <SelectItem value="60">60 Días (2 Meses)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                  <div className="flex items-center justify-between text-slate-400 text-[10px] border-t border-slate-800 pt-1.5">
+                    <span>Fecha: {new Date().toLocaleDateString('es-BO')}</span>
+                    <span>Canal: {saleChannel === "local" ? "En Local" : "A Domicilio"}</span>
+                  </div>
+                </div>
 
-                        <div className="p-2 bg-white/90 rounded-xl border border-amber-200 text-xs flex justify-between items-center">
-                          <span className="text-slate-500 font-medium">Fecha Límite:</span>
-                          <span className="font-black text-amber-700 font-mono">
-                            {(() => {
-                              const d = new Date();
-                              d.setDate(d.getDate() + creditDays);
-                              return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-                            })()}
-                          </span>
-                        </div>
+                {/* Bloque Destacado de TOTAL */}
+                <div className="my-2 bg-emerald-600 p-2.5 rounded-xl flex items-center justify-between shadow-inner">
+                  <div>
+                    <span className="text-[9px] uppercase font-black tracking-widest text-emerald-100 block">
+                      Total a Cobrar
+                    </span>
+                    <span className="text-2xl font-black tracking-tight text-white leading-none">
+                      {formatCurrency(computedCart.total)}
+                    </span>
+                  </div>
+                  <Badge className="bg-emerald-950/40 text-emerald-100 text-[10px] font-bold border-none">
+                    {paymentMethodLabel(paymentMethod)}
+                  </Badge>
+                </div>
 
-                        {!creditDataComplete && (
-                          <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold flex items-start gap-2">
-                            <AlertTriangle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
-                            <div>
-                              <p className="font-extrabold text-red-800">Faltan datos del cliente</p>
-                              <p className="text-[11px] text-red-600 font-medium">Debes completar Nombre, Teléfono y NIT/CI para habilitar la venta a crédito.</p>
-                            </div>
-                          </div>
-                        )}
+                {/* Botones de Acción */}
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => { setIsCreateOpen(false); resetForm(); }}
+                    className="h-10 px-3 rounded-xl border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white text-xs font-bold shrink-0"
+                  >
+                    Cancelar
+                  </Button>
 
-                        <p className="text-[10px] text-amber-700 italic">
-                          * Se registrará una Cuenta por Cobrar (CXC) a nombre del cliente.
-                        </p>
-                      </div>
+                  <Button
+                    onClick={submitSale}
+                    disabled={
+                      createSaleMutation.isPending || 
+                      computedCart.items.length === 0 || 
+                      (paymentMethod !== "credit" && !openingStatus?.hasActive && user?.role !== "admin") ||
+                      !creditDataComplete
+                    }
+                    className={`flex-1 h-10 rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-1.5 transition-all ${
+                      paymentMethod === "credit" && !creditDataComplete 
+                        ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700" 
+                        : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 hover:shadow-emerald-500/20"
+                    }`}
+                  >
+                    {createSaleMutation.isPending ? (
+                      "Registrando..."
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>{paymentMethod === "credit" ? "Registrar Crédito" : "Completar Venta"}</span>
+                      </>
                     )}
-                    {(!openingStatus?.hasActive && user?.role !== "admin") && (
-                      <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-bold flex items-center gap-2">
-                        <XCircle className="h-4 w-4 shrink-0" />
-                        LA CAJA DE {paymentMethodLabel(paymentMethod).toUpperCase()} ESTÁ CERRADA. ABRA LA CAJA EN FINANZAS.
-                      </div>
-                    )}
-                    {(!openingStatus?.hasActive && user?.role === "admin") && (
-                      <div className="mt-3 p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-bold flex items-center gap-2">
-                        <BadgeDollarSign className="h-4 w-4 shrink-0" />
-                        MODO ADMIN: REGISTRANDO VENTA SIN APERTURA DE CAJA PROPIA.
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Garantía */}
-                <Card className="border-blue-200 bg-blue-50/20">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2 text-blue-800 font-bold">
-                      <Shield className="h-5 w-5 text-blue-600" />
-                      Garantía del Equipo
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <Select value={String(warrantyDays)} onValueChange={(val) => setWarrantyDays(parseInt(val))}>
-                      <SelectTrigger className="bg-background text-sm font-semibold border-blue-200">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="15">🛡️ 15 Días de Garantía</SelectItem>
-                        <SelectItem value="30">🛡️ 30 Días de Garantía (Recomendado)</SelectItem>
-                        <SelectItem value="60">🛡️ 60 Días de Garantía</SelectItem>
-                        <SelectItem value="90">🛡️ 90 Días (3 Meses)</SelectItem>
-                        <SelectItem value="180">🛡️ 180 Días (6 Meses)</SelectItem>
-                        <SelectItem value="0">❌ Sin Garantía</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[11px] text-muted-foreground">
-                      * Se creará automáticamente un registro de garantía activa en el Módulo de Garantías.
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {/* Notas */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Observaciones</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Textarea
-                      value={notes}
-                      onChange={(event) => setNotes(event.target.value)}
-                      placeholder="Notas opcionales de la venta..."
-                      className="text-sm min-h-[72px]"
-                      rows={3}
-                    />
-                  </CardContent>
-                </Card>
+                  </Button>
+                </div>
               </div>
+
             </div>
           </div>
-
-          <DialogFooter className={isMobile ? "gap-2" : "border-t border-slate-100 bg-gradient-to-r from-slate-50/60 to-white px-8 py-4 gap-3"}>
-            <Button
-              variant="outline"
-              onClick={() => { setIsCreateOpen(false); resetForm(); }}
-              className={isMobile ? "" : "min-w-36 h-12 rounded-xl border-slate-200 font-bold text-slate-600 hover:bg-slate-50"}
-            >
-              <ArrowLeft className="h-4 w-4 mr-1.5" />
-              Cancelar
-            </Button>
-            <Button
-              onClick={submitSale}
-              disabled={
-                createSaleMutation.isPending || 
-                computedCart.items.length === 0 || 
-                (paymentMethod !== "credit" && !openingStatus?.hasActive && user?.role !== "admin") ||
-                !creditDataComplete
-              }
-              className={`${isMobile ? "gap-2 flex-1" : "min-w-72 gap-2.5 h-12 rounded-xl text-base"} ${
-                paymentMethod === "credit" && !creditDataComplete 
-                  ? "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none hover:bg-slate-300" 
-                  : "bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-lg shadow-emerald-600/20 transition-all hover:shadow-xl hover:shadow-emerald-600/30"
-              }`}
-            >
-              {createSaleMutation.isPending ? (
-                "Registrando..."
-              ) : (
-                <>
-                  <CheckCircle2 className="h-5 w-5" />
-                  {paymentMethod === "credit" ? "Registrar Crédito · " : "Registrar Venta · "}{formatCurrency(computedCart.total)}
-                </>
-              )}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
