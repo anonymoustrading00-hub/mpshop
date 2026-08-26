@@ -52,7 +52,9 @@ import {
   ChevronDown,
   Filter,
   CreditCard,
-  AlertTriangle
+  AlertTriangle,
+  Phone,
+  X
 } from "lucide-react";
 import { useBranch } from "@/contexts/BranchContext";
 
@@ -434,16 +436,18 @@ export default function Sales() {
 
   const filteredCustomers = useMemo(() => {
     if (!customers) return [];
-    const search = (customerSearch || "").trim().toLowerCase();
-    if (!search) return [];
+    const search = (anonymousCustomerName || customerSearch || "").trim().toLowerCase();
+    if (!search || search.length < 2) return [];
 
     return (customers as any[])
       .filter((customer: any) =>
         customer.name.toLowerCase().includes(search) ||
+        customer.phone?.toLowerCase().includes(search) ||
+        customer.taxId?.toLowerCase().includes(search) ||
         customer.clientNumber?.toLowerCase().includes(search)
       )
-      .slice(0, 8);
-  }, [customers, customerSearch]);
+      .slice(0, 6);
+  }, [customers, anonymousCustomerName, customerSearch]);
 
   const computedCart = useMemo(() => {
     const items = cartItems.map((item) => ({
@@ -569,6 +573,47 @@ export default function Sales() {
 
   const removeCartItem = (productId: number) => {
     setCartItems((current) => current.filter((item) => item.productId !== productId));
+  };
+
+  const handleSelectCustomer = (customer: any) => {
+    setSelectedCustomerId(customer.id);
+    setAnonymousCustomerName(customer.name);
+    setAnonymousCustomerPhone(customer.phone || "");
+    setAnonymousCustomerTaxId(customer.taxId || "");
+    const type = customer.customerType || "retail";
+    setSelectedCustomerType(type);
+
+    if (type === "wholesale") {
+      setCartItems((current) =>
+        current.map((item) => {
+          const prod = products?.find((p: any) => p.id === item.productId);
+          return {
+            ...item,
+            pricingType: "wholesale",
+            basePrice: prod?.wholesalePrice || item.basePrice,
+          };
+        })
+      );
+    } else {
+      setCartItems((current) =>
+        current.map((item) => {
+          const prod = products?.find((p: any) => p.id === item.productId);
+          return {
+            ...item,
+            pricingType: "unit",
+            basePrice: prod?.salePrice || item.basePrice,
+          };
+        })
+      );
+    }
+  };
+
+  const handleClearCustomer = () => {
+    setSelectedCustomerId(null);
+    setAnonymousCustomerName("");
+    setAnonymousCustomerPhone("");
+    setAnonymousCustomerTaxId("");
+    setSelectedCustomerType("retail");
   };
 
   const openDetail = (saleId: number) => {
@@ -1063,145 +1108,148 @@ export default function Sales() {
 
           <div className={isMobile ? "mt-6 space-y-6" : "grid min-h-0 flex-1 overflow-hidden gap-0 lg:grid-cols-[minmax(0,1.1fr)_420px]"}>
             <div className={isMobile ? "space-y-6" : "min-h-0 space-y-5 overflow-y-auto px-8 py-6"}>
-              <Card className={isMobile ? "" : "border-slate-100 shadow-sm hover:shadow-md transition-shadow"}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <UserRound className="h-4 w-4 text-slate-400" />
-                    Cliente y condiciones
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className={isMobile ? "grid gap-4" : "grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]"}>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cliente</Label>
+              {/* ─── Cliente y condiciones (Diseño Compacto Unificado) ─── */}
+              <Card className="border-slate-100 shadow-sm p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <UserRound className="h-3.5 w-3.5 text-slate-400" />
+                    Cliente y Condiciones
+                  </span>
+                  {selectedCustomerId ? (
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold py-0 h-5">
+                        ✓ Cliente Registrado
+                      </Badge>
+                      {selectedCustomerType === "wholesale" && (
+                        <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[10px] font-bold py-0 h-5">
+                          Mayorista
+                        </Badge>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleClearCustomer}
+                        className="h-5 px-1.5 text-[11px] text-slate-400 hover:text-red-600 gap-1"
+                        title="Cambiar cliente"
+                      >
+                        <X className="h-3 w-3" />
+                        <span className="text-[10px]">Cambiar</span>
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-start">
+                  {/* Campo 1: Nombre / Buscador de Cliente */}
+                  <div className="relative space-y-1 sm:col-span-1 lg:col-span-2">
+                    <Label className="text-[11px] font-semibold text-slate-600">
+                      Cliente (Escribe o busca):
+                    </Label>
                     <div className="relative">
-                      <UserRound className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <UserRound className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
                       <Input
-                        value={customerSearch}
-                        onChange={(event) => {
-                          setCustomerSearch(event.target.value);
-                          setSelectedCustomerId(null);
+                        value={anonymousCustomerName}
+                        onChange={(e) => {
+                          setAnonymousCustomerName(e.target.value);
+                          if (selectedCustomerId) setSelectedCustomerId(null);
                         }}
-                        placeholder="Buscar cliente registrado..."
-                        className="pl-9"
+                        placeholder="Nombre del cliente o busca registrado..."
+                        className="pl-8 h-9 text-sm focus:border-blue-500"
                       />
                     </div>
-                    {filteredCustomers.length > 0 && !selectedCustomerId ? (
-                      <div className="rounded-xl border border-white/70 bg-white/80">
+
+                    {/* Dropdown flotante de clientes encontrados */}
+                    {filteredCustomers.length > 0 && !selectedCustomerId && (
+                      <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-xl border border-slate-200 bg-white shadow-xl overflow-hidden max-h-48 overflow-y-auto">
+                        <div className="px-2.5 py-1 bg-slate-50 border-b text-[10px] font-bold text-slate-400 uppercase">
+                          Clientes Registrados Encontrados
+                        </div>
                         {filteredCustomers.map((customer: any) => (
                           <button
                             key={customer.id}
                             type="button"
-                            className="block w-full border-b px-3 py-2 text-left text-sm last:border-b-0 hover:bg-muted/50"
-                            onClick={() => {
-                              setSelectedCustomerId(customer.id);
-                              setCustomerSearch(customer.name);
-                              const type = customer.customerType || "retail";
-                              setSelectedCustomerType(type);
-                              
-                              // Auto-update cart prices if becoming wholesale
-                              if (type === "wholesale") {
-                                setCartItems(current => current.map(item => {
-                                  const prod = products?.find((p: any) => p.id === item.productId);
-                                  return {
-                                    ...item,
-                                    pricingType: "wholesale",
-                                    basePrice: prod?.wholesalePrice || item.basePrice
-                                  };
-                                }));
-                              } else {
-                                setCartItems(current => current.map(item => {
-                                  const prod = products?.find((p: any) => p.id === item.productId);
-                                  return {
-                                    ...item,
-                                    pricingType: "unit",
-                                    basePrice: prod?.salePrice || item.basePrice
-                                  };
-                                }));
-                              }
-                            }}
+                            className="flex items-center justify-between w-full px-3 py-2 text-left text-xs border-b last:border-b-0 hover:bg-blue-50 transition-colors"
+                            onClick={() => handleSelectCustomer(customer)}
                           >
-                            <span className="font-medium">{customer.name}</span>
-                            {customer.clientNumber ? <span className="ml-2 text-xs text-muted-foreground">#{customer.clientNumber}</span> : null}
+                            <div>
+                              <p className="font-bold text-slate-800">{customer.name}</p>
+                              <p className="text-[10px] text-slate-500">
+                                {customer.phone ? `📞 ${customer.phone}` : "Sin teléfono"}
+                                {customer.taxId ? ` · CI/NIT: ${customer.taxId}` : ""}
+                              </p>
+                            </div>
+                            {customer.customerType === "wholesale" && (
+                              <Badge className="bg-amber-100 text-amber-800 text-[9px] py-0 h-4 border-none">
+                                Mayorista
+                              </Badge>
+                            )}
                           </button>
                         ))}
                       </div>
-                    ) : null}
-                    {!selectedCustomerId ? (
-                      <div className="grid gap-2">
-                        <Input
-                          value={anonymousCustomerName}
-                          onChange={(event) => setAnonymousCustomerName(event.target.value)}
-                          placeholder="Nombre del cliente"
-                        />
-                        <Input
-                          value={anonymousCustomerPhone}
-                          onChange={(event) => setAnonymousCustomerPhone(event.target.value)}
-                          placeholder="Teléfono / Celular"
-                        />
-                        <Input
-                          value={anonymousCustomerTaxId}
-                          onChange={(event) => setAnonymousCustomerTaxId(event.target.value)}
-                          placeholder="NIT / CI (Requerido para crédito)"
-                        />
-                        <p className="text-[10px] text-muted-foreground italic">
-                          * Si ingresas datos, se guardará automáticamente como cliente nuevo.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">Cliente seleccionado</Badge>
-                        <Button type="button" size="sm" variant="ghost" onClick={() => {
-                          setSelectedCustomerId(null);
-                          setCustomerSearch("");
-                          setSelectedCustomerType("retail");
-                        }}>
-                          Cambiar
-                        </Button>
-                        {selectedCustomerType === "wholesale" && (
-                          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200">Mayorista</Badge>
-                        )}
-                      </div>
                     )}
                   </div>
 
-                  <div className="grid gap-4">
-                    <div className="space-y-2">
-                      <Label>Canal</Label>
-                      <Select value={saleChannel} onValueChange={(value: "local" | "delivery") => setSaleChannel(value)}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="local">Venta en local</SelectItem>
-                          <SelectItem value="delivery">Entrega a domicilio</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  {/* Campo 2: Teléfono / WhatsApp (en la misma fila) */}
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold text-slate-600">
+                      Teléfono / WhatsApp:
+                    </Label>
+                    <div className="relative">
+                      <Phone className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                      <Input
+                        value={anonymousCustomerPhone}
+                        onChange={(e) => setAnonymousCustomerPhone(e.target.value)}
+                        placeholder="ej. 70012345 (opcional)"
+                        className="pl-8 h-9 text-sm"
+                      />
                     </div>
-
-                    {paymentMethod !== "credit" && (
-                      <div className="space-y-2">
-                        <Label>Estado de pago</Label>
-                        <Select value={paymentStatus} onValueChange={(value: PaymentStatus) => setPaymentStatus(value)}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="completed">Pagada</SelectItem>
-                            <SelectItem value="pending">Pendiente</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    {paymentMethod === "credit" && (
-                      <div className="space-y-1">
-                        <Label className="text-xs text-amber-700 font-bold uppercase tracking-wider">Estado de pago</Label>
-                        <div className="h-10 flex items-center px-3 rounded-md border border-amber-200 bg-amber-50 text-amber-800 text-sm font-bold">
-                          ⏳ Pendiente (Crédito)
-                        </div>
-                      </div>
-                    )}
                   </div>
-                </CardContent>
+
+                  {/* Campo 3: Canal de Venta */}
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold text-slate-600">
+                      Canal:
+                    </Label>
+                    <Select value={saleChannel} onValueChange={(value: "local" | "delivery") => setSaleChannel(value)}>
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="local">Tienda / Local</SelectItem>
+                        <SelectItem value="delivery">A Domicilio</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Si es venta a crédito, mostrar campo de NIT/CI en fila compacta */}
+                {paymentMethod === "credit" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-bold text-amber-800">
+                        NIT / CI del Cliente * (Requerido para crédito):
+                      </Label>
+                      <Input
+                        value={anonymousCustomerTaxId}
+                        onChange={(e) => setAnonymousCustomerTaxId(e.target.value)}
+                        placeholder="Número de CI o NIT..."
+                        className="h-9 text-sm border-amber-300 focus:border-amber-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-bold text-amber-800">
+                        Días de Crédito:
+                      </Label>
+                      <Input
+                        type="number"
+                        value={creditDays}
+                        onChange={(e) => setCreditDays(parseInt(e.target.value) || 30)}
+                        className="h-9 text-sm border-amber-300"
+                      />
+                    </div>
+                  </div>
+                )}
               </Card>
 
               <Card className={isMobile ? "" : "border-slate-100 shadow-sm hover:shadow-md transition-shadow"}>
