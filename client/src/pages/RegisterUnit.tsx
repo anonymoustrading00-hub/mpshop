@@ -13,7 +13,7 @@ import { useLocation } from "wouter";
 import { formatCurrency } from "@/lib/currency";
 import { useBranch } from "@/contexts/BranchContext";
 import { BatchLabelsModal } from "@/components/BatchLabelsModal";
-import { Combobox, ComboboxOption } from "@/components/ui/combobox";
+import { Autocomplete, AutocompleteOption } from "@/components/ui/autocomplete";
 import type { DeviceBrand, DeviceModel, Processor, RamOption, StorageOption, ScreenSize } from "../../../drizzle/schema";
 
 type UnitType = "laptop" | "tablet" | "phone" | "monitor" | "charger" | "accessory" | "other";
@@ -293,50 +293,36 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     }
   }, [type, initialSpecs]);
 
-  // Handler para cambio de marca (ahora permite texto libre)
-  const handleBrandChange = (value: string | number) => {
-    if (typeof value === 'string') {
-      // Texto libre
-      setBrand(value);
-      setBrandId(undefined);
-      setModelId(undefined);
-      setModel("");
+  // Handler para cambio de marca (texto libre con autocompletado)
+  const handleBrandChange = (value: string) => {
+    setBrand(value);
+    // Buscar si coincide con alguna marca del catálogo
+    const matchingBrand = brandsData?.find((b: DeviceBrand) => 
+      b.name.toLowerCase() === value.toLowerCase()
+    );
+    if (matchingBrand) {
+      setBrandId(matchingBrand.id);
     } else {
-      // Selección de catálogo
-      const selectedBrandId = value;
-      setBrandId(selectedBrandId);
-      const selectedBrand = brandsData?.find((b: DeviceBrand) => b.id === selectedBrandId);
-      setBrand(selectedBrand?.name || "");
+      setBrandId(undefined);
       setModelId(undefined);
       setModel("");
     }
   };
 
-  // Handler para texto de marca personalizado
-  const handleBrandTextChange = (text: string) => {
-    setBrand(text);
-    setBrandId(undefined); // Limpiar ID cuando es texto libre
-    setModelId(undefined);
-    setModel("");
-  };
-
-  // Handler para cambio de modelo (permite texto libre)
-  const handleModelChange = async (value: string | number) => {
-    if (typeof value === 'string') {
-      // Texto libre
-      setModel(value);
-      setModelId(undefined);
-    } else {
-      // Selección de catálogo con autocompletado
-      const selectedModelId = value;
-      setModelId(selectedModelId);
-      const selectedModel = modelsData?.find((m: DeviceModel) => m.id === selectedModelId);
-      setModel(selectedModel?.name || "");
-      
+  // Handler para cambio de modelo (texto libre con autocompletado)
+  const handleModelChange = (value: string) => {
+    setModel(value);
+    // Buscar si coincide con algún modelo del catálogo
+    const matchingModel = modelsData?.find((m: DeviceModel) => 
+      m.name.toLowerCase() === value.toLowerCase()
+    );
+    
+    if (matchingModel) {
+      setModelId(matchingModel.id);
       // Autocompletar specs si el modelo tiene defaultSpecs
-      if (selectedModel?.defaultSpecs) {
+      if (matchingModel.defaultSpecs) {
         try {
-          const specs = JSON.parse(selectedModel.defaultSpecs);
+          const specs = JSON.parse(matchingModel.defaultSpecs);
           const specsArray: Array<{ key: string; value: string }> = [];
           
           Object.entries(specs).forEach(([key, value]) => {
@@ -349,13 +335,9 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
           console.error("Error parsing defaultSpecs:", error);
         }
       }
+    } else {
+      setModelId(undefined);
     }
-  };
-
-  // Handler para texto de modelo personalizado
-  const handleModelTextChange = (text: string) => {
-    setModel(text);
-    setModelId(undefined);
   };
 
   const { data: suppliersData } = trpc.suppliers.list.useQuery();
@@ -372,33 +354,33 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
   const { data: storageOptionsData } = trpc.deviceCatalogs.getStorageOptions.useQuery();
   const { data: screenSizesData } = trpc.deviceCatalogs.getScreenSizes.useQuery();
 
-  // Convertir datos de catálogos a formato ComboboxOption
-  const brandOptions: ComboboxOption[] = useMemo(() => 
+  // Convertir datos de catálogos a formato AutocompleteOption
+  const brandOptions: AutocompleteOption[] = useMemo(() => 
     brandsData?.map((b: DeviceBrand) => ({ value: b.id, label: b.name })) || [],
     [brandsData]
   );
 
-  const modelOptions: ComboboxOption[] = useMemo(() => 
+  const modelOptions: AutocompleteOption[] = useMemo(() => 
     modelsData?.map((m: DeviceModel) => ({ value: m.id, label: m.name })) || [],
     [modelsData]
   );
 
-  const processorOptions: ComboboxOption[] = useMemo(() => 
+  const processorOptions: AutocompleteOption[] = useMemo(() => 
     processorsData?.map((p: Processor) => ({ value: p.name, label: p.name })) || [],
     [processorsData]
   );
 
-  const ramOptions: ComboboxOption[] = useMemo(() => 
+  const ramOptions: AutocompleteOption[] = useMemo(() => 
     ramOptionsData?.map((r: RamOption) => ({ value: r.capacity, label: r.capacity })) || [],
     [ramOptionsData]
   );
 
-  const storageOptions: ComboboxOption[] = useMemo(() => 
+  const storageOptions: AutocompleteOption[] = useMemo(() => 
     storageOptionsData?.map((s: StorageOption) => ({ value: s.capacity, label: s.capacity })) || [],
     [storageOptionsData]
   );
 
-  const screenOptions: ComboboxOption[] = useMemo(() => 
+  const screenOptions: AutocompleteOption[] = useMemo(() => 
     screenSizesData?.map((s: ScreenSize) => ({ 
       value: s.size, 
       label: s.resolution ? `${s.size} (${s.resolution})` : s.size 
@@ -658,27 +640,21 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
               <div>
                 <label className="text-xs font-semibold block mb-1">Marca *:</label>
-                <Combobox
+                <Autocomplete
                   options={brandOptions}
-                  value={brandId || brand}
+                  value={brand}
                   onChange={handleBrandChange}
-                  onTextChange={handleBrandTextChange}
-                  placeholder="Escribir o seleccionar marca..."
-                  emptyMessage="No hay marcas en catálogo"
-                  allowCustomValue={true}
+                  placeholder="Escribir marca (ej: HP, Dell, Lenovo...)"
                 />
               </div>
 
               <div>
                 <label className="text-xs font-semibold block mb-1">Modelo *:</label>
-                <Combobox
+                <Autocomplete
                   options={modelOptions}
-                  value={modelId || model}
+                  value={model}
                   onChange={handleModelChange}
-                  onTextChange={handleModelTextChange}
-                  placeholder="Escribir o seleccionar modelo..."
-                  emptyMessage={brandId ? "No hay modelos para esta marca" : "Primero selecciona una marca"}
-                  allowCustomValue={true}
+                  placeholder="Escribir modelo (ej: ThinkPad X1, EliteBook...)"
                 />
               </div>
             </div>
@@ -751,15 +727,15 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                   };
                   const displayKey = SPEC_LABELS[spec.key] || spec.key;
                   
-                  // Determinar si este campo debe usar Combobox
-                  const useCombobox = ["cpu", "ram", "storage", "screenSize"].includes(spec.key);
-                  let comboboxOptions: ComboboxOption[] = [];
+                  // Determinar si este campo debe usar Autocomplete
+                  const useAutocomplete = ["cpu", "ram", "storage", "screenSize"].includes(spec.key);
+                  let autocompleteOptions: AutocompleteOption[] = [];
                   
-                  if (useCombobox) {
-                    if (spec.key === "cpu") comboboxOptions = processorOptions;
-                    else if (spec.key === "ram") comboboxOptions = ramOptions;
-                    else if (spec.key === "storage") comboboxOptions = storageOptions;
-                    else if (spec.key === "screenSize") comboboxOptions = screenOptions;
+                  if (useAutocomplete) {
+                    if (spec.key === "cpu") autocompleteOptions = processorOptions;
+                    else if (spec.key === "ram") autocompleteOptions = ramOptions;
+                    else if (spec.key === "storage") autocompleteOptions = storageOptions;
+                    else if (spec.key === "screenSize") autocompleteOptions = screenOptions;
                   }
                   
                   return (
@@ -778,24 +754,17 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                       }}
                       className="w-1/3"
                     />
-                    {useCombobox ? (
+                    {useAutocomplete ? (
                       <div className="flex-1">
-                        <Combobox
-                          options={comboboxOptions}
+                        <Autocomplete
+                          options={autocompleteOptions}
                           value={spec.value}
                           onChange={(value) => {
                             const updated = [...customSpecs];
-                            updated[idx].value = String(value);
+                            updated[idx].value = value;
                             setCustomSpecs(updated);
                           }}
-                          onTextChange={(text) => {
-                            const updated = [...customSpecs];
-                            updated[idx].value = text;
-                            setCustomSpecs(updated);
-                          }}
-                          placeholder={`Escribir o seleccionar ${displayKey.toLowerCase()}...`}
-                          emptyMessage="Escribe para agregar"
-                          allowCustomValue={true}
+                          placeholder={`Escribir ${displayKey.toLowerCase()}...`}
                         />
                       </div>
                     ) : (
