@@ -880,3 +880,74 @@ export const userBranchesRelations = relations(userBranches, ({ one }) => ({
     references: [branches.id],
   }),
 }));
+
+// ============================================================
+// CATÁLOGOS DE AUTOCOMPLETADO PARA REGISTRO DE EQUIPOS
+// ============================================================
+
+// Marcas de equipos
+export const deviceBrands = mysqlTable("device_brands", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type DeviceBrand = typeof deviceBrands.$inferSelect;
+export type InsertDeviceBrand = typeof deviceBrands.$inferInsert;
+
+// Modelos de equipos (asociados a una marca)
+export const deviceModels = mysqlTable("device_models", {
+  id: int("id").autoincrement().primaryKey(),
+  brandId: int("brandId").notNull().references(() => deviceBrands.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  // Specs predeterminadas (JSON): { cpu, ram, storage, screenSize, gpu, etc. }
+  defaultSpecs: text("defaultSpecs"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type DeviceModel = typeof deviceModels.$inferSelect;
+export type InsertDeviceModel = typeof deviceModels.$inferInsert;
+
+// Procesadores
+export const processors = mysqlTable("processors", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  generation: varchar("generation", { length: 50 }), // ej: "10th Gen", "12th Gen", "Ryzen 5000"
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Processor = typeof processors.$inferSelect;
+export type InsertProcessor = typeof processors.$inferInsert;
+
+// RAM (capacidades)
+export const ramOptions = mysqlTable("ram_options", {
+  id: int("id").autoincrement().primaryKey(),
+  capacity: varchar("capacity", { length: 50 }).notNull().unique(), // ej: "4GB", "8GB", "16GB", "32GB"
+  type: varchar("type", { length: 50 }), // ej: "DDR4", "DDR5", "LPDDR4"
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type RamOption = typeof ramOptions.$inferSelect;
+export type InsertRamOption = typeof ramOptions.$inferInsert;
+
+// Almacenamiento
+export const storageOptions = mysqlTable("storage_options", {
+  id: int("id").autoincrement().primaryKey(),
+  capacity: varchar("capacity", { length: 50 }).notNull().unique(), // ej: "128GB SSD", "256GB SSD", "512GB SSD", "1TB HDD"
+  type: varchar("type", { length: 50 }), // ej: "SSD", "HDD", "NVMe"
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type StorageOption = typeof storageOptions.$inferSelect;
+export type InsertStorageOption = typeof storageOptions.$inferInsert;
+
+// Tamaños de pantalla
+export const screenSizes = mysqlTable("screen_sizes", {
+  id: int("id").autoincrement().primaryKey(),
+  size: varchar("size", { length: 50 }).notNull().unique(), // ej: "13.3\"", "14\"", "15.6\"", "17.3\""
+  resolution: varchar("resolution", { length: 100 }), // ej: "1920x1080 (FHD)", "2560x1440 (QHD)"
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ScreenSize = typeof screenSizes.$inferSelect;
+export type InsertScreenSize = typeof screenSizes.$inferInsert;

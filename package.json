@@ -17,6 +17,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed-admin": "tsx scripts/seed_railway_admin.ts",
     "db:seed-products": "tsx seed_all_required_products.ts",
+    "db:seed-devices": "tsx scripts/seed_device_catalogs.ts",
     "db:fix-columns": "tsx scripts/fix_missing_columns.ts",
     "railway:predeploy": "pnpm run db:ensure-tables && pnpm run db:fix-columns && pnpm run db:seed-admin && pnpm run db:seed-products",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"

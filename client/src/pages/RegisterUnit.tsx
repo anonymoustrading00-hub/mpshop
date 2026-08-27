@@ -13,6 +13,8 @@ import { useLocation } from "wouter";
 import { formatCurrency } from "@/lib/currency";
 import { useBranch } from "@/contexts/BranchContext";
 import { BatchLabelsModal } from "@/components/BatchLabelsModal";
+import { Combobox, ComboboxOption } from "@/components/ui/combobox";
+import type { DeviceBrand, DeviceModel, Processor, RamOption, StorageOption, ScreenSize } from "../../../drizzle/schema";
 
 type UnitType = "laptop" | "tablet" | "phone" | "monitor" | "charger" | "accessory" | "other";
 
@@ -131,6 +133,8 @@ export default function RegisterUnit() {
 
   // Campos del formulario
   const [type, setType] = useState<UnitType>("laptop");
+  const [brandId, setBrandId] = useState<number | undefined>();
+  const [modelId, setModelId] = useState<number | undefined>();
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
@@ -289,8 +293,90 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     }
   }, [type, initialSpecs]);
 
+  // Handler para cambio de marca
+  const handleBrandChange = (value: string | number) => {
+    const selectedBrandId = typeof value === 'string' ? parseInt(value) : value;
+    setBrandId(selectedBrandId);
+    const selectedBrand = brandsData?.find((b: DeviceBrand) => b.id === selectedBrandId);
+    setBrand(selectedBrand?.name || "");
+    // Resetear modelo al cambiar marca
+    setModelId(undefined);
+    setModel("");
+  };
+
+  // Handler para cambio de modelo (con autocompletado de specs)
+  const handleModelChange = async (value: string | number) => {
+    const selectedModelId = typeof value === 'string' ? parseInt(value) : value;
+    setModelId(selectedModelId);
+    const selectedModel = modelsData?.find((m: DeviceModel) => m.id === selectedModelId);
+    setModel(selectedModel?.name || "");
+    
+    // Autocompletar specs si el modelo tiene defaultSpecs
+    if (selectedModel?.defaultSpecs) {
+      try {
+        const specs = JSON.parse(selectedModel.defaultSpecs);
+        const specsArray: Array<{ key: string; value: string }> = [];
+        
+        // Convertir el objeto de specs a array
+        Object.entries(specs).forEach(([key, value]) => {
+          specsArray.push({ key, value: value as string });
+        });
+        
+        setCustomSpecs(specsArray);
+        toast.success("Especificaciones autocompletadas del modelo");
+      } catch (error) {
+        console.error("Error parsing defaultSpecs:", error);
+      }
+    }
+  };
+
   const { data: suppliersData } = trpc.suppliers.list.useQuery();
   const { data: globalBalances } = (trpc.finance as any).getGlobalBalances.useQuery();
+
+  // Queries para catálogos de autocompletado
+  const { data: brandsData } = trpc.deviceCatalogs.getBrands.useQuery();
+  const { data: modelsData } = trpc.deviceCatalogs.getModelsByBrand.useQuery(
+    { brandId: brandId! },
+    { enabled: !!brandId }
+  );
+  const { data: processorsData } = trpc.deviceCatalogs.getProcessors.useQuery();
+  const { data: ramOptionsData } = trpc.deviceCatalogs.getRamOptions.useQuery();
+  const { data: storageOptionsData } = trpc.deviceCatalogs.getStorageOptions.useQuery();
+  const { data: screenSizesData } = trpc.deviceCatalogs.getScreenSizes.useQuery();
+
+  // Convertir datos de catálogos a formato ComboboxOption
+  const brandOptions: ComboboxOption[] = useMemo(() => 
+    brandsData?.map((b: DeviceBrand) => ({ value: b.id, label: b.name })) || [],
+    [brandsData]
+  );
+
+  const modelOptions: ComboboxOption[] = useMemo(() => 
+    modelsData?.map((m: DeviceModel) => ({ value: m.id, label: m.name })) || [],
+    [modelsData]
+  );
+
+  const processorOptions: ComboboxOption[] = useMemo(() => 
+    processorsData?.map((p: Processor) => ({ value: p.name, label: p.name })) || [],
+    [processorsData]
+  );
+
+  const ramOptions: ComboboxOption[] = useMemo(() => 
+    ramOptionsData?.map((r: RamOption) => ({ value: r.capacity, label: r.capacity })) || [],
+    [ramOptionsData]
+  );
+
+  const storageOptions: ComboboxOption[] = useMemo(() => 
+    storageOptionsData?.map((s: StorageOption) => ({ value: s.capacity, label: s.capacity })) || [],
+    [storageOptionsData]
+  );
+
+  const screenOptions: ComboboxOption[] = useMemo(() => 
+    screenSizesData?.map((s: ScreenSize) => ({ 
+      value: s.size, 
+      label: s.resolution ? `${s.size} (${s.resolution})` : s.size 
+    })) || [],
+    [screenSizesData]
+  );
 
   const codeQuery = trpc.units.getByCode.useQuery(
     { code: scannedCode },
@@ -544,12 +630,25 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
               <div>
                 <label className="text-xs font-semibold block mb-1">Marca *:</label>
-                <Input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Lenovo, Dell, HP, Samsung..." />
+                <Combobox
+                  options={brandOptions}
+                  value={brandId}
+                  onChange={handleBrandChange}
+                  placeholder="Seleccionar marca..."
+                  emptyMessage="No se encontraron marcas"
+                />
               </div>
 
               <div>
                 <label className="text-xs font-semibold block mb-1">Modelo *:</label>
-                <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="ThinkPad T490, Galaxy S23..." />
+                <Combobox
+                  options={modelOptions}
+                  value={modelId}
+                  onChange={handleModelChange}
+                  placeholder="Seleccionar modelo..."
+                  emptyMessage={brandId ? "No hay modelos para esta marca" : "Primero selecciona una marca"}
+                  disabled={!brandId}
+                />
               </div>
             </div>
 
@@ -620,6 +719,18 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                     panelType: "Tipo de Panel", refreshRate: "Tasa de Refresco",
                   };
                   const displayKey = SPEC_LABELS[spec.key] || spec.key;
+                  
+                  // Determinar si este campo debe usar Combobox
+                  const useCombobox = ["cpu", "ram", "storage", "screenSize"].includes(spec.key);
+                  let comboboxOptions: ComboboxOption[] = [];
+                  
+                  if (useCombobox) {
+                    if (spec.key === "cpu") comboboxOptions = processorOptions;
+                    else if (spec.key === "ram") comboboxOptions = ramOptions;
+                    else if (spec.key === "storage") comboboxOptions = storageOptions;
+                    else if (spec.key === "screenSize") comboboxOptions = screenOptions;
+                  }
+                  
                   return (
                   <div key={idx} className="flex gap-2 items-center">
                     <Input
@@ -636,16 +747,32 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                       }}
                       className="w-1/3"
                     />
-                    <Input
-                      placeholder="Valor (ej. Core i5, 8GB)"
-                      value={spec.value}
-                      onChange={(e) => {
-                        const updated = [...customSpecs];
-                        updated[idx].value = e.target.value;
-                        setCustomSpecs(updated);
-                      }}
-                      className="flex-1"
-                    />
+                    {useCombobox ? (
+                      <div className="flex-1">
+                        <Combobox
+                          options={comboboxOptions}
+                          value={spec.value}
+                          onChange={(value) => {
+                            const updated = [...customSpecs];
+                            updated[idx].value = String(value);
+                            setCustomSpecs(updated);
+                          }}
+                          placeholder={`Seleccionar ${displayKey.toLowerCase()}...`}
+                          emptyMessage="No hay opciones disponibles"
+                        />
+                      </div>
+                    ) : (
+                      <Input
+                        placeholder="Valor (ej. Core i5, 8GB)"
+                        value={spec.value}
+                        onChange={(e) => {
+                          const updated = [...customSpecs];
+                          updated[idx].value = e.target.value;
+                          setCustomSpecs(updated);
+                        }}
+                        className="flex-1"
+                      />
+                    )}
                     <Button type="button" variant="ghost" size="icon" onClick={() => removeCustomSpecField(idx)}>
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
