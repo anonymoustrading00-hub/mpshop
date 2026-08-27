@@ -111,7 +111,9 @@ export const financeRouter = router({
             openedByUserId: ctx.user.id,
             notes: method === input.paymentMethod ? input.notes : `Apertura automática (${input.paymentMethod.toUpperCase()})`,
             status: "open",
+            createdAt: new Date(),
           });
+
           results.push(result);
         }
       }
@@ -481,20 +483,29 @@ export const financeRouter = router({
       startDate: z.string().optional(),
       endDate: z.string().optional(),
       type: z.enum(["all", "income", "expense"]).default("all"),
+      branchId: z.number().optional(),
     }))
     .query(async ({ ctx, input }) => {
       if (ctx.user?.role !== "admin") {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
-      const allTransactions = await getFinancialTransactions();
+      const branchId = input.branchId || ctx.branchId;
+      const allTransactions = await getFinancialTransactions(undefined, branchId);
       const allOpenings = await getAllCashOpenings();
+      const allUsers = await getAllUsers();
+      const activeUsersMap = new Map((allUsers as any[]).map((u: any) => [u.id, u.name || u.username]));
 
       // Filtrar transacciones por método de pago
-      let filtered = allTransactions.filter((t: any) => t.paymentMethod === input.paymentMethod);
+      let filtered = allTransactions.filter((t: any) => 
+        t.paymentMethod === input.paymentMethod || (!t.paymentMethod && input.paymentMethod === "cash")
+      );
 
-      // Filtrar openings por método de pago
-      const filteredOpenings = allOpenings.filter((o: any) => o.paymentMethod === input.paymentMethod);
+      // Filtrar openings por método de pago y que pertenezcan a usuarios activos
+      const filteredOpenings = allOpenings.filter((o: any) => 
+        (o.paymentMethod === input.paymentMethod || (!o.paymentMethod && input.paymentMethod === "cash")) &&
+        activeUsersMap.has(o.responsibleUserId)
+      );
 
       // Filtrar por tipo
       if (input.type !== "all") {
@@ -510,9 +521,12 @@ export const financeRouter = router({
         type: "income",
         category: "cash_opening",
         amount: o.openingAmount,
-        paymentMethod: o.paymentMethod,
-        notes: `Apertura de caja - ${o.responsibleUserName || `Usuario #${o.responsibleUserId}`}`,
-        createdAt: new Date(o.openingDate + "T00:00:00"),
+        paymentMethod: o.paymentMethod || "cash",
+        notes: o.notes || `Apertura de caja - ${o.responsibleUserName || activeUsersMap.get(o.responsibleUserId) || `Usuario #${o.responsibleUserId}`}`,
+        userId: o.responsibleUserId,
+        userName: o.responsibleUserName || activeUsersMap.get(o.responsibleUserId) || `Usuario #${o.responsibleUserId}`,
+        responsibleUserName: o.responsibleUserName || activeUsersMap.get(o.responsibleUserId) || `Usuario #${o.responsibleUserId}`,
+        createdAt: o.createdAt ? new Date(o.createdAt) : new Date(o.openingDate + "T12:00:00"),
         runningBalance: 0,
         direction: "entry",
         isOpening: true,
@@ -521,15 +535,21 @@ export const financeRouter = router({
       // Construir filas de transacciones
       const txRows = filtered.map((t: any) => ({
         ...t,
+        userName: t.userName || activeUsersMap.get(t.userId) || (t.userId ? `Usuario #${t.userId}` : "Administrador"),
         runningBalance: 0,
         direction: t.type === "income" ? "entry" : "exit",
         isOpening: false,
       }));
 
       // Combinar y ordenar por fecha ASCENDENTE para el cálculo correcto del saldo correlativo
-      const sortedAsc = [...openingRows, ...txRows].sort((a: any, b: any) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      );
+      const sortedAsc = [...openingRows, ...txRows].sort((a: any, b: any) => {
+        const timeA = new Date(a.createdAt).getTime();
+        const timeB = new Date(b.createdAt).getTime();
+        if (timeA !== timeB) return timeA - timeB;
+        if (a.isOpening && !b.isOpening) return -1;
+        if (!a.isOpening && b.isOpening) return 1;
+        return 0;
+      });
 
       // Calcular saldo acumulado correlativo
       let runningBalance = 0;
@@ -545,8 +565,7 @@ export const financeRouter = router({
         };
       });
 
-      // Filtrar por rango de fechas (después de calcular el saldo para mantener la correlación histórica si es posible, 
-      // aunque aquí el saldo inicial siempre parte de 0 en el set completo por ahora)
+      // Filtrar por rango de fechas
       let finalRows = calculatedRows;
       if (input.startDate) {
         finalRows = finalRows.filter((t: any) => {
@@ -562,9 +581,14 @@ export const financeRouter = router({
       }
 
       // Ordenar por fecha DESCENDENTE para mostrar lo más reciente arriba (Historial)
-      const transactionsWithBalance = [...finalRows].sort((a: any, b: any) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
+      const transactionsWithBalance = [...finalRows].sort((a: any, b: any) => {
+        const timeA = new Date(a.createdAt).getTime();
+        const timeB = new Date(b.createdAt).getTime();
+        if (timeA !== timeB) return timeB - timeA;
+        if (a.isOpening && !b.isOpening) return -1;
+        if (!a.isOpening && b.isOpening) return 1;
+        return 0;
+      });
 
       const totalIncome = finalRows
         .filter((t: any) => t.type === "income")
@@ -579,7 +603,7 @@ export const financeRouter = router({
         summary: {
           totalIncome,
           totalExpense,
-          finalBalance: runningBalance, // Este es el saldo final absoluto del set completo
+          finalBalance: runningBalance,
           count: transactionsWithBalance.length,
         },
       };

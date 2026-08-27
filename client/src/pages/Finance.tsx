@@ -56,6 +56,7 @@ function categoryLabel(cat: string) {
     donation: "Donación",
     loan: "Préstamo",
     gift: "Regalo",
+    cash_opening: "Apertura de Caja",
     other_income: "Otros Ingresos",
     // Egresos operativos
     purchase: "Compra Inventario",
@@ -398,9 +399,9 @@ export default function Finance() {
       </div>
 
       {/* Modales de Historial */}
-      <BoxHistoryModal paymentMethod="cash" title="Caja Efectivo" colorClass="emerald" open={cashHistoryOpen} onOpenChange={setCashHistoryOpen} />
-      <BoxHistoryModal paymentMethod="qr" title="Caja QR" colorClass="blue" open={qrHistoryOpen} onOpenChange={setQrHistoryOpen} />
-      <BoxHistoryModal paymentMethod="transfer" title="Cuenta Bancaria" colorClass="purple" open={transferHistoryOpen} onOpenChange={setTransferHistoryOpen} />
+      <BoxHistoryModal paymentMethod="cash" title="Caja Efectivo" colorClass="emerald" open={cashHistoryOpen} onOpenChange={setCashHistoryOpen} branchId={activeBranchId} />
+      <BoxHistoryModal paymentMethod="qr" title="Caja QR" colorClass="blue" open={qrHistoryOpen} onOpenChange={setQrHistoryOpen} branchId={activeBranchId} />
+      <BoxHistoryModal paymentMethod="transfer" title="Cuenta Bancaria" colorClass="purple" open={transferHistoryOpen} onOpenChange={setTransferHistoryOpen} branchId={activeBranchId} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] gap-6">
         <Card className="border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[2.5rem] bg-white">
@@ -579,9 +580,10 @@ interface BoxHistoryModalProps {
   colorClass: "emerald" | "blue" | "purple";
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  branchId?: number;
 }
 
-function BoxHistoryModal({ paymentMethod, title, colorClass, open, onOpenChange }: BoxHistoryModalProps) {
+function BoxHistoryModal({ paymentMethod, title, colorClass, open, onOpenChange, branchId }: BoxHistoryModalProps) {
   const [filter, setFilter] = useState<"all" | "income" | "expense">("all");
   const [dateRange, setDateRange] = useState<"today" | "week" | "month" | "custom">("month");
   const [startDate, setStartDate] = useState(getMonthAgo());
@@ -605,9 +607,10 @@ function BoxHistoryModal({ paymentMethod, title, colorClass, open, onOpenChange 
   const colors = colorStyles[colorClass];
 
   const { data, isLoading, refetch } = trpc.finance.getBoxHistory.useQuery(
-    { paymentMethod, startDate, endDate, type: filter },
+    { paymentMethod, startDate, endDate, type: filter, branchId },
     { enabled: open }
   );
+
 
   useEffect(() => {
     if (open) {
@@ -850,7 +853,7 @@ function BoxHistoryModal({ paymentMethod, title, colorClass, open, onOpenChange 
                           <div className="flex items-center gap-2 mb-1">
                             <span className={`w-2 h-2 rounded-full ${t.type === "income" ? "bg-emerald-500" : "bg-red-500"}`} />
                             <span className="font-black text-slate-800 uppercase tracking-tight">{categoryLabel(t.category)}</span>
-                            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">{t.userName || t.responsibleUserName || `ID: ${t.userId}`}</span>
+                            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">{t.userName || t.responsibleUserName || (t.userId ? `ID: ${t.userId}` : "Administrador")}</span>
                           </div>
                           <div className="text-[11px] text-slate-500 font-medium max-w-md line-clamp-2">
                             {t.referenceId ? <span className="font-bold text-primary mr-1">#{t.referenceId}</span> : ""}
