@@ -322,6 +322,7 @@ export const generateInventoryPDF = (data: any, companyConfig?: any) => {
   const statusLabels: Record<string, string> = {
     available: "Disponible para Venta",
     in_repair: "En Taller",
+    in_diagnosis: "En Diagnóstico",
     sold: "Vendido",
     reserved: "Reservado",
     returned: "Devuelto",
@@ -410,8 +411,10 @@ export const generateInventoryPDF = (data: any, companyConfig?: any) => {
     const statusEmoji = 
       unit.status === "available" ? "✅" :
       unit.status === "in_repair" ? "🔧" :
+      unit.status === "in_diagnosis" ? "🔍" :
       unit.status === "sold" ? "💰" :
-      unit.status === "reserved" ? "📌" : "❓";
+      unit.status === "reserved" ? "📌" :
+      unit.status === "scrapped" ? "🗑️" : "❓";
 
     return [
       unit.code || "N/A",

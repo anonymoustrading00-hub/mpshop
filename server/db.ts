@@ -198,6 +198,88 @@ export const MOCK_WARRANTIES: any[] = [];
 export const MOCK_RETURNS: any[] = [];
 export const MOCK_GENERATED_CODES: any[] = [];
 
+// MOCK DATA para catálogos de dispositivos
+export const MOCK_DEVICE_BRANDS: any[] = [
+  { id: 1, name: "HP", createdAt: new Date() },
+  { id: 2, name: "Dell", createdAt: new Date() },
+  { id: 3, name: "Lenovo", createdAt: new Date() },
+  { id: 4, name: "Asus", createdAt: new Date() },
+  { id: 5, name: "Acer", createdAt: new Date() },
+  { id: 6, name: "Toshiba", createdAt: new Date() },
+  { id: 7, name: "Apple", createdAt: new Date() },
+  { id: 8, name: "MSI", createdAt: new Date() },
+];
+
+export const MOCK_DEVICE_MODELS: any[] = [
+  // HP
+  { id: 1, brandId: 1, name: "EliteBook 840 G7", defaultSpecs: JSON.stringify({ cpu: "Intel Core i5-10210U", ram: "8GB DDR4", storage: "256GB SSD", screenSize: "14\" FHD" }), createdAt: new Date() },
+  { id: 2, brandId: 1, name: "EliteBook 850 G8", defaultSpecs: JSON.stringify({ cpu: "Intel Core i7-1165G7", ram: "16GB DDR4", storage: "512GB SSD", screenSize: "15.6\" FHD" }), createdAt: new Date() },
+  { id: 3, brandId: 1, name: "ProBook 450 G8", defaultSpecs: JSON.stringify({ cpu: "Intel Core i5-1135G7", ram: "8GB DDR4", storage: "256GB SSD", screenSize: "15.6\" FHD" }), createdAt: new Date() },
+  { id: 4, brandId: 1, name: "Pavilion 15", defaultSpecs: JSON.stringify({ cpu: "Intel Core i5-1135G7", ram: "8GB DDR4", storage: "512GB SSD", screenSize: "15.6\" FHD" }), createdAt: new Date() },
+  // Dell
+  { id: 5, brandId: 2, name: "Latitude 5420", defaultSpecs: JSON.stringify({ cpu: "Intel Core i5-1135G7", ram: "8GB DDR4", storage: "256GB SSD", screenSize: "14\" FHD" }), createdAt: new Date() },
+  { id: 6, brandId: 2, name: "Inspiron 15 5000", defaultSpecs: JSON.stringify({ cpu: "Intel Core i5-1135G7", ram: "8GB DDR4", storage: "256GB SSD", screenSize: "15.6\" FHD" }), createdAt: new Date() },
+  { id: 7, brandId: 2, name: "XPS 13 9310", defaultSpecs: JSON.stringify({ cpu: "Intel Core i7-1165G7", ram: "16GB LPDDR4x", storage: "512GB SSD", screenSize: "13.4\" FHD+" }), createdAt: new Date() },
+  // Lenovo
+  { id: 8, brandId: 3, name: "ThinkPad X1 Carbon Gen 9", defaultSpecs: JSON.stringify({ cpu: "Intel Core i7-1165G7", ram: "16GB LPDDR4x", storage: "512GB SSD", screenSize: "14\" FHD" }), createdAt: new Date() },
+  { id: 9, brandId: 3, name: "ThinkPad T14 Gen 2", defaultSpecs: JSON.stringify({ cpu: "Intel Core i5-1135G7", ram: "8GB DDR4", storage: "256GB SSD", screenSize: "14\" FHD" }), createdAt: new Date() },
+  { id: 10, brandId: 3, name: "IdeaPad 5 Pro", defaultSpecs: JSON.stringify({ cpu: "Intel Core i5-11300H", ram: "16GB DDR4", storage: "512GB SSD", screenSize: "14\" 2.2K" }), createdAt: new Date() },
+  // Asus
+  { id: 11, brandId: 4, name: "VivoBook 15", defaultSpecs: JSON.stringify({ cpu: "Intel Core i3-1115G4", ram: "4GB DDR4", storage: "128GB SSD", screenSize: "15.6\" FHD" }), createdAt: new Date() },
+  { id: 12, brandId: 4, name: "ZenBook 14", defaultSpecs: JSON.stringify({ cpu: "Intel Core i7-1165G7", ram: "16GB LPDDR4x", storage: "512GB SSD", screenSize: "14\" FHD" }), createdAt: new Date() },
+  // Acer
+  { id: 13, brandId: 5, name: "Aspire 5", defaultSpecs: JSON.stringify({ cpu: "Intel Core i5-1135G7", ram: "8GB DDR4", storage: "256GB SSD", screenSize: "15.6\" FHD" }), createdAt: new Date() },
+  { id: 14, brandId: 5, name: "Swift 3", defaultSpecs: JSON.stringify({ cpu: "Intel Core i5-1135G7", ram: "8GB LPDDR4x", storage: "512GB SSD", screenSize: "14\" FHD" }), createdAt: new Date() },
+  // Apple
+  { id: 15, brandId: 7, name: "MacBook Air M1", defaultSpecs: JSON.stringify({ cpu: "Apple M1", ram: "8GB", storage: "256GB SSD", screenSize: "13.3\" Retina" }), createdAt: new Date() },
+  { id: 16, brandId: 7, name: "MacBook Pro 13\" M1", defaultSpecs: JSON.stringify({ cpu: "Apple M1", ram: "8GB", storage: "256GB SSD", screenSize: "13.3\" Retina" }), createdAt: new Date() },
+];
+
+export const MOCK_PROCESSORS: any[] = [
+  { id: 1, name: "Intel Core i3-1115G4", generation: "11th Gen", createdAt: new Date() },
+  { id: 2, name: "Intel Core i5-1135G7", generation: "11th Gen", createdAt: new Date() },
+  { id: 3, name: "Intel Core i5-10210U", generation: "10th Gen", createdAt: new Date() },
+  { id: 4, name: "Intel Core i7-1165G7", generation: "11th Gen", createdAt: new Date() },
+  { id: 5, name: "Intel Core i7-10750H", generation: "10th Gen", createdAt: new Date() },
+  { id: 6, name: "AMD Ryzen 5 5500U", generation: "Ryzen 5000", createdAt: new Date() },
+  { id: 7, name: "AMD Ryzen 7 5800H", generation: "Ryzen 5000", createdAt: new Date() },
+  { id: 8, name: "Apple M1", generation: "M1", createdAt: new Date() },
+  { id: 9, name: "Apple M2", generation: "M2", createdAt: new Date() },
+];
+
+export const MOCK_RAM_OPTIONS: any[] = [
+  { id: 1, capacity: "4GB DDR4", type: "DDR4", createdAt: new Date() },
+  { id: 2, capacity: "8GB DDR4", type: "DDR4", createdAt: new Date() },
+  { id: 3, capacity: "16GB DDR4", type: "DDR4", createdAt: new Date() },
+  { id: 4, capacity: "32GB DDR4", type: "DDR4", createdAt: new Date() },
+  { id: 5, capacity: "8GB LPDDR4x", type: "LPDDR4x", createdAt: new Date() },
+  { id: 6, capacity: "16GB LPDDR4x", type: "LPDDR4x", createdAt: new Date() },
+  { id: 7, capacity: "8GB (Apple)", type: "Unified", createdAt: new Date() },
+  { id: 8, capacity: "16GB (Apple)", type: "Unified", createdAt: new Date() },
+];
+
+export const MOCK_STORAGE_OPTIONS: any[] = [
+  { id: 1, capacity: "128GB SSD", type: "SSD", createdAt: new Date() },
+  { id: 2, capacity: "256GB SSD", type: "SSD", createdAt: new Date() },
+  { id: 3, capacity: "512GB SSD", type: "SSD", createdAt: new Date() },
+  { id: 4, capacity: "1TB SSD", type: "SSD", createdAt: new Date() },
+  { id: 5, capacity: "256GB NVMe", type: "NVMe", createdAt: new Date() },
+  { id: 6, capacity: "512GB NVMe", type: "NVMe", createdAt: new Date() },
+  { id: 7, capacity: "1TB NVMe", type: "NVMe", createdAt: new Date() },
+  { id: 8, capacity: "1TB HDD", type: "HDD", createdAt: new Date() },
+];
+
+export const MOCK_SCREEN_SIZES: any[] = [
+  { id: 1, size: "13.3\"", resolution: "1920x1080 (FHD)", createdAt: new Date() },
+  { id: 2, size: "13.4\"", resolution: "1920x1200 (FHD+)", createdAt: new Date() },
+  { id: 3, size: "14\"", resolution: "1920x1080 (FHD)", createdAt: new Date() },
+  { id: 4, size: "14\"", resolution: "2240x1400 (2.2K)", createdAt: new Date() },
+  { id: 5, size: "15.6\"", resolution: "1366x768 (HD)", createdAt: new Date() },
+  { id: 6, size: "15.6\"", resolution: "1920x1080 (FHD)", createdAt: new Date() },
+  { id: 7, size: "15.6\"", resolution: "2560x1440 (QHD)", createdAt: new Date() },
+  { id: 8, size: "17.3\"", resolution: "1920x1080 (FHD)", createdAt: new Date() },
+];
+
 export function syncMocksToDisk() {
   if (process.env.DATABASE_URL) return;
   const data = {
