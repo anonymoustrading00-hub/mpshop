@@ -259,10 +259,69 @@ export const reportsRouter = router({
     };
   }),
 
+  // Reporte mejorado de inventario (unidades)
   inventoryReport: protectedProcedure.query(async () => {
     const db = await getDb();
-    if (!db) return [];
-    return await db.select().from(units);
+    if (!db) {
+      return {
+        units: [],
+        stats: {
+          total: 0,
+          byStatus: {},
+          byType: {},
+          totalCost: 0,
+          totalSaleValue: 0,
+          potentialProfit: 0,
+          avgDaysInStock: 0,
+          inRepair: 0,
+          inWarranty: 0,
+        },
+      };
+    }
+
+    const allUnits = await db.select().from(units);
+
+    // Calcular estadísticas
+    const stats = {
+      total: allUnits.length,
+      byStatus: allUnits.reduce((acc: Record<string, number>, u: any) => {
+        const status = u.status || "unknown";
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+      byType: allUnits.reduce((acc: Record<string, number>, u: any) => {
+        const type = u.type || "other";
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+      totalCost: allUnits.reduce((sum: number, u: any) => sum + (u.purchasePrice || 0), 0),
+      totalSaleValue: allUnits.filter((u: any) => u.status === "available").reduce((sum: number, u: any) => sum + (u.salePrice || 0), 0),
+      potentialProfit: 0,
+      avgDaysInStock: 0,
+      inRepair: allUnits.filter((u: any) => u.status === "in_repair").length,
+      inWarranty: allUnits.filter((u: any) => u.warrantyStatus === "active").length,
+    };
+
+    // Calcular ganancia potencial
+    stats.potentialProfit = stats.totalSaleValue - allUnits
+      .filter((u: any) => u.status === "available")
+      .reduce((sum: number, u: any) => sum + (u.purchasePrice || 0), 0);
+
+    // Calcular días promedio en stock (para unidades no vendidas)
+    const unsoldUnits = allUnits.filter((u: any) => u.status !== "sold");
+    if (unsoldUnits.length > 0) {
+      const totalDays = unsoldUnits.reduce((sum: number, u: any) => {
+        const purchaseDate = u.purchaseDate ? new Date(u.purchaseDate) : new Date(u.createdAt);
+        const daysDiff = Math.floor((Date.now() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24));
+        return sum + daysDiff;
+      }, 0);
+      stats.avgDaysInStock = Math.round(totalDays / unsoldUnits.length);
+    }
+
+    return {
+      units: allUnits,
+      stats,
+    };
   }),
 
   inventoryMovementsReport: protectedProcedure

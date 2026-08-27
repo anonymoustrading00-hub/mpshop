@@ -230,64 +230,226 @@ export const generateSalesPDF = (sales: any[], filters: any, companyConfig?: any
   return doc;
 };
 
-// 3. REPORTE DE INVENTARIO
-export const generateInventoryPDF = (products: any[], inventory: any[], companyConfig?: any) => {
-  const doc = createPDF("Reporte de Inventario", companyConfig);
+// 3. REPORTE DE INVENTARIO (UNIDADES) - MEJORADO
+export const generateInventoryPDF = (data: any, companyConfig?: any) => {
+  const units = data?.units || [];
+  const stats = data?.stats || {};
+  
+  const doc = createPDF("Reporte de Inventario - Unidades", companyConfig);
 
   let y = 45;
 
-  // Tabla de productos con stock
-  const tableData = products.map((product, idx) => {
-    const inv = inventory.find((i) => i.productId === product.id) || {};
+  // ═══════════════════════════════════════════════════════════
+  // SECCIÓN 1: RESUMEN EJECUTIVO
+  // ═══════════════════════════════════════════════════════════
+  doc.setFillColor(240, 245, 250);
+  doc.rect(15, y - 5, 180, 50, "F");
+  
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 58, 138);
+  doc.text("📊 RESUMEN EJECUTIVO", 20, y + 2);
+  doc.setTextColor(40, 40, 40);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+
+  const row1Y = y + 10;
+  const row2Y = y + 18;
+  const row3Y = y + 26;
+  const row4Y = y + 34;
+
+  // Fila 1: Total y Valoración
+  doc.setFont("helvetica", "bold");
+  doc.text(`Total Unidades:`, 20, row1Y);
+  doc.setFont("helvetica", "normal");
+  doc.text(`${stats.total || 0}`, 55, row1Y);
+
+  doc.setFont("helvetica", "bold");
+  doc.text(`Inversión Total:`, 100, row1Y);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(220, 38, 38);
+  doc.text(`${formatBs(stats.totalCost / 100)}`, 135, row1Y);
+  doc.setTextColor(40, 40, 40);
+
+  // Fila 2: Valor de venta y Ganancia proyectada
+  doc.setFont("helvetica", "bold");
+  doc.text(`Valor en Venta:`, 20, row2Y);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(22, 163, 74);
+  doc.text(`${formatBs(stats.totalSaleValue / 100)}`, 55, row2Y);
+  doc.setTextColor(40, 40, 40);
+
+  doc.setFont("helvetica", "bold");
+  doc.text(`Ganancia Potencial:`, 100, row2Y);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(16, 185, 129);
+  doc.text(`${formatBs(stats.potentialProfit / 100)} (${stats.totalCost > 0 ? Math.round((stats.potentialProfit / stats.totalCost) * 100) : 0}%)`, 135, row2Y);
+  doc.setTextColor(40, 40, 40);
+
+  // Fila 3: Rotación y Taller
+  doc.setFont("helvetica", "bold");
+  doc.text(`Días Prom. Stock:`, 20, row3Y);
+  doc.setFont("helvetica", "normal");
+  doc.text(`${stats.avgDaysInStock || 0} días`, 55, row3Y);
+
+  doc.setFont("helvetica", "bold");
+  doc.text(`En Taller:`, 100, row3Y);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(234, 179, 8);
+  doc.text(`${stats.inRepair || 0} unidades`, 135, row3Y);
+  doc.setTextColor(40, 40, 40);
+
+  // Fila 4: Garantías activas
+  doc.setFont("helvetica", "bold");
+  doc.text(`En Garantía:`, 20, row4Y);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(59, 130, 246);
+  doc.text(`${stats.inWarranty || 0} unidades`, 55, row4Y);
+  doc.setTextColor(40, 40, 40);
+
+  y += 58;
+
+  // ═══════════════════════════════════════════════════════════
+  // SECCIÓN 2: DISTRIBUCIÓN POR ESTADO
+  // ═══════════════════════════════════════════════════════════
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 58, 138);
+  doc.text("📦 DISTRIBUCIÓN POR ESTADO", 20, y);
+  doc.setTextColor(40, 40, 40);
+  y += 7;
+
+  const statusLabels: Record<string, string> = {
+    available: "Disponible para Venta",
+    in_repair: "En Taller",
+    sold: "Vendido",
+    reserved: "Reservado",
+    returned: "Devuelto",
+    scrapped: "Desechado",
+  };
+
+  const statusData = Object.entries(stats.byStatus || {}).map(([status, count]) => [
+    statusLabels[status] || status,
+    (count as number).toString(),
+    `${(((count as number) / stats.total) * 100).toFixed(1)}%`,
+  ]);
+
+  if (statusData.length > 0) {
+    (autoTable as any)(doc, {
+      ...getTableOptions(y),
+      head: [["Estado", "Cantidad", "% del Total"]],
+      body: statusData,
+      theme: "grid",
+      headStyles: { fillColor: [30, 58, 138], fontSize: 9 },
+      styles: { fontSize: 9 },
+      columnStyles: {
+        1: { halign: "center" },
+        2: { halign: "center" },
+      },
+    });
+    y = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // SECCIÓN 3: DISTRIBUCIÓN POR TIPO DE EQUIPO
+  // ═══════════════════════════════════════════════════════════
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 58, 138);
+  doc.text("💻 DISTRIBUCIÓN POR TIPO DE EQUIPO", 20, y);
+  doc.setTextColor(40, 40, 40);
+  y += 7;
+
+  const typeLabels: Record<string, string> = {
+    laptop: "Laptops",
+    tablet: "Tablets",
+    phone: "Celulares",
+    monitor: "Monitores",
+    charger: "Cargadores",
+    accessory: "Accesorios/Repuestos",
+    other: "Otros",
+  };
+
+  const typeData = Object.entries(stats.byType || {}).map(([type, count]) => [
+    typeLabels[type] || type,
+    (count as number).toString(),
+    `${(((count as number) / stats.total) * 100).toFixed(1)}%`,
+  ]);
+
+  if (typeData.length > 0) {
+    (autoTable as any)(doc, {
+      ...getTableOptions(y),
+      head: [["Tipo", "Cantidad", "% del Total"]],
+      body: typeData,
+      theme: "grid",
+      headStyles: { fillColor: [30, 58, 138], fontSize: 9 },
+      styles: { fontSize: 9 },
+      columnStyles: {
+        1: { halign: "center" },
+        2: { halign: "center" },
+      },
+    });
+    y = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Nueva página para detalle
+  doc.addPage();
+  y = 30;
+
+  // ═══════════════════════════════════════════════════════════
+  // SECCIÓN 4: DETALLE DE UNIDADES
+  // ═══════════════════════════════════════════════════════════
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 58, 138);
+  doc.text("📋 DETALLE DE UNIDADES", 20, y);
+  doc.setTextColor(40, 40, 40);
+  y += 7;
+
+  const tableData = units.slice(0, 200).map((unit: any) => {
+    const statusEmoji = 
+      unit.status === "available" ? "✅" :
+      unit.status === "in_repair" ? "🔧" :
+      unit.status === "sold" ? "💰" :
+      unit.status === "reserved" ? "📌" : "❓";
+
     return [
-      product.code,
-      product.name,
-      product.category === "finished_product" ? "Producto Terminado"
-        : product.category === "raw_material" ? "Materia Prima"
-        : "Suministro",
-      (inv.quantity || 0).toString(),
-      (inv.minStock || 0).toString(),
-      (inv.quantity || 0) <= (inv.minStock || 0) ? "BAJO" : "OK",
-      formatBs(product.salePrice),
+      unit.code || "N/A",
+      `${unit.brand || ""} ${unit.model || ""}`.trim() || "N/A",
+      typeLabels[unit.type] || unit.type,
+      `${statusEmoji} ${statusLabels[unit.status] || unit.status}`,
+      formatBs((unit.purchasePrice || 0) / 100),
+      formatBs((unit.salePrice || 0) / 100),
+      unit.purchaseDate ? format(new Date(unit.purchaseDate), "dd/MM/yyyy", { locale: es }) : "N/A",
     ];
   });
 
   (autoTable as any)(doc, {
     ...getTableOptions(y),
-    head: [["Código", "Producto", "Categoría", "Stock", "Mín.", "Estado", "Precio"]],
+    head: [["Código", "Marca/Modelo", "Tipo", "Estado", "Costo", "Precio Venta", "F. Compra"]],
     body: tableData,
-    didParseCell: (data: any) => {
-      if (data.column.index === 5 && data.cell.text[0] === "BAJO") {
-        data.cell.styles.textColor = [220, 53, 69];
-        data.cell.styles.fontStyle = "bold";
-      }
+    theme: "striped",
+    headStyles: { fillColor: [30, 58, 138], fontSize: 8 },
+    styles: { fontSize: 7 },
+    columnStyles: {
+      0: { cellWidth: 20 },
+      1: { cellWidth: 45 },
+      2: { cellWidth: 22 },
+      3: { cellWidth: 32 },
+      4: { cellWidth: 20, halign: "right" },
+      5: { cellWidth: 20, halign: "right" },
+      6: { cellWidth: 22, halign: "center" },
     },
   });
 
   const finalY = (doc as any).lastAutoTable.finalY + 10;
 
-  // Resumen
-  const totalProducts = products.length;
-  const lowStock = products.filter((p, idx) => {
-    const inv = inventory.find((i) => i.productId === p.id) || {};
-    return (inv.quantity || 0) <= (inv.minStock || 0);
-  }).length;
-  const totalValue = products.reduce((sum, p, idx) => {
-    const inv = inventory.find((i) => i.productId === p.id) || {};
-    return sum + (p.salePrice || 0) * (inv.quantity || 0);
-  }, 0);
-
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text("RESUMEN", 20, finalY);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.text(`Total de Productos: ${totalProducts}`, 20, finalY + 7);
-  doc.setTextColor(220, 53, 69);
-  doc.text(`Stock Bajo: ${lowStock}`, 20, finalY + 14);
-  doc.setTextColor(40, 40, 40);
-  doc.setFont("helvetica", "bold");
-  doc.text(`Valor Total en Inventario: ${formatBs(totalValue)}`, 20, finalY + 21);
+  // Nota de corte si hay más de 200 unidades
+  if (units.length > 200) {
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Nota: Se muestran las primeras 200 unidades de ${units.length} totales.`, 20, finalY);
+  }
 
   return doc;
 };

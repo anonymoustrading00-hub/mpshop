@@ -70,12 +70,8 @@ export default function Reports() {
 
   const downloadInventoryReport = () => {
     if (inventoryQuery.data) {
-      const doc = generateInventoryPDF(
-        inventoryQuery.data.products,
-        inventoryQuery.data.inventory,
-        companyConfig
-      );
-      doc.save(`reporte-inventario-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      const doc = generateInventoryPDF(inventoryQuery.data, companyConfig);
+      doc.save(`reporte-inventario-unidades-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     }
   };
 
@@ -134,11 +130,11 @@ export default function Reports() {
     },
     {
       id: "inventory",
-      name: "Inventario",
+      name: "Inventario (Unidades)",
       icon: Package,
-      description: "Estado actual del inventario",
+      description: "Valoración y análisis del inventario",
       onDownload: downloadInventoryReport,
-      dataCount: inventoryQuery.data?.products?.length || 0,
+      dataCount: inventoryQuery.data?.units?.length || 0,
     },
     {
       id: "movements",
@@ -277,8 +273,8 @@ export default function Reports() {
               salesQuery.data?.length === 0 &&
               "No hay ventas en el período seleccionado"}
             {selectedReport === "inventory" &&
-              inventoryQuery.data?.products.length === 0 &&
-              "No hay productos registrados"}
+              inventoryQuery.data?.units?.length === 0 &&
+              "No hay unidades registradas"}
             {selectedReport === "movements" &&
               movementsQuery.data?.movements.length === 0 &&
               "No hay movimientos en el período seleccionado"}

@@ -28,8 +28,8 @@ import {
 
 const NAV_ITEMS = [
   { label: "Inicio", href: "/", icon: Home, keywords: "home inicio" },
-  { label: "Catálogo / Inventario", href: "/catalog", icon: Package, keywords: "catalogo inventario stock productos equipos laptops" },
-  { label: "Unidades", href: "/units", icon: Package, keywords: "unidades laptops series equipos" },
+  { label: "Catálogo / Productos", href: "/catalog", icon: Package, keywords: "catalogo productos stock genéricos" },
+  { label: "Unidades / Inventario", href: "/units", icon: Package, keywords: "unidades laptops series equipos inventario stock" },
   { label: "Taller & Servicio Técnico", href: "/repairs", icon: Factory, keywords: "taller tecnico reparaciones ordenes servicio repuestos" },
   { label: "Garantías", href: "/warranties", icon: FileText, keywords: "garantias garantia cobertura rma" },
   { label: "Devoluciones (RMA)", href: "/returns", icon: Package, keywords: "devoluciones rma devolucion cambios" },

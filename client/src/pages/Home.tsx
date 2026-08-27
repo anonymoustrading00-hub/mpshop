@@ -32,8 +32,8 @@ import {
 } from "lucide-react";
 
 const adminModules = [
-  { href: "/catalog", title: "Inventario / Catálogo", description: "Fotos y fichas de laptops, equipos y artículos en stock.", icon: Package },
-  { href: "/units", title: "Unidades", description: "Cada laptop o accesorio con su código, estado y dueño.", icon: Tag },
+  { href: "/catalog", title: "Catálogo de Productos", description: "Fotos y fichas de laptops, equipos y artículos en stock.", icon: Package },
+  { href: "/units", title: "Unidades / Inventario", description: "Cada laptop o accesorio con su código, estado y dueño.", icon: Tag },
   { href: "/repairs", title: "Taller", description: "Órdenes de servicio, diagnóstico y repuestos.", icon: Factory },
   { href: "/warranties", title: "Garantías", description: "Cobertura después de una venta.", icon: LayoutGrid },
   { href: "/returns", title: "Devoluciones", description: "RMA y reingreso al taller.", icon: AlertTriangle },
@@ -44,11 +44,11 @@ const adminModules = [
   { href: "/dashboard-kpis", title: "KPIs", description: "Indicadores prioritarios en tiempo real.", icon: LineChart },
   { href: "/analytics", title: "Analítica", description: "Margen, rotación, taller y comercial.", icon: LineChart },
   { href: "/rentabilidad", title: "Rentabilidad", description: "Utilidad real: ventas, costos y gastos.", icon: LineChart },
-  { href: "/reports", title: "Reportes", description: "PDFs de ventas, finanzas e inventario.", icon: LineChart },
+  { href: "/reports", title: "Reportes", description: "PDFs de ventas, finanzas y unidades.", icon: LineChart },
   { href: "/users", title: "Usuarios", description: "Quién entra, con qué rol y a qué sucursal.", icon: Users },
   { href: "/branches", title: "Sucursales", description: "Tiendas y bodegas.", icon: Package },
   { href: "/suppliers", title: "Proveedores", description: "A quién le compras y cómo contactarlo.", icon: Users },
-  { href: "/purchases", title: "Compras", description: "Lotes que entran al inventario.", icon: ShoppingCart },
+  { href: "/purchases", title: "Compras", description: "Lotes que entran a las unidades.", icon: ShoppingCart },
   { href: "/customers", title: "Clientes", description: "Ficha, deuda, zona y WhatsApp.", icon: Users },
   { href: "/finance", title: "Finanzas", description: "Caja, ingresos y egresos.", icon: DollarSign },
   { href: "/expenses", title: "Gastos", description: "Gastos operativos del día a día.", icon: Receipt },
@@ -230,8 +230,8 @@ export default function Home() {
                 <CredentialRow label="Contrasena" value="admin123" />
               </div>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <FeaturePill label="Pedidos" />
-                <FeaturePill label="Inventario" />
+                <FeaturePill label="Unidades" />
+                <FeaturePill label="Catálogo" />
                 <FeaturePill label="Clientes" />
                 <FeaturePill label="Ventas" />
               </div>
