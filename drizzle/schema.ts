@@ -157,6 +157,7 @@ export const purchases = mysqlTable("purchases", {
   paymentStatus: mysqlEnum("paymentStatus", ["pending", "paid"]).default("pending").notNull(),
   paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer"]).default("cash"),
   isCredit: int("isCredit").default(0),
+  branchId: int("branchId").default(1),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

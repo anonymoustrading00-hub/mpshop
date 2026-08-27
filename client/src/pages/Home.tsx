@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useBranch } from "@/contexts/BranchContext";
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { formatCurrency } from "@/lib/currency";
@@ -100,14 +101,16 @@ function getOrderStatusLabel(status: string) {
 
 export default function Home() {
   const { user, loading, isAuthenticated, logout } = useAuth();
+  const { activeBranchId } = useBranch();
 
   const isAdmin = user?.role === "admin";
   const isDelivery = user?.role === "user";
   const today = getLocalDateInputValue();
 
-  const { data: adminStats } = trpc.stats.getDashboardStats.useQuery(undefined, {
-    enabled: isAdmin,
-  });
+  const { data: adminStats } = trpc.stats.getDashboardStats.useQuery(
+    { branchId: activeBranchId || undefined },
+    { enabled: isAdmin }
+  );
   const { data: deliveryStats } = trpc.stats.getDeliveryStats.useQuery(undefined, {
     enabled: isDelivery,
   });
@@ -117,13 +120,15 @@ export default function Home() {
   const { data: myOrders } = trpc.orders.listForDelivery.useQuery(undefined, {
     enabled: isDelivery,
   });
-  const { data: inventory } = trpc.units.list.useQuery(undefined, {
-    enabled: isAdmin,
-  });
+  const { data: inventory } = trpc.units.list.useQuery(
+    { branchId: activeBranchId || undefined },
+    { enabled: isAdmin }
+  );
   const expiryAlerts: any[] = [];
-  const { data: sales } = trpc.sales.list.useQuery(undefined, {
-    enabled: isAdmin,
-  });
+  const { data: sales } = trpc.sales.list.useQuery(
+    { branchId: activeBranchId || undefined },
+    { enabled: isAdmin }
+  );
   const { data: closureStatus } = trpc.finance.hasPendingClosure.useQuery();
 
   const actionableOrders = useMemo(() => {

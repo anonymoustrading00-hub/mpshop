@@ -65,14 +65,17 @@ export const salesRouter = router({
     return { saleNumber: await getNextSaleNumber() };
   }),
 
-  list: protectedProcedure.query(async ({ ctx }) => {
-    const allSales = await getAllSales(ctx.user?.role === "admin" ? undefined : ctx.branchId);
-    if (ctx.user?.role === "admin") {
-      return allSales;
-    }
+  list: protectedProcedure
+    .input(z.object({ branchId: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const branchId = input?.branchId !== undefined ? input.branchId : ctx.branchId;
+      const allSales = await getAllSales(branchId);
+      if (ctx.user?.role === "admin") {
+        return allSales;
+      }
 
-    return (allSales as any[]).filter((sale: any) => sale.soldBy === ctx.user?.id);
-  }),
+      return (allSales as any[]).filter((sale: any) => sale.soldBy === ctx.user?.id);
+    }),
 
   getDetails: protectedProcedure
     .input(z.object({ saleId: z.number() }))
@@ -93,6 +96,7 @@ export const salesRouter = router({
   create: protectedProcedure
     .input(
       z.object({
+        branchId: z.number().optional(),
         customerId: z.number().optional(),
         customerName: z.string().optional(),
         customerPhone: z.string().optional(),
@@ -163,7 +167,7 @@ export const salesRouter = router({
       try {
         const result = await createSaleWithItems({
           saleNumber,
-          branchId: ctx.branchId,
+          branchId: input.branchId || ctx.branchId,
           customerId,
           customerName: customerId ? undefined : input.customerName,
           saleChannel: input.saleChannel,

@@ -597,7 +597,9 @@ export default function Sales() {
   const utils = trpc.useUtils();
 
   const { data: closureStatus } = trpc.finance.hasPendingClosure.useQuery();
-  const { data: salesList, isLoading } = trpc.sales.list.useQuery();
+  const { data: salesList, isLoading } = trpc.sales.list.useQuery({
+    branchId: activeBranchId || undefined,
+  });
   const { data: nextSaleData } = trpc.sales.getNextSaleNumber.useQuery();
   const { data: companyConfig } = trpc.settings.getCompanyConfig.useQuery();
 
@@ -1069,6 +1071,7 @@ export default function Sales() {
     const resolvedPaymentStatus = paymentMethod === "credit" ? "pending" : paymentStatus;
 
     createSaleMutation.mutate({
+      branchId: activeBranchId || undefined,
       customerId: selectedCustomerId || undefined,
       customerName: selectedCustomerId ? undefined : (anonymousCustomerName || "").trim() || undefined,
       customerPhone: selectedCustomerId ? undefined : (anonymousCustomerPhone || "").trim() || undefined,

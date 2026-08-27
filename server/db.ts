@@ -1464,10 +1464,15 @@ export async function getAllPurchases(branchId?: number) {
       return { ...p, supplierName: supplier?.name || "Proveedor Desconocido" };
     });
   }
-  return await db.select({
+  let query = db.select({
     ...purchases,
     supplierName: suppliers.name,
-  }).from(purchases).leftJoin(suppliers, eq(purchases.supplierId, suppliers.id));
+  }).from(purchases).leftJoin(suppliers, eq(purchases.supplierId, suppliers.id)).$dynamic();
+
+  if (branchId) {
+    query = query.where(eq(purchases.branchId, branchId));
+  }
+  return await query;
 }
 
 export async function getPurchaseItems(purchaseId: number) {
@@ -3438,7 +3443,7 @@ export async function getAllSales(branchId?: number) {
   if (!db) {
     let list = MOCK_SALES;
     if (branchId) {
-      list = list.filter((s: any) => !s.branchId || s.branchId === branchId);
+      list = list.filter((s: any) => (s.branchId || 1) === branchId);
     }
     return list.map((sale: any) => {
       return mapSaleWithRelations(sale, MOCK_USERS, MOCK_CUSTOMERS);

@@ -820,6 +820,7 @@ export async function ensureTables() {
     await runSQL("inventoryMovements.batchNumber", `ALTER TABLE inventoryMovements ADD COLUMN batchNumber VARCHAR(50) AFTER saleId`);
 
     // purchaseItems columns
+    await runSQL("purchases.branchId", `ALTER TABLE purchases ADD COLUMN branchId INT DEFAULT 1 AFTER isCredit`);
     await runSQL("purchaseItems.batchNumber", `ALTER TABLE purchaseItems ADD COLUMN batchNumber VARCHAR(50) AFTER price`);
     await runSQL("purchaseItems.expiryDate", `ALTER TABLE purchaseItems ADD COLUMN expiryDate VARCHAR(10) AFTER batchNumber`);
 

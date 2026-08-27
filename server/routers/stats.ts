@@ -17,14 +17,18 @@ import { TRPCError } from "@trpc/server";
 
 export const statsRouter = router({
   // ─── Dashboard stats (existing) ──────────────────────────────────────────
-  getDashboardStats: protectedProcedure.query(async ({ ctx }) => {
-    if (ctx.user?.role !== "admin") {
-      throw new TRPCError({ code: "FORBIDDEN" });
-    }
+  getDashboardStats: protectedProcedure
+    .input(z.object({ branchId: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      if (ctx.user?.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
 
-    const orders = await getAllOrders();
-    const unitsList = await getAllUnits();
-    const transactions = await getFinancialTransactions();
+      const branchId = input?.branchId !== undefined ? input.branchId : ctx.branchId;
+
+      const orders = await getAllOrders();
+      const unitsList = await getAllUnits(branchId);
+      const transactions = await getFinancialTransactions(undefined, branchId);
 
     const revenueByMethod = {
       cash: transactions
