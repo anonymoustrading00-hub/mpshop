@@ -205,7 +205,9 @@ export const financeRouter = router({
         type: input.type,
         notes: input.notes,
         orderId: input.orderId,
+        branchId: ctx.branchId,
       });
+
     }),
   // Obtener historial de entregas del repartidor hoy
   getDeliveryHistory: protectedProcedure

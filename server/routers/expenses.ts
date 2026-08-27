@@ -25,6 +25,9 @@ const EXPENSE_CATEGORY_ENUM = z.enum([
   "taxes",
   "insurance",
   "bank_fees",
+  "fuel",
+  "subsistence",
+  "logistics",
   // Costos directos (generados automáticamente por el sistema)
   "repair_cost",
   "warranty_repair_cost",
@@ -48,8 +51,12 @@ const MANUAL_CATEGORY_ENUM = z.enum([
   "taxes",
   "insurance",
   "bank_fees",
+  "fuel",
+  "subsistence",
+  "logistics",
   "other",
 ]);
+
 
 // Schema de filtros compartidos
 const expenseFiltersSchema = z.object({

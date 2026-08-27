@@ -517,6 +517,9 @@ export const operationalExpenses = mysqlTable("operationalExpenses", {
     "taxes",
     "insurance",
     "bank_fees",
+    "fuel",
+    "subsistence",
+    "logistics",
     // Costos directos del negocio (se crean automáticamente)
     "repair_cost",
     "warranty_repair_cost",

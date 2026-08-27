@@ -2105,19 +2105,44 @@ export async function getFinancialTransactions(userId?: number, branchId?: numbe
 
 export async function createDeliveryExpense(data: any) {
   const db = await getDb();
+  const category = data.type === "fuel" ? "fuel" : data.type === "subsistence" ? "subsistence" : "logistics";
+  const desc = data.notes ? `Gasto Repartidor: ${data.notes}` : `Gasto Logístico (${category === "fuel" ? "Combustible" : category === "subsistence" ? "Viáticos" : "Logística"})`;
+
   if (!db) {
     const newId = MOCK_DELIVERY_EXPENSES.length + 1;
     const expense = { ...data, id: newId, createdAt: new Date() };
     MOCK_DELIVERY_EXPENSES.push(expense);
 
+    // Registrar en Gastos Operativos (Módulo de Gastos)
+    const opExpenseId = MOCK_OPERATIONAL_EXPENSES.length + 1;
+    MOCK_OPERATIONAL_EXPENSES.push({
+      id: opExpenseId,
+      branchId: data.branchId || 1,
+      description: desc,
+      category,
+      costType: "operational_expense",
+      referenceType: "delivery_expense",
+      referenceId: newId,
+      isAutomatic: 1,
+      amount: data.amount,
+      paymentMethod: "cash",
+      expenseDate: new Date(),
+      status: "paid",
+      userId: data.deliveryPersonId,
+      notes: data.notes || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
     // Impacto financiero automático
     await createFinancialTransaction({
       type: "expense",
-      category: data.type === "fuel" ? "fuel" : "subsistence",
+      category,
       amount: data.amount,
-      notes: data.notes || "Gasto de repartidor",
+      notes: desc,
       paymentMethod: "cash",
       userId: data.deliveryPersonId,
+      branchId: data.branchId || 1,
       referenceId: data.orderId || null
     });
 
@@ -2126,19 +2151,44 @@ export async function createDeliveryExpense(data: any) {
   }
   // Real DB
   return await db.transaction(async (tx: any) => {
-    const result = await tx.insert(deliveryExpenses).values(data);
+    const result = await tx.insert(deliveryExpenses).values({
+      deliveryPersonId: data.deliveryPersonId,
+      orderId: data.orderId || null,
+      amount: data.amount,
+      type: data.type,
+      notes: data.notes || null,
+    });
     const insertId = getInsertId(result);
 
-    await tx.insert(financialTransactions).values({
-      type: "expense",
-      category: data.type === "fuel" ? "fuel" : "subsistence",
+    // Registrar en Gastos Operativos (Módulo de Gastos)
+    await tx.insert(operationalExpenses).values({
+      branchId: data.branchId || 1,
+      description: desc,
+      category,
+      costType: "operational_expense",
+      referenceType: "delivery_expense",
+      referenceId: insertId,
+      isAutomatic: 1,
       amount: data.amount,
-      notes: data.notes || "Gasto de repartidor",
+      paymentMethod: "cash",
+      expenseDate: new Date(),
+      status: "paid",
+      userId: data.deliveryPersonId,
+      notes: data.notes || null,
+    });
+
+    await tx.insert(financialTransactions).values(buildFinancialTransactionRecord({
+      type: "expense",
+      category,
+      amount: data.amount,
+      notes: desc,
       paymentMethod: "cash", // Los gastos de repartidor suelen ser en efectivo
       userId: data.deliveryPersonId,
+      branchId: data.branchId || 1,
       referenceId: data.orderId || null,
       createdAt: new Date()
-    });
+    }));
+
     return { insertId };
   });
 }

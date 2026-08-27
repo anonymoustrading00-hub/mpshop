@@ -412,7 +412,7 @@ export async function ensureTables() {
       ALTER TABLE operationalExpenses ADD COLUMN isAutomatic int NOT NULL DEFAULT 0
     `);
     await runSQL("operationalExpenses.category enum", `
-      ALTER TABLE operationalExpenses MODIFY COLUMN category enum('facebook_ads','google_ads','electricity','water','internet','telephone','rent','salaries','maintenance','supplies','taxes','insurance','bank_fees','repair_cost','warranty_repair_cost','warranty_replacement_cost','cogs','other') NOT NULL
+      ALTER TABLE operationalExpenses MODIFY COLUMN category enum('facebook_ads','google_ads','electricity','water','internet','telephone','rent','salaries','maintenance','supplies','taxes','insurance','bank_fees','fuel','subsistence','logistics','repair_cost','warranty_repair_cost','warranty_replacement_cost','cogs','other') NOT NULL
     `);
 
     // ============================================================

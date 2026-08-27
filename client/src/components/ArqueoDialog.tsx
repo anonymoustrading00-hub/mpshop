@@ -132,16 +132,17 @@ export function ArqueoDialog({
   const handleProcessClosure = () => {
     mutation.mutate({
       date: getLocalDateInputValue(),
-      initialCash: 0,
+      initialCash: Math.round(openingAmount ?? 0),
       reportedCash: totalReportedCash,
       reportedQr: Math.round(reportedQr * 100),
       reportedTransfer: Math.round(reportedTransfer * 100),
       expectedCash: expectedCash,
       expectedQr: expectedQr,
       expectedTransfer: expectedTransfer,
-      expenses: 0,
+      expenses: Math.round((cashPurchases ?? 0) + (otherExpenses ?? 0)),
     });
   };
+
 
 
   const handleCountChange = (denom: number, val: string) => {

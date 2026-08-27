@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArqueoDialog } from "@/components/ArqueoDialog";
 import { useBranch } from "@/contexts/BranchContext";
+import { Link } from "wouter";
 
 function getLocalDateInputValue() {
   const now = new Date();
@@ -157,6 +158,8 @@ export default function Finance() {
 
   const cashIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
   const cashExpense = (transactions as any[])?.filter((t: any) => t.type === "expense" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const cashPurchases = (transactions as any[])?.filter((t: any) => t.type === "expense" && t.category === "purchase" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const otherExpenses = (transactions as any[])?.filter((t: any) => t.type === "expense" && t.category !== "purchase" && t.category !== "transfer_between_registers" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
   const baseCashBalance = cashIncome - cashExpense;
 
   const qrIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && t.paymentMethod === "qr").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
@@ -223,15 +226,20 @@ export default function Finance() {
             companyConfig={companyData}
             openingAmount={totalCashOpenings}
             cashSales={cashIncome}
-            cashPurchases={cashExpense}
-            otherExpenses={0}
+            cashPurchases={cashPurchases}
+            otherExpenses={otherExpenses}
           />
           <TransferDialog />
           <OpenCashDialog />
           <AddIncomeDialog />
-          <AddExpenseDialog />
+          <Link href="/expenses">
+            <Button className="gap-2 bg-slate-900 hover:bg-slate-800 text-white h-10 px-4">
+              <Receipt className="h-4 w-4" /> Módulo de Gastos
+            </Button>
+          </Link>
         </div>
       </div>
+
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Caja Efectivo */}

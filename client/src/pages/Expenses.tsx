@@ -46,6 +46,9 @@ export const ALL_CATEGORIES = [
   { value: "bank_fees",    label: "Comisiones Bancarias",   costType: "operational_expense", color: "bg-gray-100 text-gray-800",      auto: false },
   { value: "facebook_ads", label: "Facebook Ads",           costType: "operational_expense", color: "bg-blue-100 text-blue-800",      auto: false },
   { value: "google_ads",   label: "Google Ads",             costType: "operational_expense", color: "bg-yellow-100 text-yellow-800",  auto: false },
+  { value: "logistics",    label: "Gasto Logístico / Envío", costType: "operational_expense", color: "bg-blue-100 text-blue-800",    auto: false },
+  { value: "fuel",         label: "Combustible",            costType: "operational_expense", color: "bg-amber-100 text-amber-800",   auto: false },
+  { value: "subsistence",  label: "Viáticos / Movilidad",   costType: "operational_expense", color: "bg-emerald-100 text-emerald-800", auto: false },
   // Gastos Administrativos (manuales)
   { value: "salaries",     label: "Sueldos / Salarios",     costType: "admin_expense",       color: "bg-green-100 text-green-800",    auto: false },
   { value: "other",        label: "Otros",                  costType: "admin_expense",       color: "bg-muted text-muted-foreground", auto: false },
@@ -66,9 +69,10 @@ const TABS = [
   { id: "direct_cost",         label: "Costos Directos",  icon: DollarSign,   filter: (e: any) => ["cogs"].includes(e.category) },
   { id: "repair_cost",         label: "Reparaciones",     icon: Wrench,       filter: (e: any) => ["repair_cost"].includes(e.category) },
   { id: "warranty_cost",       label: "Garantías",        icon: ShieldAlert,  filter: (e: any) => ["warranty_repair_cost","warranty_replacement_cost"].includes(e.category) },
-  { id: "operational_expense", label: "Gastos Op.",       icon: Receipt,      filter: (e: any) => ["rent","electricity","water","internet","telephone","maintenance","supplies","taxes","insurance","bank_fees","facebook_ads","google_ads"].includes(e.category) },
+  { id: "operational_expense", label: "Gastos Op.",       icon: Receipt,      filter: (e: any) => ["rent","electricity","water","internet","telephone","maintenance","supplies","taxes","insurance","bank_fees","facebook_ads","google_ads","logistics","fuel","subsistence"].includes(e.category) },
   { id: "admin_expense",       label: "Gastos Admin",     icon: DollarSign,   filter: (e: any) => ["salaries","other"].includes(e.category) },
 ] as const;
+
 
 // ─────────────────────────────────────────────
 // Página principal
