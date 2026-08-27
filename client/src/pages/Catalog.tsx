@@ -17,6 +17,7 @@ import {
   Play, ExternalLink, Video, Sparkles, Boxes, Layers, QrCode, ArrowRight
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useBranch } from "@/contexts/BranchContext";
 import { CommercialCatalogModal } from "@/components/CommercialCatalogModal";
 import { CommercialSheetModal } from "@/components/CommercialSheetModal";
 import { WorkOrderModal } from "@/components/WorkOrderModal";
@@ -492,6 +493,7 @@ function PrintableCard({ unit }: { unit: any }) {
 /* ─── Main Component ────────────────────────────────────────────── */
 export default function Catalog() {
   const { user } = useAuth();
+  const { activeBranchId } = useBranch();
   const [search, setSearch] = useState("");
   const [statusTab, setStatusTab] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -538,6 +540,7 @@ export default function Catalog() {
     search: search || undefined,
     type: typeFilter !== "all" ? (typeFilter as any) : undefined,
     status: statusTab !== "all" ? (statusTab as any) : undefined,
+    branchId: activeBranchId || undefined,
     limit: 500,
   });
 

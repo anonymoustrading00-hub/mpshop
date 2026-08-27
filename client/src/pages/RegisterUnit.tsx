@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { QrCode, Search, CheckCircle, AlertTriangle, Plus, Minus, Laptop, Trash2, Camera, ImagePlus, X, Smartphone, Tablet, Monitor, Plug, Package, MoreHorizontal, Wallet, Landmark, Video, ExternalLink, Play, Boxes, Layers, Calculator, Printer } from "lucide-react";
 import { useLocation } from "wouter";
 import { formatCurrency } from "@/lib/currency";
+import { useBranch } from "@/contexts/BranchContext";
 import { BatchLabelsModal } from "@/components/BatchLabelsModal";
 
 type UnitType = "laptop" | "tablet" | "phone" | "monitor" | "charger" | "accessory" | "other";
@@ -117,6 +118,7 @@ function validateImeiFormat(imei: string): { valid: boolean; reason?: string } {
 
 export default function RegisterUnit() {
   const [, setLocation] = useLocation();
+  const { activeBranchId } = useBranch();
   const [scannedCode, setScannedCode] = useState("");
   const scanInputRef = useRef<HTMLInputElement>(null);
 
@@ -417,6 +419,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
       status: defaultStatus,
       photos: photos.length > 0 ? JSON.stringify(photos) : undefined,
       tiktokUrl: tiktokUrl.trim() || undefined,
+      branchId: activeBranchId || 1,
     });
   };
 

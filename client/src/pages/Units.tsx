@@ -16,6 +16,7 @@ import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Boxes, Layers, Table, Grid, List
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useBranch } from "@/contexts/BranchContext";
 import { UnitKardex } from "@/components/UnitKardex";
 import { CommercialCatalogModal } from "@/components/CommercialCatalogModal";
 import { CommercialSheetModal } from "@/components/CommercialSheetModal";
@@ -182,6 +183,7 @@ function UnitStatusSelect({
 
 export default function Units() {
   const { user } = useAuth();
+  const { activeBranchId } = useBranch();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -323,6 +325,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     search: search || undefined,
     type: typeFilter !== "all" ? (typeFilter as any) : undefined,
     status: statusFilter !== "all" ? (statusFilter as any) : undefined,
+    branchId: activeBranchId || undefined,
     limit: viewMode === "grouped" ? 500 : pageSize,
     offset: viewMode === "grouped" ? 0 : (page - 1) * pageSize,
   });
