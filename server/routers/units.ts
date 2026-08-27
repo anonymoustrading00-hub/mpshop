@@ -1312,4 +1312,42 @@ export const unitsRouter = router({
 
       return { success: true };
     }),
+
+  // Eliminar múltiples unidades en lote (solo admin)
+  deleteBatch: protectedProcedure
+    .input(z.object({ ids: z.array(z.number()).min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Solo los administradores pueden eliminar unidades." });
+      }
+
+      const db = await getDb();
+
+      if (!db) {
+        // MOCK mode
+        const idSet = new Set(input.ids);
+        for (let i = MOCK_UNITS.length - 1; i >= 0; i--) {
+          if (idSet.has((MOCK_UNITS as any[])[i].id)) {
+            (MOCK_UNITS as any[]).splice(i, 1);
+          }
+        }
+        syncMocksToDisk();
+        return { success: true, count: input.ids.length };
+      }
+
+      try {
+        for (const id of input.ids) {
+          await db.insert(unitEvents).values({
+            unitId: id,
+            eventType: "status_change",
+            userId: ctx.user.id,
+            notes: `Unidad eliminada en lote por ${ctx.user.name || ctx.user.email || "admin"}`,
+          });
+        }
+      } catch (_) {}
+
+      await db.delete(units).where(inArray(units.id, input.ids));
+
+      return { success: true, count: input.ids.length };
+    }),
 });

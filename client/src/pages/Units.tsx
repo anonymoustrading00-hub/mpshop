@@ -424,6 +424,14 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     onError: (err: any) => toast.error(err.message),
   });
 
+  // Estado para modal de eliminación en lote / selección de unidades
+  const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
+  const [targetArticleForDelete, setTargetArticleForDelete] = useState<any>(null);
+  const [selectedUnitIdsToDelete, setSelectedUnitIdsToDelete] = useState<number[]>([]);
+  const [deleteMode, setDeleteMode] = useState<"all" | "quantity" | "custom">("all");
+  const [customQtyToDelete, setCustomQtyToDelete] = useState<number>(1);
+  const [expandedSelectedIds, setExpandedSelectedIds] = useState<Record<string, number[]>>({});
+
   const deleteUnitMutation = (trpc.units as any).delete?.useMutation({
     onSuccess: () => {
       toast.success("✅ Unidad eliminada correctamente");
@@ -431,6 +439,97 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     },
     onError: (err: any) => toast.error(err.message),
   });
+
+  const deleteBatchMutation = (trpc.units as any).deleteBatch?.useMutation({
+    onSuccess: (res: any) => {
+      toast.success(`✅ ${res?.count || "Las"} unidades fueron eliminadas correctamente`);
+      setIsBatchDeleteOpen(false);
+      setTargetArticleForDelete(null);
+      setSelectedUnitIdsToDelete([]);
+      refetch();
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const handleOpenDeleteArticle = (item: any) => {
+    setTargetArticleForDelete(item);
+    setSelectedUnitIdsToDelete(item.units.map((u: any) => u.id));
+    setDeleteMode("all");
+    setCustomQtyToDelete(item.units.length > 1 ? Math.min(10, item.units.length) : 1);
+    setIsBatchDeleteOpen(true);
+  };
+
+  const handleToggleUnitSelection = (unitId: number) => {
+    setSelectedUnitIdsToDelete((prev) =>
+      prev.includes(unitId) ? prev.filter((id) => id !== unitId) : [...prev, unitId]
+    );
+  };
+
+  const handleSelectAllInModal = () => {
+    if (!targetArticleForDelete) return;
+    setSelectedUnitIdsToDelete(targetArticleForDelete.units.map((u: any) => u.id));
+  };
+
+  const handleDeselectAllInModal = () => {
+    setSelectedUnitIdsToDelete([]);
+  };
+
+  const handleConfirmBatchDelete = () => {
+    if (!targetArticleForDelete) return;
+
+    let idsToDelete: number[] = [];
+    if (deleteMode === "all") {
+      idsToDelete = targetArticleForDelete.units.map((u: any) => u.id);
+    } else if (deleteMode === "quantity") {
+      const qty = Math.max(1, Math.min(customQtyToDelete, targetArticleForDelete.units.length));
+      idsToDelete = targetArticleForDelete.units.slice(0, qty).map((u: any) => u.id);
+    } else if (deleteMode === "custom") {
+      idsToDelete = selectedUnitIdsToDelete;
+    }
+
+    if (idsToDelete.length === 0) {
+      toast.error("Selecciona al menos una unidad para eliminar");
+      return;
+    }
+
+    deleteBatchMutation.mutate({ ids: idsToDelete });
+  };
+
+  const toggleExpandedUnit = (articleKey: string, unitId: number) => {
+    setExpandedSelectedIds((prev) => {
+      const current = prev[articleKey] || [];
+      const updated = current.includes(unitId)
+        ? current.filter((id) => id !== unitId)
+        : [...current, unitId];
+      return { ...prev, [articleKey]: updated };
+    });
+  };
+
+  const selectAllExpanded = (articleKey: string, allUnits: any[]) => {
+    setExpandedSelectedIds((prev) => ({
+      ...prev,
+      [articleKey]: allUnits.map((u) => u.id),
+    }));
+  };
+
+  const deselectAllExpanded = (articleKey: string) => {
+    setExpandedSelectedIds((prev) => ({
+      ...prev,
+      [articleKey]: [],
+    }));
+  };
+
+  const handleDeleteSelectedFromExpanded = (articleKey: string) => {
+    const selected = expandedSelectedIds[articleKey] || [];
+    if (selected.length === 0) {
+      toast.error("No has seleccionado ninguna serie para eliminar.");
+      return;
+    }
+    if (window.confirm(`¿Eliminar las ${selected.length} series seleccionadas? Esta acción no se puede deshacer.`)) {
+      deleteBatchMutation.mutate({ ids: selected });
+      deselectAllExpanded(articleKey);
+    }
+  };
 
   const createRepairMutation = trpc.repairs.create.useMutation({
     onSuccess: (res: any) => {
@@ -873,14 +972,8 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                                   size="sm"
                                   variant="ghost"
                                   className="h-7 w-7 p-0 text-red-600 hover:bg-red-50"
-                                  title="Eliminar"
-                                  onClick={() => {
-                                    if (window.confirm(`¿Eliminar "${item.description}"? Esta acción no se puede deshacer.`)) {
-                                      if (deleteUnitMutation) {
-                                        deleteUnitMutation.mutate({ id: item.firstUnit.id });
-                                      }
-                                    }
-                                  }}
+                                  title="Eliminar unidades"
+                                  onClick={() => handleOpenDeleteArticle(item)}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -890,22 +983,66 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
                           {/* Fila expandible con las unidades / series individuales si tiene varias */}
                           {isExpanded && item.units.length > 0 && (
-                            <tr className="bg-slate-50 border-b border-slate-200">
+                            <tr className="bg-slate-50 border-b border-slate-200" onClick={(e) => e.stopPropagation()}>
                               <td colSpan={14} className="p-3">
-                                <div className="bg-white rounded-lg border p-3 space-y-2">
-                                  <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
-                                    <Layers className="h-3.5 w-3.5 text-blue-600" />
-                                    Detalle de Unidades / Series Registradas ({item.units.length}):
+                                <div className="bg-white rounded-lg border p-3 space-y-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+                                    <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                                      <Layers className="h-4 w-4 text-blue-600" />
+                                      Detalle de Unidades / Series Registradas ({item.units.length}):
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 text-xs px-2"
+                                        onClick={() => selectAllExpanded(item.key, item.units)}
+                                      >
+                                        Marcar todos ({item.units.length})
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 text-xs px-2"
+                                        onClick={() => deselectAllExpanded(item.key)}
+                                      >
+                                        Desmarcar
+                                      </Button>
+                                      {(expandedSelectedIds[item.key] || []).length > 0 && (
+                                        <Button
+                                          size="sm"
+                                          variant="destructive"
+                                          className="h-7 text-xs px-2.5 gap-1 font-bold"
+                                          onClick={() => handleDeleteSelectedFromExpanded(item.key)}
+                                          disabled={deleteBatchMutation.isPending}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                          Eliminar seleccionadas ({(expandedSelectedIds[item.key] || []).length})
+                                        </Button>
+                                      )}
+                                    </div>
                                   </div>
+
                                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                                     {item.units.map((u: any) => {
-                                      const cfg = STATUS_CONFIG[u.status] || STATUS_CONFIG.in_diagnosis;
+                                      const isChecked = (expandedSelectedIds[item.key] || []).includes(u.id);
                                       return (
-                                        <div key={u.id} className="flex items-center justify-between p-2 rounded border bg-slate-50/50 text-xs">
-                                          <div>
-                                            <span className="font-mono font-bold text-blue-700 mr-2">{u.code}</span>
-                                            {u.serialNumber && <span className="text-slate-500 font-mono text-[10px]">S/N: {u.serialNumber}</span>}
-                                            {u.rmaNumber && <span className="text-emerald-600 font-mono text-[10px] ml-1 font-bold">RMA: {u.rmaNumber}</span>}
+                                        <div
+                                          key={u.id}
+                                          className={`flex items-center justify-between p-2 rounded border transition-colors text-xs ${
+                                            isChecked ? "bg-red-50/60 border-red-300" : "bg-slate-50/50 border-slate-200"
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <Checkbox
+                                              checked={isChecked}
+                                              onCheckedChange={() => toggleExpandedUnit(item.key, u.id)}
+                                            />
+                                            <div>
+                                              <span className="font-mono font-bold text-blue-700 mr-1.5">{u.code}</span>
+                                              {u.serialNumber && <span className="text-slate-500 font-mono text-[10px]">S/N: {u.serialNumber}</span>}
+                                              {u.rmaNumber && <span className="text-emerald-600 font-mono text-[10px] ml-1 font-bold">RMA: {u.rmaNumber}</span>}
+                                            </div>
                                           </div>
                                           <div className="flex items-center gap-1">
                                             <UnitStatusSelect currentStatus={u.status} onStatusChange={(s) => handleStatusChangeRequest(u, s)} />
@@ -1755,6 +1892,236 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
               >
                 <CheckCircle className="h-4 w-4" />
                 {updateUnitMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── MODAL ELIMINAR UNIDADES / LOTES CON CHECKS Y CANTIDADES ───────── */}
+        <Dialog open={isBatchDeleteOpen} onOpenChange={setIsBatchDeleteOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <Trash2 className="h-5 w-5" />
+                Eliminar Unidades de Inventario
+              </DialogTitle>
+            </DialogHeader>
+
+            {targetArticleForDelete && (
+              <div className="space-y-4 py-2">
+                {/* Resumen del Artículo */}
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-slate-900 uppercase text-sm">
+                      {targetArticleForDelete.description}
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      Marca: <span className="font-medium text-slate-700">{targetArticleForDelete.brand}</span> | Modelo: <span className="font-medium text-slate-700">{targetArticleForDelete.model}</span> | Código: <span className="font-mono font-medium text-slate-700">{targetArticleForDelete.displayCode}</span>
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 font-bold">
+                    {targetArticleForDelete.units.length} {targetArticleForDelete.units.length === 1 ? "unidad" : "unidades"}
+                  </Badge>
+                </div>
+
+                {targetArticleForDelete.units.length > 1 ? (
+                  <>
+                    {/* Selector de Modo de Eliminación */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700">¿Cómo deseas eliminar?</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDeleteMode("all")}
+                          className={`p-2.5 rounded-lg border text-left text-xs transition-all ${
+                            deleteMode === "all"
+                              ? "border-red-500 bg-red-50/80 text-red-900 font-bold shadow-sm"
+                              : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="h-2 w-2 rounded-full bg-red-500"></span>
+                            Todo el lote
+                          </div>
+                          <span className="text-[11px] font-normal text-slate-500">
+                            Eliminar las {targetArticleForDelete.units.length}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setDeleteMode("quantity")}
+                          className={`p-2.5 rounded-lg border text-left text-xs transition-all ${
+                            deleteMode === "quantity"
+                              ? "border-red-500 bg-red-50/80 text-red-900 font-bold shadow-sm"
+                              : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                            Por cantidad
+                          </div>
+                          <span className="text-[11px] font-normal text-slate-500">
+                            Indicar número (ej. 10)
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setDeleteMode("custom")}
+                          className={`p-2.5 rounded-lg border text-left text-xs transition-all ${
+                            deleteMode === "custom"
+                              ? "border-red-500 bg-red-50/80 text-red-900 font-bold shadow-sm"
+                              : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+                            Con casillas (Checks)
+                          </div>
+                          <span className="text-[11px] font-normal text-slate-500">
+                            Elegir series específicas
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Modo 1: Todo el lote */}
+                    {deleteMode === "all" && (
+                      <div className="p-3 bg-red-50/60 rounded-lg border border-red-200 text-xs text-red-800 space-y-1">
+                        <p className="font-bold">⚠️ Se eliminarán todas las {targetArticleForDelete.units.length} unidades registradas.</p>
+                        <p className="text-red-700 text-[11px]">Esta acción borrará el artículo completo y todas sus series de la sucursal activa.</p>
+                      </div>
+                    )}
+
+                    {/* Modo 2: Por cantidad */}
+                    {deleteMode === "quantity" && (
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                        <label className="text-xs font-semibold text-slate-700">
+                          Cantidad de unidades a eliminar (máx: {targetArticleForDelete.units.length}):
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <Input
+                            type="number"
+                            min={1}
+                            max={targetArticleForDelete.units.length}
+                            value={customQtyToDelete}
+                            onChange={(e) => setCustomQtyToDelete(Math.max(1, Math.min(Number(e.target.value) || 1, targetArticleForDelete.units.length)))}
+                            className="h-10 w-28 font-bold text-center text-sm"
+                          />
+                          <span className="text-xs text-slate-600">
+                            de <strong>{targetArticleForDelete.units.length}</strong> unidades disponibles.
+                          </span>
+                        </div>
+                        <div className="flex gap-1.5 pt-1">
+                          {[5, 10, 20, 50].filter(n => n <= targetArticleForDelete.units.length).map(n => (
+                            <Button
+                              key={n}
+                              size="sm"
+                              variant="outline"
+                              className="h-6 text-xs px-2"
+                              onClick={() => setCustomQtyToDelete(n)}
+                            >
+                              {n} unidades
+                            </Button>
+                          ))}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 text-xs px-2 font-bold"
+                            onClick={() => setCustomQtyToDelete(targetArticleForDelete.units.length)}
+                          >
+                            Todas ({targetArticleForDelete.units.length})
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Modo 3: Con casillas (Checks) */}
+                    {deleteMode === "custom" && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-slate-700">
+                            Seleccionadas: <strong className="text-red-600">{selectedUnitIdsToDelete.length}</strong> de {targetArticleForDelete.units.length}
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={handleSelectAllInModal}
+                              className="text-blue-600 hover:underline font-medium text-xs"
+                            >
+                              Marcar todos
+                            </button>
+                            <span>|</span>
+                            <button
+                              type="button"
+                              onClick={handleDeselectAllInModal}
+                              className="text-slate-500 hover:underline text-xs"
+                            >
+                              Desmarcar todos
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100 bg-white">
+                          {targetArticleForDelete.units.map((u: any) => {
+                            const isChecked = selectedUnitIdsToDelete.includes(u.id);
+                            return (
+                              <label
+                                key={u.id}
+                                className={`flex items-center gap-2.5 p-2 text-xs cursor-pointer hover:bg-slate-50 transition-colors ${
+                                  isChecked ? "bg-red-50/50" : ""
+                                }`}
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={() => handleToggleUnitSelection(u.id)}
+                                />
+                                <span className="font-mono font-bold text-blue-700">{u.code}</span>
+                                {u.serialNumber && (
+                                  <span className="text-slate-500 font-mono text-[10px]">S/N: {u.serialNumber}</span>
+                                )}
+                                <span className="ml-auto text-[10px] uppercase font-bold text-slate-500">
+                                  {STATUS_CONFIG[u.status]?.label || u.status}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="p-3 bg-red-50 rounded-lg border border-red-200 text-xs text-red-800">
+                    <p className="font-bold">¿Estás seguro de eliminar esta unidad ({targetArticleForDelete.displayCode})?</p>
+                    <p className="text-[11px] text-red-700 mt-1">Esta acción no se puede deshacer.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setIsBatchDeleteOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmBatchDelete}
+                disabled={
+                  deleteBatchMutation.isPending ||
+                  (deleteMode === "custom" && selectedUnitIdsToDelete.length === 0) ||
+                  (deleteMode === "quantity" && customQtyToDelete < 1)
+                }
+                className="gap-1.5 font-bold"
+              >
+                <Trash2 className="h-4 w-4" />
+                {deleteBatchMutation.isPending
+                  ? "Eliminando..."
+                  : deleteMode === "all"
+                  ? `Eliminar todo (${targetArticleForDelete?.units.length})`
+                  : deleteMode === "quantity"
+                  ? `Eliminar ${customQtyToDelete} unidades`
+                  : `Eliminar seleccionadas (${selectedUnitIdsToDelete.length})`}
               </Button>
             </DialogFooter>
           </DialogContent>
