@@ -650,4 +650,41 @@ export const financeRouter = router({
 
       return { rows, methodName: input.paymentMethod === "cash" ? "Caja_Efectivo" : input.paymentMethod === "qr" ? "Caja_QR" : "Cuenta_Bancaria" };
     }),
+
+  // Retorna repartidores que tienen caja abierta hoy (para alertar al admin en arqueo)
+  getDeliveryOpenBoxStatus: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user?.role !== "admin") {
+      throw new TRPCError({ code: "FORBIDDEN" });
+    }
+
+    const allUsers = await getAllUsers();
+    const allOpenings = await getAllCashOpenings();
+    const today = getLocalDateKey(new Date());
+
+    // Repartidores = usuarios que no son admin
+    const deliveryUsers = (allUsers as any[]).filter((u: any) => u.role !== "admin");
+
+    const result = deliveryUsers.map((u: any) => {
+      const userOpenings = (allOpenings as any[]).filter(
+        (o: any) => o.responsibleUserId === u.id && o.openingDate === today
+      );
+      const hasOpen = userOpenings.some((o: any) => o.status === "open");
+      const hasClosed = userOpenings.some((o: any) => o.status === "closed");
+      const hasAny = userOpenings.length > 0;
+
+      return {
+        userId: u.id,
+        name: u.name || u.username,
+        role: u.role,
+        hasOpenBox: hasOpen,
+        hasClosedBox: hasClosed && !hasOpen,
+        hasNoBox: !hasAny,
+      };
+    });
+
+    return {
+      deliveryUsers: result,
+      pendingCount: result.filter((u: any) => u.hasOpenBox).length,
+    };
+  }),
 });

@@ -6,9 +6,10 @@ import { formatCurrency } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ScrollText, Calendar, DollarSign, Clock, CheckCircle2, AlertCircle, History } from "lucide-react";
+import { ScrollText, Calendar, DollarSign, Clock, CheckCircle2, AlertCircle, History, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { generateArqueoPDF, downloadPDF } from "@/utils/pdfReports";
 
 type ClosureDetail = {
   id: number;
@@ -37,6 +38,8 @@ export default function ClosuresHistory() {
   const [selectedClosure, setSelectedClosure] = useState<ClosureDetail | null>(null);
 
   const { data: closures, isLoading } = trpc.finance.listAllClosures.useQuery();
+  const { data: companyConfig } = trpc.settings.getCompanyConfig.useQuery();
+
 
   const closeDetail = () => {
     setSelectedClosure(null);
@@ -383,9 +386,43 @@ export default function ClosuresHistory() {
                                   </CardContent>
                                 </Card>
                               </div>
+
+                              <Button
+                                className="w-full bg-slate-900 hover:bg-slate-800 font-bold gap-2 text-white"
+                                onClick={() => {
+                                  const pdfData = {
+                                    date: closure.date,
+                                    userName: `Usuario #${closure.userId}`,
+                                    closingDate: closure.date,
+                                    closingTime: format(new Date(closure.createdAt), "HH:mm"),
+                                    openingAmount: closure.initialCash || 0,
+                                    cashSales: closure.expectedCash || 0,
+                                    creditCollections: 0,
+                                    otherIncome: 0,
+                                    cashPurchases: closure.expenses || 0,
+                                    creditPayments: 0,
+                                    otherExpenses: 0,
+                                    totalCash: closure.expectedCash || 0,
+                                    totalQr: closure.expectedQr || 0,
+                                    totalReceipt: closure.expectedCash || 0,
+                                    expectedCash: closure.expectedCash || 0,
+                                    reportedCash: closure.reportedCash || 0,
+                                    expectedQr: closure.expectedQr || 0,
+                                    reportedQr: closure.reportedQr || 0,
+                                    expectedTransfer: closure.expectedTransfer || 0,
+                                    reportedTransfer: closure.reportedTransfer || 0,
+                                    observation: closure.adminNotes || "Cierre registrado en historial.",
+                                  };
+                                  const doc = generateArqueoPDF(pdfData, companyConfig);
+                                  downloadPDF(doc, `Arqueo_Caja_${closure.date}_#${closure.id}.pdf`);
+                                }}
+                              >
+                                <Printer className="h-4 w-4" /> Imprimir / Descargar Arqueo PDF (Carta)
+                              </Button>
                             </div>
                           </DialogContent>
                         </Dialog>
+
                       </TableCell>
                     </TableRow>
                   ))}

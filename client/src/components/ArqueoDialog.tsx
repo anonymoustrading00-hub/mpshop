@@ -4,9 +4,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/currency";
 import { toast } from "sonner";
-import { Calculator } from "lucide-react";
+import { AlertTriangle, Calculator, UserX } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { generateArqueoPDF, downloadPDF } from "@/utils/pdfReports";
 
@@ -18,19 +19,35 @@ export function ArqueoDialog({
   expectedQr,
   expectedTransfer,
   disabled,
+  branchName,
+  companyConfig,
+  openingAmount,
+  cashSales,
+  cashPurchases,
+  otherExpenses,
 }: {
   expectedCash: number;
   expectedQr: number;
   expectedTransfer: number;
   disabled?: boolean;
+  branchName?: string;
+  companyConfig?: any;
+  openingAmount?: number;
+  cashSales?: number;
+  cashPurchases?: number;
+  otherExpenses?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [reportedQr, setReportedQr] = useState<number>(0);
   const [reportedTransfer, setReportedTransfer] = useState<number>(0);
+  const [observation, setObservation] = useState<string>("");
 
   const utils = trpc.useContext();
   const { data: user } = trpc.auth.me.useQuery();
+  const { data: deliveryStatus } = trpc.finance.getDeliveryOpenBoxStatus.useQuery(undefined, {
+    enabled: open,
+  });
 
   const getLocalDateInputValue = () => {
     const now = new Date();
@@ -51,23 +68,47 @@ export function ArqueoDialog({
   const qrDifference = (reportedQr * 100) - Math.abs(expectedQr);
   const transferDifference = (reportedTransfer * 100) - Math.abs(expectedTransfer);
 
+  const pendingDeliveries = (deliveryStatus as any)?.deliveryUsers?.filter((u: any) => u.hasOpenBox) ?? [];
+
   const mutation = trpc.finance.submitClosure.useMutation({
     onSuccess: () => {
       toast.success("Cierre de caja procesado exitosamente.");
       
+      const today = getLocalDateInputValue();
+      const nowTime = new Date().toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" });
+
       const pdfData = {
-        date: getLocalDateInputValue(),
+        date: today,
         userName: user?.name || user?.username || "Usuario",
+        branchName: branchName || "Principal",
+        closingDate: today,
+        closingTime: nowTime,
+        // Ingresos
+        openingAmount: openingAmount ?? 0,
+        cashSales: cashSales ?? expectedCash,
+        creditCollections: 0,
+        otherIncome: 0,
+        // Egresos
+        cashPurchases: cashPurchases ?? 0,
+        creditPayments: 0,
+        otherExpenses: otherExpenses ?? 0,
+        // Medios de pago
+        totalCash: expectedCash,
+        totalQr: expectedQr,
+        totalReceipt: cashSales ?? 0,
+        // Cuadre
         expectedCash,
         reportedCash: totalReportedCash,
         expectedQr,
         reportedQr: Math.round(reportedQr * 100),
         expectedTransfer,
         reportedTransfer: Math.round(reportedTransfer * 100),
+        // Observación
+        observation,
       };
       
       try {
-        const doc = generateArqueoPDF(pdfData);
+        const doc = generateArqueoPDF(pdfData, companyConfig);
         downloadPDF(doc, `Arqueo_Caja_${pdfData.date}.pdf`);
       } catch (err) {
         console.error("Error generando PDF", err);
@@ -78,6 +119,7 @@ export function ArqueoDialog({
       setCounts({});
       setReportedQr(0);
       setReportedTransfer(0);
+      setObservation("");
       utils.finance.getTransactions.invalidate();
       utils.finance.listAllClosures.invalidate();
       utils.finance.getCashOpenings.invalidate();
@@ -91,15 +133,16 @@ export function ArqueoDialog({
     mutation.mutate({
       date: getLocalDateInputValue(),
       initialCash: 0,
-      reportedCash: totalReportedCash, // Ya estÃ¡ en centavos
-      reportedQr: Math.round(reportedQr * 100), // El input es float (Bs), pasamos a centavos
-      reportedTransfer: Math.round(reportedTransfer * 100), // El input es float (Bs), pasamos a centavos
+      reportedCash: totalReportedCash,
+      reportedQr: Math.round(reportedQr * 100),
+      reportedTransfer: Math.round(reportedTransfer * 100),
       expectedCash: expectedCash,
       expectedQr: expectedQr,
       expectedTransfer: expectedTransfer,
       expenses: 0,
     });
   };
+
 
   const handleCountChange = (denom: number, val: string) => {
     const parsed = parseInt(val, 10);
@@ -116,7 +159,7 @@ export function ArqueoDialog({
           <Calculator className="h-4 w-4" /> Arqueo y Cierre
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[760px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Arqueo y Cierre de Caja</DialogTitle>
           <DialogDescription>
@@ -124,7 +167,29 @@ export function ArqueoDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+        {/* ── ALERTA REPARTIDORES CON CAJA ABIERTA ──────────────────────── */}
+        {pendingDeliveries.length > 0 && (
+          <div className="flex gap-3 items-start p-3 rounded-lg border border-amber-300 bg-amber-50 text-amber-900">
+            <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0 text-amber-600" />
+            <div className="space-y-1">
+              <p className="text-sm font-bold">⚠️ Repartidores con caja aún abierta:</p>
+              <ul className="text-xs space-y-0.5">
+                {pendingDeliveries.map((u: any) => (
+                  <li key={u.userId} className="flex items-center gap-1.5">
+                    <UserX className="h-3.5 w-3.5 text-amber-600" />
+                    <span className="font-semibold">{u.name}</span>
+                    <span className="text-amber-700">— pendiente de entregar su caja</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[11px] text-amber-700 mt-1">
+                Puedes cerrar tu caja principal, pero recuerda solicitar la entrega a estos repartidores.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
           {/* Calculadora de Billetes y Monedas */}
           <div className="space-y-4">
             <h3 className="font-bold text-sm text-slate-800 border-b pb-2">Calculadora de Billetaje</h3>
@@ -268,8 +333,19 @@ export function ArqueoDialog({
           </div>
         </div>
 
+        {/* ── OBSERVACIÓN ───────────────────────────────────────────────── */}
+        <div className="space-y-1.5 pt-1">
+          <Label className="text-xs font-bold text-slate-700">Observación / Motivo de descuadre</Label>
+          <Textarea
+            className="text-xs min-h-[60px] resize-none"
+            placeholder="Ej: Faltante por vuelto incorrecto en venta #32, sobrante por..."
+            value={observation}
+            onChange={(e) => setObservation(e.target.value)}
+          />
+        </div>
+
         <Button 
-          className="w-full mt-4 bg-slate-900 hover:bg-slate-800 font-bold" 
+          className="w-full mt-2 bg-slate-900 hover:bg-slate-800 font-bold" 
           size="lg"
           onClick={handleProcessClosure}
           disabled={mutation.isPending}

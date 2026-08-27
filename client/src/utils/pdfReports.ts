@@ -509,96 +509,321 @@ export const generateAuditPDF = (logs: any[], companyConfig?: any) => {
   return doc;
 };
 
-// 8. REPORTE DE ARQUEO DE CAJA
-export const generateArqueoPDF = (data: any, companyConfig?: any) => {
-  const doc = createPDF("Comprobante de Arqueo y Cierre", companyConfig);
+// 8. REPORTE DE ARQUEO DE CAJA (Formato Oficial)
+export const generateArqueoPDF = (data: {
+  date: string;
+  userName: string;
+  branchName?: string;
+  arqueoNumber?: string;
+  openingDate?: string;
+  openingTime?: string;
+  closingDate?: string;
+  closingTime?: string;
+  // Ingresos
+  openingAmount?: number;
+  cashSales?: number;
+  creditCollections?: number;
+  otherIncome?: number;
+  // Egresos
+  cashPurchases?: number;
+  creditPayments?: number;
+  otherExpenses?: number;
+  // Medios de pago ventas
+  totalCash?: number;
+  totalCard?: number;
+  totalCheque?: number;
+  totalDeposit?: number;
+  totalQr?: number;
+  totalInvoice?: number;
+  totalReceipt?: number;
+  // Cuadre
+  expectedCash?: number;
+  reportedCash?: number;
+  expectedQr?: number;
+  reportedQr?: number;
+  expectedTransfer?: number;
+  reportedTransfer?: number;
+  // Observación
+  observation?: string;
+}, companyConfig?: any) => {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const marginL = 14;
+  const marginR = pageWidth - 14;
 
-  let y = 45;
+  const companyName = companyConfig?.name || "HK EQUIPOS TECNOLÓGICOS";
+  const companyCity = companyConfig?.city || "La Paz - Bolivia";
+  const companyLogo = companyConfig?.logo;
 
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text("DETALLES DEL CIERRE", 20, y);
-  
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Fecha de Cierre: ${data.date}`, 20, y + 7);
-  doc.text(`Responsable: ${data.userName || "Administrador"}`, 20, y + 14);
-
-  y += 25;
-
-  (autoTable as any)(doc, {
-    ...getTableOptions(y),
-    head: [["Concepto", "Esperado (Sistema)", "Reportado (Físico)", "Diferencia"]],
-    body: [
-      [
-        "Efectivo", 
-        formatBs(data.expectedCash), 
-        formatBs(data.reportedCash), 
-        formatBs(data.reportedCash - data.expectedCash)
-      ],
-      [
-        "Caja QR", 
-        formatBs(data.expectedQr), 
-        formatBs(data.reportedQr), 
-        formatBs(data.reportedQr - data.expectedQr)
-      ],
-      [
-        "Transferencia", 
-        formatBs(data.expectedTransfer), 
-        formatBs(data.reportedTransfer), 
-        formatBs(data.reportedTransfer - data.expectedTransfer)
-      ]
-    ],
-    didParseCell: (data: any) => {
-      if (data.column.index === 3 && data.section === 'body') {
-        const value = data.cell.raw as string;
-        if (value.includes("-")) {
-          data.cell.styles.textColor = [220, 53, 69]; // Red for negative difference
-        } else if (value !== "Bs. 0.00") {
-          data.cell.styles.textColor = [76, 175, 80]; // Green for positive difference
-        }
-      }
+  if (companyLogo) {
+    try {
+      const fmt = companyLogo.startsWith("data:image/jpeg") || companyLogo.startsWith("data:image/jpg") ? "JPEG" : "PNG";
+      doc.addImage(companyLogo, fmt, marginL, 8, 28, 28);
+    } catch (_) {
+      try { doc.addImage("/logo.png", "PNG", marginL, 8, 28, 28); } catch (_2) {}
     }
+  } else {
+    try { doc.addImage("/logo.png", "PNG", marginL, 8, 28, 28); } catch (_) {}
+  }
+
+  // ── CABECERA ─────────────────────────────────────────────────────────────
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(15, 23, 42);
+  doc.text("ARQUEO DE CAJA", pageWidth / 2, 15, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(71, 85, 105);
+  const branchName = data.branchName || "Principal";
+  doc.text(`(Almacén: ${branchName} - Al ${data.date})`, pageWidth / 2, 21, { align: "center" });
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42);
+  doc.text(companyName.toUpperCase(), marginR, 13, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text(companyCity, marginR, 18, { align: "right" });
+
+  doc.setDrawColor(37, 99, 235);
+  doc.setLineWidth(0.7);
+  doc.line(marginL, 30, marginR, 30);
+
+  // ── DATOS GENERALES ──────────────────────────────────────────────────────
+  let y = 36;
+  const midCol = pageWidth / 2 + 5;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(15, 23, 42);
+  doc.text("ALMACÉN / TIENDA:", marginL, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(branchName, marginL + 42, y);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Nº ARQUEO:", midCol, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.arqueoNumber || "—", midCol + 26, y);
+
+  y += 5.5;
+  doc.setFont("helvetica", "bold");
+  doc.text("RESPONSABLE:", marginL, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.userName, marginL + 42, y);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("FECHA APERTURA:", midCol, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(`${data.openingDate || data.date}  ${data.openingTime || "—"}`, midCol + 38, y);
+
+  y += 5.5;
+  doc.setFont("helvetica", "bold");
+  doc.text("FECHA CIERRE:", marginL, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(`${data.closingDate || data.date}  ${data.closingTime || new Date().toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" })}`, marginL + 42, y);
+
+  y += 4;
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.3);
+  doc.line(marginL, y, marginR, y);
+  y += 4;
+
+  // ── CALCULAR TOTALES ─────────────────────────────────────────────────────
+  const openingAmount  = data.openingAmount    ?? 0;
+  const cashSales      = data.cashSales        ?? 0;
+  const creditColl     = data.creditCollections ?? 0;
+  const otherIncome    = data.otherIncome      ?? 0;
+  const totalIngresos  = openingAmount + cashSales + creditColl + otherIncome;
+
+  const cashPurchases  = data.cashPurchases    ?? 0;
+  const creditPayments = data.creditPayments   ?? 0;
+  const otherExpenses  = data.otherExpenses    ?? 0;
+  const totalEgresos   = cashPurchases + creditPayments + otherExpenses;
+
+  // ── HELPERS ──────────────────────────────────────────────────────────────
+  const drawSectionHeader = (title: string, yPos: number, rgb: [number, number, number]) => {
+    doc.setFillColor(...rgb);
+    doc.rect(marginL, yPos - 4, marginR - marginL, 6, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    doc.text(title, pageWidth / 2, yPos, { align: "center" });
+    doc.setTextColor(15, 23, 42);
+    return yPos + 4;
+  };
+
+  const drawRow = (label: string, amount: number, yPos: number, bold = false) => {
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(label, marginL + 3, yPos);
+    doc.text(formatBs(amount), marginR - 2, yPos, { align: "right" });
+    return yPos + 5;
+  };
+
+  // ── INGRESOS ─────────────────────────────────────────────────────────────
+  y = drawSectionHeader("═══  INGRESOS  ═══", y + 2, [22, 101, 52]);
+  y += 2;
+  y = drawRow("Saldo inicial en apertura de caja:", openingAmount, y);
+  y = drawRow("Ventas al contado (efectivo):", cashSales, y);
+  y = drawRow("Cobro de cuotas de ventas al crédito:", creditColl, y);
+  y = drawRow("Otros ingresos:", otherIncome, y);
+  doc.setDrawColor(34, 197, 94);
+  doc.setLineWidth(0.3);
+  doc.line(marginL + 3, y, marginR - 3, y);
+  y += 4;
+  y = drawRow("TOTAL INGRESOS:", totalIngresos, y, true);
+  y += 2;
+
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.3);
+  doc.line(marginL, y, marginR, y);
+  y += 3;
+
+  // ── EGRESOS ──────────────────────────────────────────────────────────────
+  y = drawSectionHeader("═══  EGRESOS  ═══", y + 2, [185, 28, 28]);
+  y += 2;
+  y = drawRow("Compras al contado:", cashPurchases, y);
+  y = drawRow("Pago de cuotas de compras al crédito:", creditPayments, y);
+  y = drawRow("Otros egresos (gastos operativos):", otherExpenses, y);
+  doc.setDrawColor(239, 68, 68);
+  doc.setLineWidth(0.3);
+  doc.line(marginL + 3, y, marginR - 3, y);
+  y += 4;
+  y = drawRow("TOTAL EGRESOS:", totalEgresos, y, true);
+  y += 3;
+
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.4);
+  doc.line(marginL, y, marginR, y);
+  y += 4;
+
+  // ── TABLA DOBLE: VENTAS | CUADRE ─────────────────────────────────────────
+  const halfW = (marginR - marginL) / 2 - 2;
+  const leftBox  = marginL;
+  const rightBox = marginL + halfW + 4;
+
+  doc.setFillColor(37, 99, 235);
+  doc.rect(leftBox, y, halfW, 6, "F");
+  doc.rect(rightBox, y, halfW, 6, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text("VENTAS / MEDIOS DE PAGO", leftBox + halfW / 2, y + 4, { align: "center" });
+  doc.text("CUADRE DE CAJA", rightBox + halfW / 2, y + 4, { align: "center" });
+  doc.setTextColor(15, 23, 42);
+
+  const totalCash    = data.totalCash    ?? data.expectedCash ?? 0;
+  const totalCard    = data.totalCard    ?? 0;
+  const totalCheque  = data.totalCheque  ?? 0;
+  const totalDeposit = data.totalDeposit ?? 0;
+  const totalQr      = data.totalQr      ?? data.expectedQr ?? 0;
+  const totalInvoice = data.totalInvoice ?? 0;
+  const totalReceipt = data.totalReceipt ?? (data.cashSales ?? 0);
+
+  const expectedCash = data.expectedCash ?? 0;
+  const reportedCash = data.reportedCash ?? 0;
+  const cashDiff     = reportedCash - expectedCash;
+
+  const rowH = 5.5;
+  const startY = y + 8;
+  let lyLeft  = startY;
+  let lyRight = startY;
+
+  const leftRows: [string, string][] = [
+    ["Tot. Efectivo:",   formatBs(totalCash)],
+    ["Tot. Tarjeta:",    formatBs(totalCard)],
+    ["Tot. Cheque:",     formatBs(totalCheque)],
+    ["Tot. Depósito:",   formatBs(totalDeposit)],
+    ["Tot. Pago QR:",    formatBs(totalQr)],
+    ["Tot. Factura:",    formatBs(totalInvoice)],
+    ["Tot. Recibo:",     formatBs(totalReceipt)],
+  ];
+
+  leftRows.forEach(([label, value]) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+    doc.text(label, leftBox + 2, lyLeft);
+    doc.text(value, leftBox + halfW - 2, lyLeft, { align: "right" });
+    lyLeft += rowH;
   });
 
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
-  
-  const totalExpected = Math.abs(data.expectedCash) + Math.abs(data.expectedQr) + Math.abs(data.expectedTransfer);
-  const totalReported = data.reportedCash + data.reportedQr + data.reportedTransfer;
-  const totalDiff = totalReported - totalExpected;
+  // Cuadre derecho
+  const cuadreRows: Array<[string, string, string]> = [
+    ["Total Efectivo Registrado:", formatBs(expectedCash), "normal"],
+    ["Total Efectivo Contado:",    formatBs(reportedCash), "normal"],
+    ["", "", "normal"],
+    ["FALTANTE:", cashDiff < 0  ? formatBs(Math.abs(cashDiff)) : "Bs. 0.00", "faltante"],
+    ["SOBRANTE:", cashDiff >= 0 ? formatBs(cashDiff)           : "Bs. 0.00", "sobrante"],
+    ["", "", "normal"],
+    ["", "", "normal"],
+  ];
 
-  doc.setFontSize(12);
+  cuadreRows.forEach(([label, value, style]) => {
+    if (!label) { lyRight += rowH; return; }
+    const isBold = style === "faltante" || style === "sobrante";
+    doc.setFont("helvetica", isBold ? "bold" : "normal");
+    doc.setFontSize(8);
+    if (style === "faltante") doc.setTextColor(185, 28, 28);
+    else if (style === "sobrante") doc.setTextColor(37, 99, 235);
+    else doc.setTextColor(15, 23, 42);
+    doc.text(label, rightBox + 2, lyRight);
+    doc.text(value, rightBox + halfW - 2, lyRight, { align: "right" });
+    doc.setTextColor(15, 23, 42);
+    lyRight += rowH;
+  });
+
+  const tableHeight = Math.max(lyLeft, lyRight) - y;
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.3);
+  doc.rect(leftBox, y, halfW, tableHeight);
+  doc.rect(rightBox, y, halfW, tableHeight);
+  y = Math.max(lyLeft, lyRight) + 4;
+
+  // ── OBSERVACIÓN ──────────────────────────────────────────────────────────
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.3);
+  doc.line(marginL, y, marginR, y);
+  y += 5;
+
   doc.setFont("helvetica", "bold");
-  doc.text("TOTALES GLOBALES", 20, finalY);
-  
-  doc.setFontSize(10);
+  doc.setFontSize(8.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text("Observación:", marginL, y);
   doc.setFont("helvetica", "normal");
-  doc.text(`Total Esperado: ${formatBs(totalExpected)}`, 20, finalY + 7);
-  doc.text(`Total Reportado: ${formatBs(totalReported)}`, 20, finalY + 14);
-  
-  doc.setFont("helvetica", "bold");
-  if (totalDiff < 0) {
-    doc.setTextColor(220, 53, 69);
-    doc.text(`Faltante Total: ${formatBs(Math.abs(totalDiff))}`, 20, finalY + 21);
-  } else if (totalDiff > 0) {
-    doc.setTextColor(33, 150, 243); // Blue for Sobrante
-    doc.text(`Sobrante Total: ${formatBs(totalDiff)}`, 20, finalY + 21);
-  } else {
-    doc.setTextColor(76, 175, 80);
-    doc.text(`Diferencia Total: Bs. 0.00 (CUADRADO)`, 20, finalY + 21);
-  }
-  doc.setTextColor(40, 40, 40);
+  const obs = data.observation || "Sin observaciones.";
+  const obsLines = doc.splitTextToSize(obs, marginR - marginL - 36);
+  doc.text(obsLines, marginL + 36, y);
+  y += Math.max(obsLines.length * 4, 8) + 6;
 
-  // Firmas
-  y = finalY + 45;
+  // ── FIRMAS ────────────────────────────────────────────────────────────────
+  const sigY  = Math.min(y + 10, pageHeight - 25);
+  const sig1X = marginL + 25;
+  const sig2X = marginR - 25;
+
   doc.setLineWidth(0.5);
-  doc.line(30, y, 80, y);
-  doc.line(130, y, 180, y);
-  
+  doc.setDrawColor(100, 116, 139);
+  doc.line(sig1X - 22, sigY, sig1X + 22, sigY);
+  doc.line(sig2X - 22, sigY, sig2X + 22, sigY);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+  doc.text("CAJERO", sig1X, sigY + 5, { align: "center" });
+  doc.text("SUPERVISOR / ADMIN", sig2X, sigY + 5, { align: "center" });
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.text("Firma Entregue", 55, y + 5, { align: "center" });
-  doc.text("Firma Recibí Conforme", 155, y + 5, { align: "center" });
+  doc.setFontSize(7.5);
+  doc.text(data.userName, sig1X, sigY + 9, { align: "center" });
+
+  // Footer
+  doc.setFontSize(7.5);
+  doc.setTextColor(148, 163, 184);
+  const nowFmt = format(new Date(), "dd 'de' MMMM 'de' yyyy HH:mm", { locale: es });
+  doc.text(`${companyName} · Generado: ${nowFmt}`, pageWidth / 2, pageHeight - 8, { align: "center" });
 
   return doc;
 };

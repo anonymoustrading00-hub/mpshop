@@ -86,46 +86,71 @@ function categoryLabel(cat: string) {
   return labels[cat] || cat;
 }
 
-function BoxStatusIndicator({ method, openings }: { method: string, openings: any[] }) {
+function BoxStatusIndicator({ method, openings, adminUserId }: { method: string, openings: any[], adminUserId?: number }) {
+  // Filter to this payment method
   const methodOpenings = openings.filter(o => o.paymentMethod === method || (!o.paymentMethod && method === "cash"));
-  const activeOpening = methodOpenings.find(o => o.status === "open");
-  const closedOpenings = methodOpenings.filter(o => o.status === "closed");
 
-  if (activeOpening) {
-    return (
-      <div className="flex items-center gap-1.5 mt-1.5">
-        <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-        </span>
-        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">ABIERTA · {activeOpening.responsibleUserName?.split(' ')[0]}</span>
-      </div>
-    );
-  } else if (closedOpenings.length > 0) {
-    return (
-      <div className="flex items-center gap-1.5 mt-1.5">
-        <span className="relative flex h-2 w-2">
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-        </span>
-        <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">CORTADA · {closedOpenings[closedOpenings.length - 1].responsibleUserName?.split(' ')[0]}</span>
-      </div>
-    );
-  } else {
-    return (
-      <div className="flex items-center gap-1.5 mt-1.5">
-        <span className="relative flex h-2 w-2">
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-400"></span>
-        </span>
-        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">CERRADA</span>
-      </div>
-    );
-  }
+  // Separate admin/main box from delivery boxes
+  const adminOpenings = adminUserId
+    ? methodOpenings.filter(o => o.responsibleUserId === adminUserId)
+    : methodOpenings;
+
+  const deliveryOpenings = adminUserId
+    ? methodOpenings.filter(o => o.responsibleUserId !== adminUserId)
+    : [];
+
+  const adminActiveOpening = adminOpenings.find(o => o.status === "open");
+  const adminClosedOpenings = adminOpenings.filter(o => o.status === "closed");
+  const deliveryOpen = deliveryOpenings.filter(o => o.status === "open");
+
+  return (
+    <div className="space-y-0.5 mt-1">
+      {/* Caja Principal */}
+      {adminActiveOpening ? (
+        <div className="flex items-center gap-1.5">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">ABIERTA · PRINCIPAL</span>
+        </div>
+      ) : adminClosedOpenings.length > 0 ? (
+        <div className="flex items-center gap-1.5">
+          <span className="relative flex h-2 w-2">
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+          </span>
+          <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">CORTADA · PRINCIPAL</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          <span className="relative flex h-2 w-2">
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-400"></span>
+          </span>
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">CERRADA</span>
+        </div>
+      )}
+      {/* Repartidores con caja abierta (sólo efectivo) */}
+      {method === "cash" && deliveryOpen.length > 0 && (
+        <div className="flex items-center gap-1.5">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+          </span>
+          <span className="text-[10px] font-black uppercase tracking-wider text-orange-700">
+            {deliveryOpen.length} REPARTIDOR{deliveryOpen.length > 1 ? "ES" : ""} ABIERTO{deliveryOpen.length > 1 ? "S" : ""}
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function Finance() {
   const { activeBranchId, setActiveBranchId, branches } = useBranch();
   const { data: transactions, isLoading } = trpc.finance.getTransactions.useQuery();
   const { data: cashOpenings, isLoading: isLoadingOpenings } = trpc.finance.getCashOpenings.useQuery();
+  const { data: currentUser } = trpc.auth.me.useQuery();
+  const { data: companyData } = trpc.settings.getCompanyConfig.useQuery();
   const [cashHistoryOpen, setCashHistoryOpen] = useState(false);
   const [qrHistoryOpen, setQrHistoryOpen] = useState(false);
   const [transferHistoryOpen, setTransferHistoryOpen] = useState(false);
@@ -194,6 +219,12 @@ export default function Finance() {
             expectedQr={qrBalance} 
             expectedTransfer={transferBalance} 
             disabled={!isAnyBoxOpen}
+            branchName={branches.find((b: any) => b.id === activeBranchId)?.name}
+            companyConfig={companyData}
+            openingAmount={totalCashOpenings}
+            cashSales={cashIncome}
+            cashPurchases={cashExpense}
+            otherExpenses={0}
           />
           <TransferDialog />
           <OpenCashDialog />
@@ -214,7 +245,7 @@ export default function Finance() {
                 </div>
                 <div>
                   <CardTitle className="text-lg font-black tracking-tight text-slate-800">Caja Efectivo</CardTitle>
-                  <BoxStatusIndicator method="cash" openings={activeOpenings} />
+                  <BoxStatusIndicator method="cash" openings={activeOpenings} adminUserId={(currentUser as any)?.id} />
                 </div>
               </div>
               <Button
@@ -258,7 +289,7 @@ export default function Finance() {
                 </div>
                 <div>
                   <CardTitle className="text-lg font-black tracking-tight text-slate-800">Caja QR</CardTitle>
-                  <BoxStatusIndicator method="qr" openings={activeOpenings} />
+                  <BoxStatusIndicator method="qr" openings={activeOpenings} adminUserId={(currentUser as any)?.id} />
                 </div>
               </div>
               <Button
