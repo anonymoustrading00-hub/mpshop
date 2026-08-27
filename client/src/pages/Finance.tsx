@@ -87,17 +87,25 @@ function categoryLabel(cat: string) {
   return labels[cat] || cat;
 }
 
-function BoxStatusIndicator({ method, openings, adminUserId }: { method: string, openings: any[], adminUserId?: number }) {
+
+function BoxStatusIndicator({ method, openings, adminUserId, activeUserIds }: { method: string, openings: any[], adminUserId?: number, activeUserIds?: number[] }) {
   // Filter to this payment method
-  const methodOpenings = openings.filter(o => o.paymentMethod === method || (!o.paymentMethod && method === "cash"));
+  const methodOpenings = (openings || []).filter(o => o.paymentMethod === method || (!o.paymentMethod && method === "cash"));
 
   // Separate admin/main box from delivery boxes
   const adminOpenings = adminUserId
     ? methodOpenings.filter(o => o.responsibleUserId === adminUserId)
     : methodOpenings;
 
+  // Only show delivery openings for existing active delivery users
   const deliveryOpenings = adminUserId
-    ? methodOpenings.filter(o => o.responsibleUserId !== adminUserId)
+    ? methodOpenings.filter(o => {
+        if (o.responsibleUserId === adminUserId) return false;
+        if (activeUserIds && activeUserIds.length > 0) {
+          return activeUserIds.includes(o.responsibleUserId);
+        }
+        return false;
+      })
     : [];
 
   const adminActiveOpening = adminOpenings.find(o => o.status === "open");
@@ -118,9 +126,9 @@ function BoxStatusIndicator({ method, openings, adminUserId }: { method: string,
       ) : adminClosedOpenings.length > 0 ? (
         <div className="flex items-center gap-1.5">
           <span className="relative flex h-2 w-2">
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-400"></span>
           </span>
-          <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">CORTADA · PRINCIPAL</span>
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">CERRADA</span>
         </div>
       ) : (
         <div className="flex items-center gap-1.5">
@@ -146,15 +154,23 @@ function BoxStatusIndicator({ method, openings, adminUserId }: { method: string,
   );
 }
 
+
 export default function Finance() {
   const { activeBranchId, setActiveBranchId, branches } = useBranch();
   const { data: transactions, isLoading } = trpc.finance.getTransactions.useQuery();
   const { data: cashOpenings, isLoading: isLoadingOpenings } = trpc.finance.getCashOpenings.useQuery();
   const { data: currentUser } = trpc.auth.me.useQuery();
   const { data: companyData } = trpc.settings.getCompanyConfig.useQuery();
+  const { data: allUsers } = trpc.finance.listResponsibleUsers.useQuery();
   const [cashHistoryOpen, setCashHistoryOpen] = useState(false);
   const [qrHistoryOpen, setQrHistoryOpen] = useState(false);
   const [transferHistoryOpen, setTransferHistoryOpen] = useState(false);
+
+  // IDs of users that still exist in the system (to filter out deleted user openings)
+  const activeUserIds = useMemo(
+    () => ((allUsers as any[]) || []).map((u: any) => u.id as number),
+    [allUsers]
+  );
 
   const cashIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
   const cashExpense = (transactions as any[])?.filter((t: any) => t.type === "expense" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
@@ -171,6 +187,7 @@ export default function Finance() {
   const baseTransferBalance = transferIncome - transferExpense;
 
   const today = getLocalDateInputValue();
+  const adminId = (currentUser as any)?.id as number | undefined;
 
   const activeOpenings = useMemo(
     () => ((cashOpenings as any[]) || []).filter((opening: any) => opening.status === "open"),
@@ -185,7 +202,11 @@ export default function Finance() {
   const qrBalance = baseQrBalance + totalQrOpenings;
   const transferBalance = baseTransferBalance + totalTransferOpenings;
 
-  const isAnyBoxOpen = activeOpenings.length > 0;
+  // Only consider the admin's own opening for enabling/disabling the Arqueo button
+  const isAnyBoxOpen = useMemo(() => {
+    if (!adminId) return activeOpenings.length > 0;
+    return activeOpenings.some((o: any) => o.responsibleUserId === adminId);
+  }, [activeOpenings, adminId]);
 
   const todaysOpenings = useMemo(
     () => ((cashOpenings as any[]) || []).filter((opening: any) => opening.openingDate === today),
@@ -194,6 +215,7 @@ export default function Finance() {
   const todaysOpenedAmount = todaysOpenings.reduce((sum: number, o: any) => sum + o.openingAmount, 0);
 
   return (
+
     <div className="p-4 space-y-6 max-w-5xl mx-auto mb-20 md:mb-10 min-h-full">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 no-print">
         <div>
@@ -253,7 +275,7 @@ export default function Finance() {
                 </div>
                 <div>
                   <CardTitle className="text-lg font-black tracking-tight text-slate-800">Caja Efectivo</CardTitle>
-                  <BoxStatusIndicator method="cash" openings={activeOpenings} adminUserId={(currentUser as any)?.id} />
+                  <BoxStatusIndicator method="cash" openings={todaysOpenings} adminUserId={(currentUser as any)?.id} activeUserIds={activeUserIds} />
                 </div>
               </div>
               <Button
@@ -297,7 +319,7 @@ export default function Finance() {
                 </div>
                 <div>
                   <CardTitle className="text-lg font-black tracking-tight text-slate-800">Caja QR</CardTitle>
-                  <BoxStatusIndicator method="qr" openings={activeOpenings} adminUserId={(currentUser as any)?.id} />
+                  <BoxStatusIndicator method="qr" openings={todaysOpenings} adminUserId={(currentUser as any)?.id} activeUserIds={activeUserIds} />
                 </div>
               </div>
               <Button
@@ -341,7 +363,7 @@ export default function Finance() {
                 </div>
                 <div>
                   <CardTitle className="text-lg font-black tracking-tight text-slate-800">Cta. Bancaria</CardTitle>
-                  <BoxStatusIndicator method="transfer" openings={activeOpenings} />
+                  <BoxStatusIndicator method="transfer" openings={todaysOpenings} adminUserId={(currentUser as any)?.id} activeUserIds={activeUserIds} />
                 </div>
               </div>
               <Button

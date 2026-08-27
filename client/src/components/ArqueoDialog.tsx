@@ -56,6 +56,10 @@ export function ArqueoDialog({
   };
 
   const calculateTotalCash = () => {
+    // If user pressed "Completar monto total", we stored a direct_total key
+    if ("direct_total" in counts) {
+      return (counts["direct_total"] || 0) * 100; // already in Bs, convert to cents
+    }
     let total = 0;
     Object.entries(counts).forEach(([denomination, qty]) => {
       total += parseFloat(denomination) * qty;
@@ -147,11 +151,14 @@ export function ArqueoDialog({
 
   const handleCountChange = (denom: number, val: string) => {
     const parsed = parseInt(val, 10);
-    setCounts(prev => ({
-      ...prev,
-      [denom.toString()]: isNaN(parsed) || parsed < 0 ? 0 : parsed
-    }));
+    setCounts(prev => {
+      const next = { ...prev };
+      delete next["direct_total"];
+      next[denom.toString()] = isNaN(parsed) || parsed < 0 ? 0 : parsed;
+      return next;
+    });
   };
+
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -194,7 +201,30 @@ export function ArqueoDialog({
           {/* Calculadora de Billetes y Monedas */}
           <div className="space-y-4">
             <h3 className="font-bold text-sm text-slate-800 border-b pb-2">Calculadora de Billetaje</h3>
+
+            {/* Botón para completar automáticamente el monto total esperado */}
+            <div className="flex items-center gap-2 p-2.5 rounded-lg border border-emerald-200 bg-emerald-50">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-emerald-800">Completar monto total</p>
+                <p className="text-[10px] text-emerald-600">Registra directamente el monto esperado por el sistema sin contar billetaje</p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="shrink-0 border-emerald-400 text-emerald-700 hover:bg-emerald-100 text-xs h-8 px-3"
+                onClick={() => {
+                  // Clear bill counts and set a special "direct entry" flag using a large denomination placeholder
+                  // We use 1 Bs coin count to set the total: expectedCash / 100 (in Bs)
+                  setCounts({ "direct_total": Math.round(Math.abs(expectedCash) / 100) });
+                }}
+              >
+                Usar total: {formatCurrency(Math.abs(expectedCash))}
+              </Button>
+            </div>
+
             <div className="grid grid-cols-2 gap-2 text-xs">
+
               <div className="bg-slate-50 p-2 rounded border space-y-2">
                 <p className="font-bold text-center text-slate-600">Billetes (Bs)</p>
                 {BILLS.map(denom => (
@@ -235,10 +265,27 @@ export function ArqueoDialog({
                 ))}
               </div>
             </div>
-            <div className="bg-orange-100 p-3 rounded-lg border border-orange-200">
-               <p className="text-xs font-bold text-orange-800 uppercase">Total Billetaje Contado</p>
-               <p className="text-2xl font-black text-orange-900">{formatCurrency(totalReportedCash)}</p>
-            </div>
+            {"direct_total" in counts ? (
+              <div className="bg-emerald-100 p-3 rounded-lg border border-emerald-300 space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-emerald-800 uppercase">Monto Completado</p>
+                  <button
+                    type="button"
+                    className="text-[10px] text-emerald-700 underline hover:text-emerald-900"
+                    onClick={() => setCounts({})}
+                  >
+                    Usar billetaje
+                  </button>
+                </div>
+                <p className="text-2xl font-black text-emerald-900">{formatCurrency(totalReportedCash)}</p>
+                <p className="text-[10px] text-emerald-600">Monto ingresado directamente sin contar billetaje</p>
+              </div>
+            ) : (
+              <div className="bg-orange-100 p-3 rounded-lg border border-orange-200">
+                <p className="text-xs font-bold text-orange-800 uppercase">Total Billetaje Contado</p>
+                <p className="text-2xl font-black text-orange-900">{formatCurrency(totalReportedCash)}</p>
+              </div>
+            )}
           </div>
 
           {/* Cuadre del Sistema */}
