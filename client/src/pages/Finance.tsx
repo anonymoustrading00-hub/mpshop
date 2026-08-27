@@ -174,18 +174,18 @@ export default function Finance() {
     [allUsers]
   );
 
-  const cashIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
-  const cashExpense = (transactions as any[])?.filter((t: any) => t.type === "expense" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
-  const cashPurchases = (transactions as any[])?.filter((t: any) => t.type === "expense" && t.category === "purchase" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
-  const otherExpenses = (transactions as any[])?.filter((t: any) => t.type === "expense" && t.category !== "purchase" && t.category !== "transfer_between_registers" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const cashIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && !t.isOpening && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const cashExpense = (transactions as any[])?.filter((t: any) => t.type === "expense" && !t.isClosure && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const cashPurchases = (transactions as any[])?.filter((t: any) => t.type === "expense" && !t.isClosure && t.category === "purchase" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const otherExpenses = (transactions as any[])?.filter((t: any) => t.type === "expense" && !t.isClosure && t.category !== "purchase" && t.category !== "transfer_between_registers" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
   const baseCashBalance = cashIncome - cashExpense;
 
-  const qrIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && t.paymentMethod === "qr").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
-  const qrExpense = (transactions as any[])?.filter((t: any) => t.type === "expense" && t.paymentMethod === "qr").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const qrIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && !t.isOpening && t.paymentMethod === "qr").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const qrExpense = (transactions as any[])?.filter((t: any) => t.type === "expense" && !t.isClosure && t.paymentMethod === "qr").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
   const baseQrBalance = qrIncome - qrExpense;
 
-  const transferIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && t.paymentMethod === "transfer").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
-  const transferExpense = (transactions as any[])?.filter((t: any) => t.type === "expense" && t.paymentMethod === "transfer").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const transferIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && !t.isOpening && t.paymentMethod === "transfer").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const transferExpense = (transactions as any[])?.filter((t: any) => t.type === "expense" && !t.isClosure && t.paymentMethod === "transfer").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
   const baseTransferBalance = transferIncome - transferExpense;
 
   const today = getLocalDateInputValue();
