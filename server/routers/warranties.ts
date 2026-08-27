@@ -128,6 +128,7 @@ export const warrantiesRouter = router({
         unitId: z.number().optional(),
         saleId: z.number().optional(),
         orderId: z.number().optional(),
+        branchId: z.number().optional(),
         search: z.string().optional(),
         limit: z.number().default(100),
         offset: z.number().default(0),
@@ -141,6 +142,12 @@ export const warrantiesRouter = router({
         if (input?.unitId) filtered = filtered.filter((w: any) => w.unitId === input.unitId);
         if (input?.saleId) filtered = filtered.filter((w: any) => w.saleId === input.saleId);
         if (input?.orderId) filtered = filtered.filter((w: any) => w.orderId === input.orderId);
+        if (input?.branchId) {
+          filtered = filtered.filter((w: any) => {
+            const unit = MOCK_UNITS.find((u: any) => u.id === w.unitId);
+            return !unit || unit.branchId === input.branchId;
+          });
+        }
 
         let items = filtered.map((w: any) => {
           const unit = MOCK_UNITS.find((u: any) => u.id === w.unitId);
@@ -174,6 +181,7 @@ export const warrantiesRouter = router({
       if (input?.unitId) conditions.push(eq(warranties.unitId, input.unitId));
       if (input?.saleId) conditions.push(eq(warranties.saleId, input.saleId));
       if (input?.orderId) conditions.push(eq(warranties.orderId, input.orderId));
+      if (input?.branchId) conditions.push(eq(units.branchId, input.branchId));
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 

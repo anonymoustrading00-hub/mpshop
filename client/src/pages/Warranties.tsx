@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { useBranch } from "@/contexts/BranchContext";
 import {
   Shield,
   RefreshCw,
@@ -31,6 +32,7 @@ import {
 } from "lucide-react";
 
 export default function Warranties() {
+  const { activeBranchId } = useBranch();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "expiring_soon" | "expired" | "claimed">("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
@@ -42,7 +44,9 @@ export default function Warranties() {
   const [rmaResolution, setRmaResolution] = useState("");
   const [reenterRepair, setReenterRepair] = useState(true);
 
-  const { data: warrantiesData, isLoading, refetch } = trpc.warranties.list.useQuery();
+  const { data: warrantiesData, isLoading, refetch } = trpc.warranties.list.useQuery({
+    branchId: activeBranchId || undefined,
+  });
 
   const createReturnMutation = trpc.returns.create.useMutation({
     onSuccess: () => {

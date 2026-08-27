@@ -85,7 +85,9 @@ export default function Purchases() {
 
   const { user } = useAuth();
   const utils = trpc.useContext();
-  const { data: purchases, isLoading: isPurchasesLoading } = (trpc.purchases as any).listAll.useQuery();
+  const { data: purchases, isLoading: isPurchasesLoading } = (trpc.purchases as any).listAll.useQuery({
+    branchId: activeBranchId || undefined,
+  });
   const { data: suppliers } = (trpc.suppliers as any).list.useQuery();
   const { data: products } = (trpc.inventory as any).listProducts.useQuery();
 

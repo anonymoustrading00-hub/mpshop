@@ -249,6 +249,7 @@ export const repairsRouter = router({
         status: z.enum(["in_progress", "completed", "cancelled"]).optional(),
         technicianId: z.number().optional(),
         unitId: z.number().optional(),
+        branchId: z.number().optional(),
         search: z.string().max(100).optional(),
         limit: z.number().default(50),
         offset: z.number().default(0),
@@ -263,6 +264,12 @@ export const repairsRouter = router({
         if (input?.status) filtered = filtered.filter(r => r.status === input.status);
         if (input?.technicianId) filtered = filtered.filter(r => r.technicianId === input.technicianId);
         if (input?.unitId) filtered = filtered.filter(r => r.unitId === input.unitId);
+        if (input?.branchId) {
+          filtered = filtered.filter(r => {
+            const unit = MOCK_UNITS.find((u: any) => u.id === r.unitId);
+            return !unit || unit.branchId === input.branchId;
+          });
+        }
 
         // Indexar códigos generados por unidad para búsqueda O(1).
         const codeByUnitId = new Map<number, string[]>();
@@ -331,6 +338,7 @@ export const repairsRouter = router({
       if (input?.status) conditions.push(eq(repairs.status, input.status));
       if (input?.technicianId) conditions.push(eq(repairs.technicianId, input.technicianId));
       if (input?.unitId) conditions.push(eq(repairs.unitId, input.unitId));
+      if (input?.branchId) conditions.push(eq(units.branchId, input.branchId));
 
       if (input?.search) {
         const term = input.search.trim();

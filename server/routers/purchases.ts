@@ -16,15 +16,19 @@ export const purchasesRouter = router({
    * con compras de unidades registradas desde RegisterUnit (COMP-UNIT-*).
    * Cada entrada incluye un campo `source` para distinguir el origen.
    */
-  listAll: protectedProcedure.query(async ({ ctx }) => {
-    if (ctx.user?.role !== "admin") {
-      throw new TRPCError({ code: "FORBIDDEN" });
-    }
+  listAll: protectedProcedure
+    .input(z.object({ branchId: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      if (ctx.user?.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
 
-    const [traditional, units] = await Promise.all([
-      getAllPurchases(ctx.branchId),
-      getAllUnits(),
-    ]);
+      const branchId = input?.branchId || ctx.branchId;
+
+      const [traditional, units] = await Promise.all([
+        getAllPurchases(branchId),
+        getAllUnits(branchId),
+      ]);
 
     // Compras tradicionales
     const tradRows = (traditional as any[]).map((p: any) => ({

@@ -255,12 +255,36 @@ export const transfersRouter = router({
 
       // Insertar items del traspaso y actualizar unidades
       for (const unit of selectedUnits) {
-        await db.insert(inventoryTransferItems).values({
-          transferId,
-          unitId: unit.id,
-          unitCode: unit.code || null,
-          quantity: 1,
-        });
+        try {
+          await db.insert(inventoryTransferItems).values({
+            transferId,
+            unitId: unit.id,
+            productId: 0,
+            productName: `${unit.brand || ""} ${unit.model || ""}`.trim() || unit.type || "Unidad",
+            productUnit: "unidad",
+            unitCode: unit.code || null,
+            quantity: 1,
+            notes: input.notes || null,
+          });
+        } catch (insertErr: any) {
+          // Fallback en caso de que la tabla en MySQL tenga columnas legadas específicas
+          const pool = (db as any).session?.client || (global as any)._pool;
+          if (pool && typeof pool.execute === "function") {
+            try {
+              await pool.execute(
+                `INSERT INTO inventory_transfer_items (transferId, unitId, quantity, unitCode, notes) VALUES (?, ?, ?, ?, ?)`,
+                [transferId, unit.id, 1, unit.code || null, input.notes || null]
+              );
+            } catch (fallbackErr: any) {
+              await pool.execute(
+                `INSERT INTO inventory_transfer_items (transferId, productId, quantity, productName, productUnit) VALUES (?, ?, ?, ?, ?)`,
+                [transferId, 0, 1, `${unit.brand || ""} ${unit.model || ""}`.trim(), "unidad"]
+              );
+            }
+          } else {
+            throw insertErr;
+          }
+        }
 
         // Mover la unidad a la sucursal destino
         await db

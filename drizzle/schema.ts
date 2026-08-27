@@ -698,10 +698,14 @@ export type InsertInventoryTransfer = typeof inventoryTransfers.$inferInsert;
 
 export const inventoryTransferItems = mysqlTable("inventory_transfer_items", {
   id: int("id").autoincrement().primaryKey(),
-  transferId: int("transferId").notNull().references(() => inventoryTransfers.id),
-  unitId: int("unitId").notNull().references(() => units.id),
+  transferId: int("transferId").notNull(),
+  unitId: int("unitId").default(0),
+  productId: int("productId").default(0),
+  productName: varchar("productName", { length: 255 }),
+  productUnit: varchar("productUnit", { length: 50 }),
   quantity: int("quantity").notNull().default(1),
   unitCode: varchar("unitCode", { length: 50 }),
+  notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

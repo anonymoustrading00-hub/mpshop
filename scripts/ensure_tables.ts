@@ -790,6 +790,18 @@ export async function ensureTables() {
     await runSQL("inventory_transfer_items.notes column", `
       ALTER TABLE inventory_transfer_items ADD COLUMN notes text NULL AFTER unitCode
     `);
+    await runSQL("inventory_transfer_items.productId column", `
+      ALTER TABLE inventory_transfer_items ADD COLUMN productId int NULL DEFAULT 0
+    `);
+    await runSQL("inventory_transfer_items.productId nullable", `
+      ALTER TABLE inventory_transfer_items MODIFY COLUMN productId int NULL DEFAULT 0
+    `);
+    await runSQL("inventory_transfer_items.productName nullable", `
+      ALTER TABLE inventory_transfer_items MODIFY COLUMN productName varchar(255) NULL
+    `);
+    await runSQL("inventory_transfer_items.productUnit nullable", `
+      ALTER TABLE inventory_transfer_items MODIFY COLUMN productUnit varchar(50) NULL
+    `);
 
     // ============================================================
     // ENSURE MISSING COLUMNS ON EXISTING TABLES

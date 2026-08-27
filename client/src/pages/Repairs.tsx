@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useBranch } from "@/contexts/BranchContext";
 import {
   Wrench,
   CheckCircle,
@@ -538,6 +539,7 @@ function CompleteRepairDialog({
 }
 
 export default function Repairs() {
+  const { activeBranchId } = useBranch();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
@@ -570,6 +572,7 @@ export default function Repairs() {
   const { data: repairsData, isLoading, refetch } = trpc.repairs.list.useQuery({
     status: statusFilter !== "all" ? (statusFilter as any) : undefined,
     search: searchTerm.trim() || undefined,
+    branchId: activeBranchId || undefined,
   });
 
   const { data: usersData } = trpc.users.listDeliveryPersons.useQuery();

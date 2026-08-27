@@ -715,9 +715,15 @@ export async function updateCustomer(customerId: number, data: Partial<InsertCus
 // =============================================
 // UNIDADES (Units) - Reemplaza productos e inventario fungible
 // =============================================
-export async function getAllUnits() {
+export async function getAllUnits(branchId?: number) {
   const db = await getDb();
-  if (!db) return MOCK_UNITS;
+  if (!db) {
+    if (branchId) return (MOCK_UNITS as any[]).filter(u => u.branchId === branchId);
+    return MOCK_UNITS;
+  }
+  if (branchId) {
+    return await db.select().from(units).where(eq(units.branchId, branchId));
+  }
   return await db.select().from(units);
 }
 
