@@ -30,7 +30,96 @@ export const financeRouter = router({
   getTransactions: protectedProcedure.query(async ({ ctx }) => {
     // Si es repartidor, solo ve las suyas. Si es admin, ve todas.
     const userId = ctx.user?.role === "admin" ? undefined : ctx.user?.id;
-    return await getFinancialTransactions(userId, ctx.branchId);
+    const branchId = ctx.branchId;
+    
+    const allTransactions = await getFinancialTransactions(userId, branchId);
+    const allOpenings = await getAllCashOpenings();
+    const allClosures = await getAllCashClosures();
+    const allUsers = await getAllUsers();
+    const activeUsersMap = new Map((allUsers as any[]).map((u: any) => [u.id, u.name || u.username]));
+
+    // Construir filas de aperturas
+    const openingRows = (allOpenings as any[])
+      .filter((o: any) => activeUsersMap.has(o.responsibleUserId))
+      .map((o: any) => ({
+        id: `opening-${o.id}`,
+        type: "income",
+        category: "cash_opening",
+        amount: o.openingAmount,
+        paymentMethod: o.paymentMethod || "cash",
+        notes: o.notes || `Apertura de caja - ${o.responsibleUserName || activeUsersMap.get(o.responsibleUserId) || `Usuario #${o.responsibleUserId}`}`,
+        userId: o.responsibleUserId,
+        userName: o.responsibleUserName || activeUsersMap.get(o.responsibleUserId) || `Usuario #${o.responsibleUserId}`,
+        createdAt: o.createdAt ? new Date(o.createdAt) : new Date(o.openingDate + "T12:00:00"),
+        runningBalance: 0,
+        isOpening: true,
+        isClosure: false,
+      }));
+
+    // Construir filas de cierres (sumando todos los métodos de pago para el libro general)
+    const closureRows = (allClosures as any[])
+      .filter((c: any) => activeUsersMap.has(c.userId))
+      .map((c: any) => {
+        const totalReported = (c.reportedCash || 0) + (c.reportedQr || 0) + (c.reportedTransfer || 0);
+        return {
+          id: `closure-${c.id}`,
+          type: "expense",
+          category: "cash_closure",
+          amount: totalReported,
+          paymentMethod: "cash", // Se muestra como general
+          notes: `Cierre de caja - ${activeUsersMap.get(c.userId) || `Usuario #${c.userId}`}`,
+          userId: c.userId,
+          userName: activeUsersMap.get(c.userId) || `Usuario #${c.userId}`,
+          createdAt: c.createdAt ? new Date(c.createdAt) : new Date(c.date + "T23:59:59"),
+          runningBalance: 0,
+          isOpening: false,
+          isClosure: true,
+        };
+      });
+
+    // Construir filas de transacciones
+    const txRows = (allTransactions as any[]).map((t: any) => ({
+      ...t,
+      userName: t.userName || activeUsersMap.get(t.userId) || (t.userId ? `Usuario #${t.userId}` : "Administrador"),
+      runningBalance: 0,
+      isOpening: false,
+      isClosure: false,
+    }));
+
+    // Combinar todo y ordenar por fecha ASCENDENTE para calcular saldo
+    const sortedAsc = [...openingRows, ...closureRows, ...txRows].sort((a: any, b: any) => {
+      const timeA = new Date(a.createdAt).getTime();
+      const timeB = new Date(b.createdAt).getTime();
+      if (timeA !== timeB) return timeA - timeB;
+      if (a.isOpening && !b.isOpening) return -1;
+      if (!a.isOpening && b.isOpening) return 1;
+      if (a.isClosure && !b.isClosure) return 1;
+      if (!a.isClosure && b.isClosure) return -1;
+      return 0;
+    });
+
+    // Calcular saldo acumulado
+    let runningBalance = 0;
+    const calculatedRows = sortedAsc.map((t: any) => {
+      if (t.isOpening || (t.type === "income" && !t.isClosure)) {
+        runningBalance += t.amount;
+      } else {
+        runningBalance -= t.amount;
+      }
+      return { ...t, runningBalance };
+    });
+
+    // Ordenar DESC para mostrar lo más reciente primero
+    return calculatedRows.sort((a: any, b: any) => {
+      const timeA = new Date(a.createdAt).getTime();
+      const timeB = new Date(b.createdAt).getTime();
+      if (timeA !== timeB) return timeB - timeA;
+      if (a.isClosure && !b.isClosure) return -1;
+      if (!a.isClosure && b.isClosure) return 1;
+      if (a.isOpening && !b.isOpening) return 1;
+      if (!a.isOpening && b.isOpening) return -1;
+      return 0;
+    });
   }),
 
   getGlobalBalances: protectedProcedure.query(async ({ ctx }) => {
@@ -493,6 +582,7 @@ export const financeRouter = router({
       const branchId = input.branchId || ctx.branchId;
       const allTransactions = await getFinancialTransactions(undefined, branchId);
       const allOpenings = await getAllCashOpenings();
+      const allClosures = await getAllCashClosures();
       const allUsers = await getAllUsers();
       const activeUsersMap = new Map((allUsers as any[]).map((u: any) => [u.id, u.name || u.username]));
 
@@ -515,6 +605,15 @@ export const financeRouter = router({
       // Filtrar openings por tipo (siempre "income")
       const visibleOpenings = input.type === "expense" ? [] : filteredOpenings;
 
+      // Filtrar closures por método de pago
+      const filteredClosures = (allClosures as any[]).filter((c: any) => {
+        // Los cierres tienen múltiples métodos, debemos mostrar según el método actual
+        if (!activeUsersMap.has(c.userId)) return false;
+        // Mostrar el cierre en el historial del método correspondiente
+        return true; // mostraremos en todos, pero con monto específico por método
+      });
+      const visibleClosures = input.type === "income" ? [] : filteredClosures;
+
       // Construir filas de aperturas para intercalar en el historial
       const openingRows = visibleOpenings.map((o: any) => ({
         id: `opening-${o.id}`,
@@ -530,7 +629,34 @@ export const financeRouter = router({
         runningBalance: 0,
         direction: "entry",
         isOpening: true,
+        isClosure: false,
       }));
+
+      // Construir filas de cierres para intercalar en el historial
+      const closureRows = visibleClosures.map((c: any) => {
+        // Determinar el monto según el método de pago
+        let closureAmount = 0;
+        if (input.paymentMethod === "cash") closureAmount = c.reportedCash || 0;
+        else if (input.paymentMethod === "qr") closureAmount = c.reportedQr || 0;
+        else if (input.paymentMethod === "transfer") closureAmount = c.reportedTransfer || 0;
+
+        return {
+          id: `closure-${c.id}`,
+          type: "expense",
+          category: "cash_closure",
+          amount: closureAmount,
+          paymentMethod: input.paymentMethod,
+          notes: `Cierre de caja - ${activeUsersMap.get(c.userId) || `Usuario #${c.userId}`}`,
+          userId: c.userId,
+          userName: activeUsersMap.get(c.userId) || `Usuario #${c.userId}`,
+          responsibleUserName: activeUsersMap.get(c.userId) || `Usuario #${c.userId}`,
+          createdAt: c.createdAt ? new Date(c.createdAt) : new Date(c.date + "T23:59:59"),
+          runningBalance: 0,
+          direction: "exit",
+          isOpening: false,
+          isClosure: true,
+        };
+      });
 
       // Construir filas de transacciones
       const txRows = filtered.map((t: any) => ({
@@ -539,22 +665,26 @@ export const financeRouter = router({
         runningBalance: 0,
         direction: t.type === "income" ? "entry" : "exit",
         isOpening: false,
+        isClosure: false,
       }));
 
-      // Combinar y ordenar por fecha ASCENDENTE para el cálculo correcto del saldo correlativo
-      const sortedAsc = [...openingRows, ...txRows].sort((a: any, b: any) => {
+      // Combinar aperturas, cierres y transacciones, ordenar por fecha ASCENDENTE
+      const sortedAsc = [...openingRows, ...closureRows, ...txRows].sort((a: any, b: any) => {
         const timeA = new Date(a.createdAt).getTime();
         const timeB = new Date(b.createdAt).getTime();
         if (timeA !== timeB) return timeA - timeB;
+        // Prioridad: apertura primero, luego transacciones, luego cierre
         if (a.isOpening && !b.isOpening) return -1;
         if (!a.isOpening && b.isOpening) return 1;
+        if (a.isClosure && !b.isClosure) return 1;
+        if (!a.isClosure && b.isClosure) return -1;
         return 0;
       });
 
       // Calcular saldo acumulado correlativo
       let runningBalance = 0;
       const calculatedRows = sortedAsc.map((t: any) => {
-        if (t.isOpening || t.type === "income") {
+        if (t.isOpening || (t.type === "income" && !t.isClosure)) {
           runningBalance += t.amount;
         } else {
           runningBalance -= t.amount;
@@ -585,8 +715,11 @@ export const financeRouter = router({
         const timeA = new Date(a.createdAt).getTime();
         const timeB = new Date(b.createdAt).getTime();
         if (timeA !== timeB) return timeB - timeA;
-        if (a.isOpening && !b.isOpening) return -1;
-        if (!a.isOpening && b.isOpening) return 1;
+        // Prioridad inversa: cierre primero al final del día, luego transacciones, luego apertura
+        if (a.isClosure && !b.isClosure) return -1;
+        if (!a.isClosure && b.isClosure) return 1;
+        if (a.isOpening && !b.isOpening) return 1;
+        if (!a.isOpening && b.isOpening) return -1;
         return 0;
       });
 

@@ -56,10 +56,11 @@ function categoryLabel(cat: string) {
     donation: "Donación",
     loan: "Préstamo",
     gift: "Regalo",
-    cash_opening: "Apertura de Caja",
+    cash_opening: "🔓 APERTURA DE CAJA",
     other_income: "Otros Ingresos",
     // Egresos operativos
     purchase: "Compra Inventario",
+    cash_closure: "🔒 CIERRE DE CAJA",
     fuel: "Combustible",
     subsistence: "Viáticos",
     transfer: "Traspaso",
