@@ -326,9 +326,82 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     type: typeFilter !== "all" ? (typeFilter as any) : undefined,
     status: statusFilter !== "all" ? (statusFilter as any) : undefined,
     branchId: activeBranchId || undefined,
-    limit: viewMode === "grouped" ? 500 : pageSize,
-    offset: viewMode === "grouped" ? 0 : (page - 1) * pageSize,
+    limit: 500,
+    offset: 0,
   });
+
+  const [expandedArticleKey, setExpandedArticleKey] = useState<string | null>(null);
+
+  // ── Agrupación de artículos por Producto / Barcode + Sucursal (formato exacto de inventario) ──
+  const tableArticles = useMemo(() => {
+    if (!unitsData?.items) return [];
+
+    const map = new Map<string, {
+      key: string;
+      description: string;
+      displayCode: string;
+      barcode: string;
+      model: string;
+      supplierCode: string;
+      brand: string;
+      unitMeasure: string;
+      quantity: number;
+      wholesalePrice: number;
+      salePrice: number;
+      locationName: string;
+      supplierName: string;
+      units: any[];
+      firstUnit: any;
+    }>();
+
+    for (const u of (unitsData.items as any[])) {
+      const specs = u.specs || {};
+      const rawBarcode = specs.barcode || u.code || "";
+      const barcodeClean = rawBarcode.includes("-") && rawBarcode.length > 8 && !rawBarcode.startsWith("LT-")
+        ? rawBarcode.split("-")[0]
+        : rawBarcode;
+
+      const brandClean = (u.brand || "").trim() || "SIN MARCA";
+      const modelClean = (u.model || "").trim() || "-";
+      const branchId = u.branchId || 1;
+      const key = `${barcodeClean}___${brandClean.toLowerCase()}___${modelClean.toLowerCase()}___${branchId}`;
+
+      if (!map.has(key)) {
+        const desc = specs.description || `${brandClean} ${modelClean}`.trim();
+        const cod = String(u.id).padStart(5, "0");
+        const codProv = specs.supplierCode || specs.codProv || (u.serialNumber ? u.serialNumber.split("-")[0] : "-");
+        const unitMeasure = specs.unit || (u.type === "laptop" || u.type === "phone" ? "UNIDAD" : "PZA");
+        const loc = u.branchName || "Sucursal Principal";
+        const sup = u.supplierName || "SIN NOMBRE";
+
+        map.set(key, {
+          key,
+          description: desc,
+          displayCode: cod,
+          barcode: barcodeClean || "-",
+          model: modelClean,
+          supplierCode: codProv,
+          brand: brandClean,
+          unitMeasure,
+          quantity: 0,
+          wholesalePrice: u.wholesalePrice || 0,
+          salePrice: u.salePrice || 0,
+          locationName: loc,
+          supplierName: sup,
+          units: [],
+          firstUnit: u,
+        });
+      }
+
+      const row = map.get(key)!;
+      row.units.push(u);
+      if (u.status !== "sold") {
+        row.quantity += 1;
+      }
+    }
+
+    return Array.from(map.values());
+  }, [unitsData?.items]);
 
   const { data: suppliersData } = trpc.suppliers.list.useQuery();
 
@@ -701,65 +774,125 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
           </Card>
         ) : (
           <>
-            {/* ── MODO TABLA ─────────────────────────────────────────────── */}
+            {/* ── MODO TABLA (Formato Oficial de Inventario y Stock) ── */}
             {viewMode === "table" && (
-              <div className="overflow-x-auto rounded-xl border border-slate-100 shadow-sm bg-white">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                      <th className="text-left px-4 py-3 text-xs font-black text-slate-500 uppercase tracking-wider">Código / RMA</th>
-                      <th className="text-left px-4 py-3 text-xs font-black text-slate-500 uppercase tracking-wider">Equipo</th>
-                      <th className="text-left px-4 py-3 text-xs font-black text-slate-500 uppercase tracking-wider">Tipo</th>
-                      <th className="text-left px-4 py-3 text-xs font-black text-slate-500 uppercase tracking-wider">Specs</th>
-                      <th className="text-left px-4 py-3 text-xs font-black text-slate-500 uppercase tracking-wider">Estado</th>
-                      <th className="text-right px-4 py-3 text-xs font-black text-slate-500 uppercase tracking-wider">Precio Venta</th>
-                      <th className="text-right px-4 py-3 text-xs font-black text-slate-500 uppercase tracking-wider">Acciones</th>
+              <div className="overflow-x-auto rounded-xl border border-slate-300 shadow-sm bg-white">
+                <table className="w-full text-xs border-collapse">
+                  <thead className="bg-slate-100 border-b border-slate-300">
+                    <tr className="text-[11px] font-bold text-slate-800 uppercase tracking-wider select-none">
+                      <th className="text-left px-3 py-3 border-r border-slate-200">DESCRIPCION</th>
+                      <th className="text-center px-2 py-3 border-r border-slate-200">COD.</th>
+                      <th className="text-left px-2 py-3 border-r border-slate-200">BARCODE</th>
+                      <th className="text-left px-2 py-3 border-r border-slate-200">MODELO</th>
+                      <th className="text-left px-2 py-3 border-r border-slate-200">COD. PROV.</th>
+                      <th className="text-left px-2 py-3 border-r border-slate-200">MARCA</th>
+                      <th className="text-center px-2 py-3 border-r border-slate-200">UNIDAD</th>
+                      <th className="text-center px-3 py-3 bg-red-100/90 text-red-900 border-r border-slate-300">CANT.</th>
+                      <th className="text-right px-2 py-3 border-r border-slate-200">POR MAYOR</th>
+                      <th className="text-right px-2 py-3 border-r border-slate-200">PUBLICO</th>
+                      <th className="text-left px-2 py-3 border-r border-slate-200">Ubi.</th>
+                      <th className="text-left px-3 py-3 border-r border-slate-200">PROVEEDOR HABITUAL</th>
+                      <th className="text-right px-2 py-3">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {unitsData.items.map((unit: any) => {
-                      const specs = unit.specs || {};
-                      const cfg = STATUS_CONFIG[unit.status] || STATUS_CONFIG.in_diagnosis;
+                  <tbody className="divide-y divide-slate-200 bg-amber-50/10">
+                    {tableArticles.map((item: any) => {
+                      const isExpanded = expandedArticleKey === item.key;
                       return (
-                        <tr key={unit.id} className="hover:bg-slate-50/60 transition-colors group">
-                          <td className="px-4 py-3">
-                            <div className="font-mono text-xs font-bold text-slate-700">{unit.code}</div>
-                            {unit.rmaNumber && <div className="font-mono text-[10px] text-emerald-600 font-black">{unit.rmaNumber}</div>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="font-bold text-slate-800">{unit.brand} {unit.model}</div>
-                            {unit.serialNumber && <div className="text-[10px] text-slate-400 font-mono">{unit.serialNumber}</div>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-xs capitalize text-slate-500">{unit.type}</span>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-500 max-w-[180px]">
-                            {specs.cpu && <span className="mr-2">{specs.cpu}</span>}
-                            {specs.ram && <span className="mr-2">RAM {specs.ram}</span>}
-                            {specs.storage && <span>{specs.storage}</span>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <UnitStatusSelect currentStatus={unit.status} onStatusChange={(s) => handleStatusChangeRequest(unit, s)} />
-                          </td>
-                          <td className="px-4 py-3 text-right font-bold text-primary">
-                            {unit.salePrice ? `Bs. ${(unit.salePrice/100).toFixed(2)}` : <span className="text-slate-300 text-xs">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button size="sm" className="h-7 px-2 bg-slate-900 hover:bg-slate-800 text-white gap-1" onClick={() => { setKardexUnitId(unit.id); setIsKardexOpen(true); }}>
-                                <BookOpen className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="outline" className="h-7 px-2 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => handleOpenEdit(unit)}>
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              {unit.status === "in_repair" && (
-                                <Button size="sm" className="h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleOpenCompleteRepair(unit)}>
-                                  <CheckCircle className="h-3 w-3" />
+                        <React.Fragment key={item.key}>
+                          <tr
+                            className="hover:bg-amber-50/70 transition-colors cursor-pointer group"
+                            onClick={() => setExpandedArticleKey(isExpanded ? null : item.key)}
+                          >
+                            <td className="px-3 py-2.5 font-bold text-slate-900 border-r border-slate-200">
+                              <div className="flex items-center gap-1.5">
+                                <span className="uppercase">{item.description}</span>
+                                {item.units.length > 1 && (
+                                  <Badge variant="outline" className="text-[9px] px-1 py-0 bg-blue-50 text-blue-700 border-blue-200 shrink-0">
+                                    {item.units.length} series
+                                  </Badge>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-2 py-2.5 text-center font-mono font-bold text-slate-700 border-r border-slate-200">
+                              {item.displayCode}
+                            </td>
+                            <td className="px-2 py-2.5 font-mono text-slate-800 font-bold border-r border-slate-200">
+                              {item.barcode !== "-" ? item.barcode : ""}
+                            </td>
+                            <td className="px-2 py-2.5 text-slate-700 uppercase border-r border-slate-200">
+                              {item.model !== "-" ? item.model : ""}
+                            </td>
+                            <td className="px-2 py-2.5 text-slate-600 font-mono border-r border-slate-200">
+                              {item.supplierCode !== "-" ? item.supplierCode : ""}
+                            </td>
+                            <td className="px-2 py-2.5 text-slate-700 uppercase font-medium border-r border-slate-200">
+                              {item.brand !== "SIN MARCA" ? item.brand : ""}
+                            </td>
+                            <td className="px-2 py-2.5 text-center text-slate-600 uppercase font-bold border-r border-slate-200">
+                              {item.unitMeasure}
+                            </td>
+                            <td className="px-3 py-2.5 text-center font-black bg-red-100/80 text-red-900 border-r border-slate-300 text-sm">
+                              {item.quantity}
+                            </td>
+                            <td className="px-2 py-2.5 text-right font-medium text-slate-700 border-r border-slate-200">
+                              {item.wholesalePrice ? (item.wholesalePrice / 100).toFixed(0) : "0"}
+                            </td>
+                            <td className="px-2 py-2.5 text-right font-bold text-slate-900 border-r border-slate-200">
+                              {item.salePrice ? (item.salePrice / 100).toFixed(item.salePrice % 100 === 0 ? 0 : 2) : "0"}
+                            </td>
+                            <td className="px-2 py-2.5 text-slate-700 font-medium border-r border-slate-200">
+                              {item.locationName}
+                            </td>
+                            <td className="px-3 py-2.5 text-slate-700 uppercase font-medium border-r border-slate-200">
+                              {item.supplierName !== "SIN NOMBRE" ? item.supplierName : "SIN NOMBRE"}
+                            </td>
+                            <td className="px-2 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex justify-end gap-1">
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-slate-600 hover:bg-slate-100" title="Ver Kardex / Historial" onClick={() => { setKardexUnitId(item.firstUnit.id); setIsKardexOpen(true); }}>
+                                  <BookOpen className="h-3.5 w-3.5" />
                                 </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-700 hover:bg-blue-50" title="Editar" onClick={() => handleOpenEdit(item.firstUnit)}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Fila expandible con las unidades / series individuales si tiene varias */}
+                          {isExpanded && item.units.length > 0 && (
+                            <tr className="bg-slate-50 border-b border-slate-200">
+                              <td colSpan={13} className="p-3">
+                                <div className="bg-white rounded-lg border p-3 space-y-2">
+                                  <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
+                                    <Layers className="h-3.5 w-3.5 text-blue-600" />
+                                    Detalle de Unidades / Series Registradas ({item.units.length}):
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                    {item.units.map((u: any) => {
+                                      const cfg = STATUS_CONFIG[u.status] || STATUS_CONFIG.in_diagnosis;
+                                      return (
+                                        <div key={u.id} className="flex items-center justify-between p-2 rounded border bg-slate-50/50 text-xs">
+                                          <div>
+                                            <span className="font-mono font-bold text-blue-700 mr-2">{u.code}</span>
+                                            {u.serialNumber && <span className="text-slate-500 font-mono text-[10px]">S/N: {u.serialNumber}</span>}
+                                            {u.rmaNumber && <span className="text-emerald-600 font-mono text-[10px] ml-1 font-bold">RMA: {u.rmaNumber}</span>}
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            <UnitStatusSelect currentStatus={u.status} onStatusChange={(s) => handleStatusChangeRequest(u, s)} />
+                                            <button className="text-slate-400 hover:text-slate-700 p-1" onClick={() => { setKardexUnitId(u.id); setIsKardexOpen(true); }} title="Kardex">
+                                              <BookOpen className="h-3 w-3" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       );
                     })}
                   </tbody>

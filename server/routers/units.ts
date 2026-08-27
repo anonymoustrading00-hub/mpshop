@@ -22,7 +22,7 @@ import {
   syncMocksToDisk,
   createAutomaticOperationalExpense,
 } from "../db";
-import { generatedCodes, units, unitEvents, purchases, purchaseItems, suppliers, financialTransactions, operationalExpenses, users, repairs, warranties, returns, saleItems, sales, systemSettings } from "../../drizzle/schema";
+import { generatedCodes, units, unitEvents, purchases, purchaseItems, suppliers, financialTransactions, operationalExpenses, users, repairs, warranties, returns, saleItems, sales, systemSettings, branches } from "../../drizzle/schema";
 import * as schema from "../../drizzle/schema";
 import { eq, like, or, and, desc, sql, asc, inArray } from "drizzle-orm";
 import { DEFAULT_COMPANY_CONFIG, readCompanyConfig } from "./settings";
@@ -118,8 +118,41 @@ export const unitsRouter = router({
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
       const items = await db
-        .select()
+        .select({
+          id: units.id,
+          code: units.code,
+          rmaNumber: units.rmaNumber,
+          codeId: units.codeId,
+          type: units.type,
+          brand: units.brand,
+          model: units.model,
+          serialNumber: units.serialNumber,
+          specs: units.specs,
+          condition: units.condition,
+          batteryHealth: units.batteryHealth,
+          damageChecklist: units.damageChecklist,
+          damageNotes: units.damageNotes,
+          functionalTestPassed: units.functionalTestPassed,
+          status: units.status,
+          purchaseId: units.purchaseId,
+          purchasePrice: units.purchasePrice,
+          salePrice: units.salePrice,
+          discountPrice: units.discountPrice,
+          wholesalePrice: units.wholesalePrice,
+          supplierId: units.supplierId,
+          purchaseDate: units.purchaseDate,
+          photos: units.photos,
+          tiktokUrl: units.tiktokUrl,
+          branchId: units.branchId,
+          createdAt: units.createdAt,
+          updatedAt: units.updatedAt,
+          supplierName: suppliers.name,
+          branchName: branches.name,
+          branchAddress: branches.address,
+        })
         .from(units)
+        .leftJoin(suppliers, eq(units.supplierId, suppliers.id))
+        .leftJoin(branches, eq(units.branchId, branches.id))
         .where(whereClause)
         .orderBy(desc(units.id))
         .limit(input?.limit || 100)
@@ -550,7 +583,7 @@ export const unitsRouter = router({
             brand: input.brand,
             model: input.model,
             serialNumber: input.serialNumber ? (qty > 1 ? `${input.serialNumber}-${i + 1}` : input.serialNumber) : null,
-            specs: JSON.stringify(input.specs || {}),
+            specs: JSON.stringify({ ...(input.specs || {}), barcode: baseCodeClean }),
             condition: input.condition || 10,
             batteryHealth: input.batteryHealth || "n_a",
             damageChecklist: JSON.stringify(input.damageChecklist || {}),
@@ -635,7 +668,11 @@ export const unitsRouter = router({
         }
       }
 
-      const specsJson = input.specs ? JSON.stringify(input.specs) : JSON.stringify({});
+      const specsWithBarcode = {
+        ...(input.specs || {}),
+        barcode: baseCodeClean,
+      };
+      const specsJson = JSON.stringify(specsWithBarcode);
       const damageChecklistJson = input.damageChecklist ? JSON.stringify(input.damageChecklist) : JSON.stringify({});
 
       // Resolver o crear proveedor genérico si no se especificó
