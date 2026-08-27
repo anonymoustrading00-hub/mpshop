@@ -1275,4 +1275,41 @@ export const unitsRouter = router({
         generatedAt: new Date().toISOString(),
       };
     }),
+
+  // Eliminar una unidad (solo admin)
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Solo los administradores pueden eliminar unidades." });
+      }
+
+      const db = await getDb();
+
+      if (!db) {
+        // MOCK mode
+        const idx = (MOCK_UNITS as any[]).findIndex((u: any) => u.id === input.id);
+        if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Unidad no encontrada" });
+        (MOCK_UNITS as any[]).splice(idx, 1);
+        syncMocksToDisk();
+        return { success: true };
+      }
+
+      const [unit] = await db.select().from(units).where(eq(units.id, input.id)).limit(1);
+      if (!unit) throw new TRPCError({ code: "NOT_FOUND", message: "Unidad no encontrada" });
+
+      // Registrar evento antes de eliminar
+      try {
+        await db.insert(unitEvents).values({
+          unitId: input.id,
+          eventType: "status_change",
+          userId: ctx.user.id,
+          notes: `Unidad eliminada por ${ctx.user.name || ctx.user.email || "admin"}`,
+        });
+      } catch (_) {}
+
+      await db.delete(units).where(eq(units.id, input.id));
+
+      return { success: true };
+    }),
 });

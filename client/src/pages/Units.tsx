@@ -348,6 +348,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
       quantity: number;
       wholesalePrice: number;
       salePrice: number;
+      purchasePrice: number;
       locationName: string;
       supplierName: string;
       units: any[];
@@ -386,6 +387,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
           quantity: 0,
           wholesalePrice: u.wholesalePrice || 0,
           salePrice: u.salePrice || 0,
+          purchasePrice: u.purchasePrice || 0,
           locationName: loc,
           supplierName: sup,
           units: [],
@@ -417,6 +419,14 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     onSuccess: () => {
       toast.success("✅ Unidad actualizada correctamente");
       setIsEditOpen(false);
+      refetch();
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const deleteUnitMutation = (trpc.units as any).delete?.useMutation({
+    onSuccess: () => {
+      toast.success("✅ Unidad eliminada correctamente");
       refetch();
     },
     onError: (err: any) => toast.error(err.message),
@@ -790,6 +800,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                       <th className="text-center px-3 py-3 bg-red-100/90 text-red-900 border-r border-slate-300">CANT.</th>
                       <th className="text-right px-2 py-3 border-r border-slate-200">POR MAYOR</th>
                       <th className="text-right px-2 py-3 border-r border-slate-200">PUBLICO</th>
+                      <th className="text-right px-2 py-3 border-r border-slate-200 bg-amber-50 text-amber-900">P. COMPRA</th>
                       <th className="text-left px-2 py-3 border-r border-slate-200">Ubi.</th>
                       <th className="text-left px-3 py-3 border-r border-slate-200">PROVEEDOR HABITUAL</th>
                       <th className="text-right px-2 py-3">Acciones</th>
@@ -841,6 +852,9 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                             <td className="px-2 py-2.5 text-right font-bold text-slate-900 border-r border-slate-200">
                               {item.salePrice ? (item.salePrice / 100).toFixed(item.salePrice % 100 === 0 ? 0 : 2) : "0"}
                             </td>
+                            <td className="px-2 py-2.5 text-right font-medium text-amber-800 bg-amber-50/50 border-r border-slate-200">
+                              {item.purchasePrice ? (item.purchasePrice / 100).toFixed(item.purchasePrice % 100 === 0 ? 0 : 2) : "0"}
+                            </td>
                             <td className="px-2 py-2.5 text-slate-700 font-medium border-r border-slate-200">
                               {item.locationName}
                             </td>
@@ -855,6 +869,21 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-700 hover:bg-blue-50" title="Editar" onClick={() => handleOpenEdit(item.firstUnit)}>
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 text-red-600 hover:bg-red-50"
+                                  title="Eliminar"
+                                  onClick={() => {
+                                    if (window.confirm(`¿Eliminar "${item.description}"? Esta acción no se puede deshacer.`)) {
+                                      if (deleteUnitMutation) {
+                                        deleteUnitMutation.mutate({ id: item.firstUnit.id });
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
                               </div>
                             </td>
                           </tr>
@@ -862,7 +891,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                           {/* Fila expandible con las unidades / series individuales si tiene varias */}
                           {isExpanded && item.units.length > 0 && (
                             <tr className="bg-slate-50 border-b border-slate-200">
-                              <td colSpan={13} className="p-3">
+                              <td colSpan={14} className="p-3">
                                 <div className="bg-white rounded-lg border p-3 space-y-2">
                                   <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
                                     <Layers className="h-3.5 w-3.5 text-blue-600" />
