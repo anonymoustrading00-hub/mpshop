@@ -266,14 +266,14 @@ export default function Finance() {
   const dailyTransferIncome  = dailyTransactions.filter((t: any) => t.type === "income"  && t.paymentMethod === "transfer").reduce((s: number, t: any) => s + t.amount, 0);
   const dailyTransferExpense = dailyTransactions.filter((t: any) => t.type === "expense" && t.paymentMethod === "transfer").reduce((s: number, t: any) => s + t.amount, 0);
 
-  // Saldo esperado del día = saldo apertura + movimientos del día
-  const todayOpeningCash     = todaysOpenings.filter((o: any) => o.paymentMethod === "cash" || !o.paymentMethod).reduce((s: number, o: any) => s + o.openingAmount, 0);
-  const todayOpeningQr       = todaysOpenings.filter((o: any) => o.paymentMethod === "qr").reduce((s: number, o: any) => s + o.openingAmount, 0);
-  const todayOpeningTransfer = todaysOpenings.filter((o: any) => o.paymentMethod === "transfer").reduce((s: number, o: any) => s + o.openingAmount, 0);
+  // Saldo esperado del día = saldo apertura ACTIVA + movimientos del día
+  const activeOpeningCash     = activeAdminOpening?.paymentMethod === "cash" || !activeAdminOpening?.paymentMethod ? (activeAdminOpening?.openingAmount || 0) : 0;
+  const activeOpeningQr       = activeAdminOpening?.paymentMethod === "qr" ? (activeAdminOpening?.openingAmount || 0) : 0;
+  const activeOpeningTransfer = activeAdminOpening?.paymentMethod === "transfer" ? (activeAdminOpening?.openingAmount || 0) : 0;
 
-  const expectedDailyCash     = todayOpeningCash     + dailyCashIncome     - dailyCashExpense;
-  const expectedDailyQr       = todayOpeningQr       + dailyQrIncome       - dailyQrExpense;
-  const expectedDailyTransfer = todayOpeningTransfer + dailyTransferIncome - dailyTransferExpense;
+  const expectedDailyCash     = activeOpeningCash     + dailyCashIncome     - dailyCashExpense;
+  const expectedDailyQr       = activeOpeningQr       + dailyQrIncome       - dailyQrExpense;
+  const expectedDailyTransfer = activeOpeningTransfer + dailyTransferIncome - dailyTransferExpense;
 
   return (
 
@@ -307,7 +307,7 @@ export default function Finance() {
             disabled={!isAnyBoxOpen}
             branchName={branches.find((b: any) => b.id === activeBranchId)?.name}
             companyConfig={companyData}
-            openingAmount={todayOpeningCash}
+            openingAmount={activeOpeningCash}
             cashSales={dailyCashIncome}
             cashPurchases={dailyCashPurchases}
             otherExpenses={dailyOtherExpenses}
