@@ -293,41 +293,69 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     }
   }, [type, initialSpecs]);
 
-  // Handler para cambio de marca
+  // Handler para cambio de marca (ahora permite texto libre)
   const handleBrandChange = (value: string | number) => {
-    const selectedBrandId = typeof value === 'string' ? parseInt(value) : value;
-    setBrandId(selectedBrandId);
-    const selectedBrand = brandsData?.find((b: DeviceBrand) => b.id === selectedBrandId);
-    setBrand(selectedBrand?.name || "");
-    // Resetear modelo al cambiar marca
+    if (typeof value === 'string') {
+      // Texto libre
+      setBrand(value);
+      setBrandId(undefined);
+      setModelId(undefined);
+      setModel("");
+    } else {
+      // Selección de catálogo
+      const selectedBrandId = value;
+      setBrandId(selectedBrandId);
+      const selectedBrand = brandsData?.find((b: DeviceBrand) => b.id === selectedBrandId);
+      setBrand(selectedBrand?.name || "");
+      setModelId(undefined);
+      setModel("");
+    }
+  };
+
+  // Handler para texto de marca personalizado
+  const handleBrandTextChange = (text: string) => {
+    setBrand(text);
+    setBrandId(undefined); // Limpiar ID cuando es texto libre
     setModelId(undefined);
     setModel("");
   };
 
-  // Handler para cambio de modelo (con autocompletado de specs)
+  // Handler para cambio de modelo (permite texto libre)
   const handleModelChange = async (value: string | number) => {
-    const selectedModelId = typeof value === 'string' ? parseInt(value) : value;
-    setModelId(selectedModelId);
-    const selectedModel = modelsData?.find((m: DeviceModel) => m.id === selectedModelId);
-    setModel(selectedModel?.name || "");
-    
-    // Autocompletar specs si el modelo tiene defaultSpecs
-    if (selectedModel?.defaultSpecs) {
-      try {
-        const specs = JSON.parse(selectedModel.defaultSpecs);
-        const specsArray: Array<{ key: string; value: string }> = [];
-        
-        // Convertir el objeto de specs a array
-        Object.entries(specs).forEach(([key, value]) => {
-          specsArray.push({ key, value: value as string });
-        });
-        
-        setCustomSpecs(specsArray);
-        toast.success("Especificaciones autocompletadas del modelo");
-      } catch (error) {
-        console.error("Error parsing defaultSpecs:", error);
+    if (typeof value === 'string') {
+      // Texto libre
+      setModel(value);
+      setModelId(undefined);
+    } else {
+      // Selección de catálogo con autocompletado
+      const selectedModelId = value;
+      setModelId(selectedModelId);
+      const selectedModel = modelsData?.find((m: DeviceModel) => m.id === selectedModelId);
+      setModel(selectedModel?.name || "");
+      
+      // Autocompletar specs si el modelo tiene defaultSpecs
+      if (selectedModel?.defaultSpecs) {
+        try {
+          const specs = JSON.parse(selectedModel.defaultSpecs);
+          const specsArray: Array<{ key: string; value: string }> = [];
+          
+          Object.entries(specs).forEach(([key, value]) => {
+            specsArray.push({ key, value: value as string });
+          });
+          
+          setCustomSpecs(specsArray);
+          toast.success("Especificaciones autocompletadas del modelo");
+        } catch (error) {
+          console.error("Error parsing defaultSpecs:", error);
+        }
       }
     }
+  };
+
+  // Handler para texto de modelo personalizado
+  const handleModelTextChange = (text: string) => {
+    setModel(text);
+    setModelId(undefined);
   };
 
   const { data: suppliersData } = trpc.suppliers.list.useQuery();
@@ -632,10 +660,12 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                 <label className="text-xs font-semibold block mb-1">Marca *:</label>
                 <Combobox
                   options={brandOptions}
-                  value={brandId}
+                  value={brandId || brand}
                   onChange={handleBrandChange}
-                  placeholder="Seleccionar marca..."
-                  emptyMessage="No se encontraron marcas"
+                  onTextChange={handleBrandTextChange}
+                  placeholder="Escribir o seleccionar marca..."
+                  emptyMessage="No hay marcas en catálogo"
+                  allowCustomValue={true}
                 />
               </div>
 
@@ -643,11 +673,12 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                 <label className="text-xs font-semibold block mb-1">Modelo *:</label>
                 <Combobox
                   options={modelOptions}
-                  value={modelId}
+                  value={modelId || model}
                   onChange={handleModelChange}
-                  placeholder="Seleccionar modelo..."
+                  onTextChange={handleModelTextChange}
+                  placeholder="Escribir o seleccionar modelo..."
                   emptyMessage={brandId ? "No hay modelos para esta marca" : "Primero selecciona una marca"}
-                  disabled={!brandId}
+                  allowCustomValue={true}
                 />
               </div>
             </div>
@@ -757,8 +788,14 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                             updated[idx].value = String(value);
                             setCustomSpecs(updated);
                           }}
-                          placeholder={`Seleccionar ${displayKey.toLowerCase()}...`}
-                          emptyMessage="No hay opciones disponibles"
+                          onTextChange={(text) => {
+                            const updated = [...customSpecs];
+                            updated[idx].value = text;
+                            setCustomSpecs(updated);
+                          }}
+                          placeholder={`Escribir o seleccionar ${displayKey.toLowerCase()}...`}
+                          emptyMessage="Escribe para agregar"
+                          allowCustomValue={true}
                         />
                       </div>
                     ) : (

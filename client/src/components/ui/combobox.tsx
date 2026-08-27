@@ -25,24 +25,56 @@ interface ComboboxProps {
   options: ComboboxOption[];
   value?: string | number;
   onChange: (value: string | number) => void;
+  onTextChange?: (text: string) => void; // Nuevo: para texto libre
   placeholder?: string;
   emptyMessage?: string;
   className?: string;
   disabled?: boolean;
+  allowCustomValue?: boolean; // Nuevo: permite escribir texto libre
 }
 
 export function Combobox({
   options,
   value,
   onChange,
+  onTextChange,
   placeholder = "Seleccionar...",
   emptyMessage = "No se encontraron resultados.",
   className,
   disabled = false,
+  allowCustomValue = false,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false);
+  const [inputValue, setInputValue] = React.useState("");
 
   const selectedOption = options.find((option) => option.value === value);
+  
+  // Si hay valor pero no está en opciones (texto personalizado), mostrarlo
+  const displayText = selectedOption?.label || (typeof value === 'string' && value) || "";
+
+  React.useEffect(() => {
+    if (selectedOption) {
+      setInputValue(selectedOption.label);
+    } else if (typeof value === 'string') {
+      setInputValue(value);
+    }
+  }, [value, selectedOption]);
+
+  const handleSelect = (selectedValue: string) => {
+    const option = options.find(opt => opt.label === selectedValue);
+    if (option) {
+      onChange(option.value);
+      setInputValue(option.label);
+    }
+    setOpen(false);
+  };
+
+  const handleInputChange = (newValue: string) => {
+    setInputValue(newValue);
+    if (allowCustomValue && onTextChange) {
+      onTextChange(newValue);
+    }
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -55,25 +87,50 @@ export function Combobox({
           disabled={disabled}
         >
           <span className="truncate">
-            {selectedOption ? selectedOption.label : placeholder}
+            {displayText || placeholder}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
-        <Command>
-          <CommandInput placeholder="Buscar..." />
+        <Command shouldFilter={true}>
+          <CommandInput 
+            placeholder="Buscar o escribir..." 
+            value={inputValue}
+            onValueChange={handleInputChange}
+          />
           <CommandList>
-            <CommandEmpty>{emptyMessage}</CommandEmpty>
+            <CommandEmpty>
+              {allowCustomValue ? (
+                <div className="px-2 py-3 text-sm">
+                  <p className="text-muted-foreground mb-2">{emptyMessage}</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      if (inputValue.trim()) {
+                        onChange(inputValue.trim());
+                        if (onTextChange) {
+                          onTextChange(inputValue.trim());
+                        }
+                        setOpen(false);
+                      }
+                    }}
+                  >
+                    Usar "{inputValue}"
+                  </Button>
+                </div>
+              ) : (
+                emptyMessage
+              )}
+            </CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
                   value={option.label}
-                  onSelect={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                  }}
+                  onSelect={handleSelect}
                 >
                   <Check
                     className={cn(
