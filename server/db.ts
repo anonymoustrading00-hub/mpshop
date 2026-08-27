@@ -1669,6 +1669,7 @@ export async function createPurchase(purchaseData: any, items: any[], userId?: n
         paymentMethod: purchaseData.paymentMethod || "cash",
         referenceId: id,
         userId: userId,
+        branchId: purchaseData.branchId || null,
         notes: `Compra ${purchaseData.purchaseNumber}`,
       });
     }
@@ -1739,6 +1740,7 @@ export async function updatePurchase(purchaseId: number, purchaseData: any, item
         paymentMethod: purchaseData.paymentMethod || "cash",
         referenceId: purchaseId,
         userId: userId,
+        branchId: purchaseData.branchId || null,
         notes: `Compra ${purchaseData.purchaseNumber} (Editada)`,
         createdAt: new Date()
       });

@@ -646,13 +646,13 @@ export const generateArqueoPDF = (data: {
   // ── HELPERS ──────────────────────────────────────────────────────────────
   const drawSectionHeader = (title: string, yPos: number, rgb: [number, number, number]) => {
     doc.setFillColor(...rgb);
-    doc.rect(marginL, yPos - 4, marginR - marginL, 6, "F");
+    doc.rect(marginL, yPos - 4, marginR - marginL, 7, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(255, 255, 255);
     doc.text(title, pageWidth / 2, yPos, { align: "center" });
     doc.setTextColor(15, 23, 42);
-    return yPos + 4;
+    return yPos + 5;
   };
 
   const drawRow = (label: string, amount: number, yPos: number, bold = false) => {
@@ -665,18 +665,18 @@ export const generateArqueoPDF = (data: {
   };
 
   // ── INGRESOS ─────────────────────────────────────────────────────────────
-  y = drawSectionHeader("═══  INGRESOS  ═══", y + 2, [22, 101, 52]);
+  y = drawSectionHeader("INGRESOS", y + 2, [22, 101, 52]);
   y += 2;
   y = drawRow("Saldo inicial en apertura de caja:", openingAmount, y);
   y = drawRow("Ventas al contado (efectivo):", cashSales, y);
-  y = drawRow("Cobro de cuotas de ventas al crédito:", creditColl, y);
+  y = drawRow("Cobro de cuotas de ventas al credito:", creditColl, y);
   y = drawRow("Otros ingresos:", otherIncome, y);
   doc.setDrawColor(34, 197, 94);
   doc.setLineWidth(0.3);
   doc.line(marginL + 3, y, marginR - 3, y);
   y += 4;
   y = drawRow("TOTAL INGRESOS:", totalIngresos, y, true);
-  y += 2;
+  y += 4;
 
   doc.setDrawColor(203, 213, 225);
   doc.setLineWidth(0.3);
@@ -684,36 +684,38 @@ export const generateArqueoPDF = (data: {
   y += 3;
 
   // ── EGRESOS ──────────────────────────────────────────────────────────────
-  y = drawSectionHeader("═══  EGRESOS  ═══", y + 2, [185, 28, 28]);
+  y = drawSectionHeader("EGRESOS", y + 2, [185, 28, 28]);
   y += 2;
   y = drawRow("Compras al contado:", cashPurchases, y);
-  y = drawRow("Pago de cuotas de compras al crédito:", creditPayments, y);
+  y = drawRow("Pago de cuotas de compras al credito:", creditPayments, y);
   y = drawRow("Otros egresos (gastos operativos):", otherExpenses, y);
   doc.setDrawColor(239, 68, 68);
   doc.setLineWidth(0.3);
   doc.line(marginL + 3, y, marginR - 3, y);
   y += 4;
   y = drawRow("TOTAL EGRESOS:", totalEgresos, y, true);
-  y += 3;
+  y += 5;
 
   doc.setDrawColor(203, 213, 225);
   doc.setLineWidth(0.4);
   doc.line(marginL, y, marginR, y);
-  y += 4;
+  y += 5;
 
   // ── TABLA DOBLE: VENTAS | CUADRE ─────────────────────────────────────────
-  const halfW = (marginR - marginL) / 2 - 2;
+  const totalW = marginR - marginL;
+  const halfW  = (totalW - 4) / 2;   // 4 mm de separación entre columnas
   const leftBox  = marginL;
   const rightBox = marginL + halfW + 4;
 
+  // Cabeceras de tabla
   doc.setFillColor(37, 99, 235);
-  doc.rect(leftBox, y, halfW, 6, "F");
-  doc.rect(rightBox, y, halfW, 6, "F");
+  doc.rect(leftBox,  y, halfW, 7, "F");
+  doc.rect(rightBox, y, halfW, 7, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
   doc.setTextColor(255, 255, 255);
-  doc.text("VENTAS / MEDIOS DE PAGO", leftBox + halfW / 2, y + 4, { align: "center" });
-  doc.text("CUADRE DE CAJA", rightBox + halfW / 2, y + 4, { align: "center" });
+  doc.text("VENTAS / MEDIOS DE PAGO", leftBox  + halfW / 2, y + 4.5, { align: "center" });
+  doc.text("CUADRE DE CAJA",          rightBox + halfW / 2, y + 4.5, { align: "center" });
   doc.setTextColor(15, 23, 42);
 
   const totalCash    = data.totalCash    ?? data.expectedCash ?? 0;
@@ -728,27 +730,27 @@ export const generateArqueoPDF = (data: {
   const reportedCash = data.reportedCash ?? 0;
   const cashDiff     = reportedCash - expectedCash;
 
-  const rowH = 5.5;
-  const startY = y + 8;
-  let lyLeft  = startY;
-  let lyRight = startY;
+  const rowH   = 5.5;
+  const startY = y + 9;
+  let lyLeft   = startY;
+  let lyRight  = startY;
 
   const leftRows: [string, string][] = [
-    ["Tot. Efectivo:",   formatBs(totalCash)],
-    ["Tot. Tarjeta:",    formatBs(totalCard)],
-    ["Tot. Cheque:",     formatBs(totalCheque)],
-    ["Tot. Depósito:",   formatBs(totalDeposit)],
-    ["Tot. Pago QR:",    formatBs(totalQr)],
-    ["Tot. Factura:",    formatBs(totalInvoice)],
-    ["Tot. Recibo:",     formatBs(totalReceipt)],
+    ["Tot. Efectivo:",  formatBs(totalCash)],
+    ["Tot. Tarjeta:",   formatBs(totalCard)],
+    ["Tot. Cheque:",    formatBs(totalCheque)],
+    ["Tot. Deposito:",  formatBs(totalDeposit)],
+    ["Tot. Pago QR:",   formatBs(totalQr)],
+    ["Tot. Factura:",   formatBs(totalInvoice)],
+    ["Tot. Recibo:",    formatBs(totalReceipt)],
   ];
 
   leftRows.forEach(([label, value]) => {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(15, 23, 42);
-    doc.text(label, leftBox + 2, lyLeft);
-    doc.text(value, leftBox + halfW - 2, lyLeft, { align: "right" });
+    doc.text(label,  leftBox + 3, lyLeft);
+    doc.text(value,  leftBox + halfW - 3, lyLeft, { align: "right" });
     lyLeft += rowH;
   });
 
@@ -768,21 +770,21 @@ export const generateArqueoPDF = (data: {
     const isBold = style === "faltante" || style === "sobrante";
     doc.setFont("helvetica", isBold ? "bold" : "normal");
     doc.setFontSize(8);
-    if (style === "faltante") doc.setTextColor(185, 28, 28);
-    else if (style === "sobrante") doc.setTextColor(37, 99, 235);
-    else doc.setTextColor(15, 23, 42);
-    doc.text(label, rightBox + 2, lyRight);
-    doc.text(value, rightBox + halfW - 2, lyRight, { align: "right" });
+    if (style === "faltante")       doc.setTextColor(185, 28, 28);
+    else if (style === "sobrante")  doc.setTextColor(37, 99, 235);
+    else                            doc.setTextColor(15, 23, 42);
+    doc.text(label,  rightBox + 3, lyRight);
+    doc.text(value,  rightBox + halfW - 3, lyRight, { align: "right" });
     doc.setTextColor(15, 23, 42);
     lyRight += rowH;
   });
 
   const tableHeight = Math.max(lyLeft, lyRight) - y;
   doc.setDrawColor(203, 213, 225);
-  doc.setLineWidth(0.3);
-  doc.rect(leftBox, y, halfW, tableHeight);
+  doc.setLineWidth(0.4);
+  doc.rect(leftBox,  y, halfW, tableHeight);
   doc.rect(rightBox, y, halfW, tableHeight);
-  y = Math.max(lyLeft, lyRight) + 4;
+  y = Math.max(lyLeft, lyRight) + 6;
 
   // ── OBSERVACIÓN ──────────────────────────────────────────────────────────
   doc.setDrawColor(203, 213, 225);
