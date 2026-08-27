@@ -215,6 +215,66 @@ export default function Finance() {
   );
   const todaysOpenedAmount = todaysOpenings.reduce((sum: number, o: any) => sum + o.openingAmount, 0);
 
+  // ── DATOS DIARIOS PARA EL CIERRE DE CAJA ─────────────────────────────────
+  // Encontrar la apertura activa del admin (o la más reciente del día)
+  // y filtrar transacciones DESDE esa apertura para el arqueo diario.
+  const activeAdminOpening = useMemo(() => {
+    const adminOpenings = activeOpenings.filter(
+      (o: any) => !adminId || o.responsibleUserId === adminId
+    );
+    if (adminOpenings.length === 0) return null;
+    // La apertura con createdAt más reciente
+    return adminOpenings.reduce((latest: any, o: any) => {
+      if (!latest) return o;
+      const latestDate = latest.createdAt ? new Date(latest.createdAt).getTime() : 0;
+      const oDate = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+      return oDate > latestDate ? o : latest;
+    }, null);
+  }, [activeOpenings, adminId]);
+
+  // Timestamp de la apertura activa (en ms) para filtrar transacciones desde ese momento
+  const openingSinceMs = useMemo(() => {
+    if (!activeAdminOpening) return 0;
+    // Intentar con createdAt (timestamp exacto), luego con openingDate (solo fecha)
+    if (activeAdminOpening.createdAt) {
+      return new Date(activeAdminOpening.createdAt).getTime();
+    }
+    if (activeAdminOpening.openingDate) {
+      return new Date(`${activeAdminOpening.openingDate}T00:00:00`).getTime();
+    }
+    return 0;
+  }, [activeAdminOpening]);
+
+  // Transacciones SOLO del período actual (desde apertura)
+  const dailyTransactions = useMemo(() => {
+    if (!openingSinceMs || !(transactions as any[])?.length) return (transactions as any[]) || [];
+    return ((transactions as any[]) || []).filter((t: any) => {
+      if (!t.createdAt) return true; // si no tiene fecha, incluir
+      return new Date(t.createdAt).getTime() >= openingSinceMs;
+    });
+  }, [transactions, openingSinceMs]);
+
+  // Ingresos y egresos del DÍA (solo período de la apertura activa)
+  const dailyCashIncome   = dailyTransactions.filter((t: any) => t.type === "income"  && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((s: number, t: any) => s + t.amount, 0);
+  const dailyCashExpense  = dailyTransactions.filter((t: any) => t.type === "expense" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((s: number, t: any) => s + t.amount, 0);
+  const dailyCashPurchases = dailyTransactions.filter((t: any) => t.type === "expense" && t.category === "purchase" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((s: number, t: any) => s + t.amount, 0);
+  const dailyOtherExpenses = dailyTransactions.filter((t: any) => t.type === "expense" && t.category !== "purchase" && t.category !== "transfer_between_registers" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((s: number, t: any) => s + t.amount, 0);
+
+  const dailyQrIncome     = dailyTransactions.filter((t: any) => t.type === "income"  && t.paymentMethod === "qr").reduce((s: number, t: any) => s + t.amount, 0);
+  const dailyQrExpense    = dailyTransactions.filter((t: any) => t.type === "expense" && t.paymentMethod === "qr").reduce((s: number, t: any) => s + t.amount, 0);
+
+  const dailyTransferIncome  = dailyTransactions.filter((t: any) => t.type === "income"  && t.paymentMethod === "transfer").reduce((s: number, t: any) => s + t.amount, 0);
+  const dailyTransferExpense = dailyTransactions.filter((t: any) => t.type === "expense" && t.paymentMethod === "transfer").reduce((s: number, t: any) => s + t.amount, 0);
+
+  // Saldo esperado del día = saldo apertura + movimientos del día
+  const todayOpeningCash     = todaysOpenings.filter((o: any) => o.paymentMethod === "cash" || !o.paymentMethod).reduce((s: number, o: any) => s + o.openingAmount, 0);
+  const todayOpeningQr       = todaysOpenings.filter((o: any) => o.paymentMethod === "qr").reduce((s: number, o: any) => s + o.openingAmount, 0);
+  const todayOpeningTransfer = todaysOpenings.filter((o: any) => o.paymentMethod === "transfer").reduce((s: number, o: any) => s + o.openingAmount, 0);
+
+  const expectedDailyCash     = todayOpeningCash     + dailyCashIncome     - dailyCashExpense;
+  const expectedDailyQr       = todayOpeningQr       + dailyQrIncome       - dailyQrExpense;
+  const expectedDailyTransfer = todayOpeningTransfer + dailyTransferIncome - dailyTransferExpense;
+
   return (
 
     <div className="p-4 space-y-6 max-w-5xl mx-auto mb-20 md:mb-10 min-h-full">
@@ -240,17 +300,17 @@ export default function Finance() {
           <p className="text-sm text-slate-500 mt-1.5">Resumen de ingresos, egresos y rentabilidad.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <ArqueoDialog 
-            expectedCash={cashBalance} 
-            expectedQr={qrBalance} 
-            expectedTransfer={transferBalance} 
+          <ArqueoDialog
+            expectedCash={expectedDailyCash}
+            expectedQr={expectedDailyQr}
+            expectedTransfer={expectedDailyTransfer}
             disabled={!isAnyBoxOpen}
             branchName={branches.find((b: any) => b.id === activeBranchId)?.name}
             companyConfig={companyData}
-            openingAmount={totalCashOpenings}
-            cashSales={cashIncome}
-            cashPurchases={cashPurchases}
-            otherExpenses={otherExpenses}
+            openingAmount={todayOpeningCash}
+            cashSales={dailyCashIncome}
+            cashPurchases={dailyCashPurchases}
+            otherExpenses={dailyOtherExpenses}
           />
           <TransferDialog />
           <OpenCashDialog />
@@ -258,6 +318,7 @@ export default function Finance() {
           <Link href="/expenses">
             <Button className="gap-2 bg-slate-900 hover:bg-slate-800 text-white h-10 px-4">
               <Receipt className="h-4 w-4" /> Módulo de Gastos
+
             </Button>
           </Link>
         </div>
