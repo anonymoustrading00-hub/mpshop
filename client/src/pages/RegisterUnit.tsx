@@ -118,8 +118,9 @@ function validateImeiFormat(imei: string): { valid: boolean; reason?: string } {
 
 export default function RegisterUnit() {
   const [, setLocation] = useLocation();
-  const { activeBranchId } = useBranch();
+  const { activeBranchId, branches } = useBranch();
   const [scannedCode, setScannedCode] = useState("");
+
   const scanInputRef = useRef<HTMLInputElement>(null);
 
   // Estado del flujo
@@ -1220,7 +1221,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
       )}
 
-      {/* Modal para Impresión de Etiquetas del Lote Registrado */}
+      {/* Modal para Confirmación del Lote Registrado */}
       {batchCreatedData && (
         <BatchLabelsModal
           open={batchModalOpen}
@@ -1235,8 +1236,10 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
           type={batchCreatedData.type}
           salePrice={batchCreatedData.salePrice}
           codes={batchCreatedData.codes}
+          branchName={branches.find((b: any) => b.id === activeBranchId)?.name || "Sucursal Principal"}
         />
       )}
+
     </div>
   );
 }
