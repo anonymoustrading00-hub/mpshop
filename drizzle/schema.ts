@@ -183,7 +183,7 @@ export const units = mysqlTable("units", {
   damageNotes: text("damageNotes"),
   functionalTestPassed: int("functionalTestPassed").default(1), // 1=true, 0=false (para accesorios)
   status: mysqlEnum("status", ["in_diagnosis", "in_repair", "available", "reserved", "sold", "returned", "scrapped"]).default("in_diagnosis").notNull(),
-  warrantyStatus: mysqlEnum("warrantyStatus", ["active", "expired", "n_a"]).default("n_a").notNull(),
+  warrantyStatus: mysqlEnum("warrantyStatus", ["active", "expired", "n_a"]).default("n_a"),
   purchaseId: int("purchaseId").references(() => purchases.id),
   purchasePrice: int("purchasePrice").notNull(), // centavos
   salePrice: int("salePrice"), // centavos - Precio Venta Unit
