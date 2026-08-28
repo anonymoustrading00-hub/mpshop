@@ -103,6 +103,14 @@ async function startServer() {
     await ensureTables().catch(err =>
       console.error("[StartServer] ensureTables failed:", err)
     );
+    
+    // Ejecutar migraciones automáticas
+    const { getDb } = await import("../db");
+    const { runAutoMigrations } = await import("../migrations/auto-migrate");
+    const db = await getDb();
+    await runAutoMigrations(db).catch(err =>
+      console.error("[StartServer] Auto-migrations failed:", err)
+    );
   } else {
     console.log("[StartServer] Skipping ensureTables (no DATABASE_URL, running in demo mode)");
   }
