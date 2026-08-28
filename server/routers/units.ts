@@ -134,6 +134,7 @@ export const unitsRouter = router({
           damageNotes: units.damageNotes,
           functionalTestPassed: units.functionalTestPassed,
           status: units.status,
+          warrantyStatus: units.warrantyStatus,
           purchaseId: units.purchaseId,
           purchasePrice: units.purchasePrice,
           salePrice: units.salePrice,
@@ -1113,6 +1114,7 @@ export const unitsRouter = router({
           photos: units.photos,
           tiktokUrl: units.tiktokUrl,
           status: units.status,
+          warrantyStatus: units.warrantyStatus,
         })
         .from(units)
         .where(whereClause as any)
@@ -1236,6 +1238,7 @@ export const unitsRouter = router({
           photos: units.photos,
           tiktokUrl: units.tiktokUrl,
           status: units.status,
+          warrantyStatus: units.warrantyStatus,
           functionalTestPassed: units.functionalTestPassed,
         })
         .from(units)
