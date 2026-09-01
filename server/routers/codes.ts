@@ -11,6 +11,65 @@ let MOCK_SETTINGS = { defaultCodeType: "qr" };
 let MOCK_BATCHES: any[] = [];
 let MOCK_CODES: any[] = [];
 
+function calculateEan13CheckDigit(digits12: string): string {
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += parseInt(digits12[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  return String((10 - (sum % 10)) % 10);
+}
+
+function calculateUpcaCheckDigit(digits11: string): string {
+  let sum = 0;
+  for (let i = 0; i < 11; i++) {
+    sum += parseInt(digits11[i]) * (i % 2 === 0 ? 3 : 1);
+  }
+  return String((10 - (sum % 10)) % 10);
+}
+
+function generateCodeString(type: "qr" | "barcode", subtype?: string): string {
+  if (type === "qr") {
+    const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let suffix = "";
+    for (let i = 0; i < 6; i++) {
+      suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `QR-${suffix}`;
+  }
+
+  const sub = subtype?.toLowerCase() || "code128";
+  if (sub === "ean13") {
+    // 12 dígitos base (prefijo 777 + 9 dígitos aleatorios) + 1 dígito verificador = 13 dígitos
+    const rand9 = Math.floor(100000000 + Math.random() * 900000000).toString();
+    const base12 = `777${rand9}`;
+    return base12 + calculateEan13CheckDigit(base12);
+  }
+
+  if (sub === "upca") {
+    // 11 dígitos base (prefijo 0 + 10 dígitos aleatorios) + 1 dígito verificador = 12 dígitos
+    const rand10 = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+    const base11 = `0${rand10}`;
+    return base11 + calculateUpcaCheckDigit(base11);
+  }
+
+  if (sub === "code39") {
+    const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let suffix = "";
+    for (let i = 0; i < 6; i++) {
+      suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `BC-${suffix}`;
+  }
+
+  // Code 128 por defecto
+  const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  let suffix = "";
+  for (let i = 0; i < 6; i++) {
+    suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `BC-${suffix}`;
+}
+
 export const codesRouter = router({
   // Obtener configuraciones del sistema (ej: tipo de código por defecto)
   getSettings: protectedProcedure.query(async () => {
@@ -65,20 +124,28 @@ export const codesRouter = router({
       z.object({
         quantity: z.number().min(1).max(500, "Máximo 500 códigos por lote"),
         type: z.enum(["qr", "barcode"]),
+        subtype: z.enum(["code128", "code39", "ean13", "upca"]).optional(),
         notes: z.string().optional(),
         prefix: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Extraer subtipo de input o de las notas ej "[EAN13]"
+      let detectedSubtype = input.subtype;
+      if (!detectedSubtype && input.notes) {
+        const n = input.notes.toUpperCase();
+        if (n.includes("[EAN13]")) detectedSubtype = "ean13";
+        else if (n.includes("[UPCA]")) detectedSubtype = "upca";
+        else if (n.includes("[CODE39]")) detectedSubtype = "code39";
+        else if (n.includes("[CODE128]")) detectedSubtype = "code128";
+      }
+
       const db = await getDb();
       if (!db) {
         const batchId = MOCK_BATCHES.length + 1;
-        const prefix = input.prefix || (input.type === "qr" ? "QR" : "BC");
-        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
 
         for (let i = 0; i < input.quantity; i++) {
-          const uniqueSuffix = nanoid(6).toUpperCase();
-          const codeString = `${prefix}-${uniqueSuffix}`;
+          const codeString = generateCodeString(input.type, detectedSubtype);
           MOCK_CODES.push({
             id: MOCK_CODES.length + 1,
             code: codeString,
@@ -119,13 +186,11 @@ export const codesRouter = router({
       });
 
       const batchId = batchResult?.insertId || batchResult?.[0]?.insertId;
-      const prefix = input.prefix || (input.type === "qr" ? "QR" : "BC");
 
-      // 2. Generar códigos únicos (cortos y legibles)
+      // 2. Generar códigos únicos según tipo y subtipo
       const codeValues = [];
       for (let i = 0; i < input.quantity; i++) {
-        const uniqueSuffix = nanoid(6).toUpperCase();
-        const codeString = `${prefix}-${uniqueSuffix}`;
+        const codeString = generateCodeString(input.type, detectedSubtype);
         codeValues.push({
           code: codeString,
           type: input.type,
@@ -145,6 +210,7 @@ export const codesRouter = router({
         type: input.type,
       };
     }),
+
 
   // Listar lotes de códigos generados
   listBatches: protectedProcedure

@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,28 +29,94 @@ const BWIP_BCID: Record<BarcodeSubtype, string> = {
   upca: "upca",
 };
 
-function renderBarcodeToCanvas(canvas: HTMLCanvasElement, code: string, subtype: BarcodeSubtype) {
-  bwipjs.toCanvas(canvas, {
-    bcid: BWIP_BCID[subtype],
-    text: code,
-    scale: 3,
-    height: 12,
-    includetext: false,
-    textxalign: "center",
-  });
+/**
+ * Adapta el código al formato solicitado:
+ * - Code 128: admite cualquier ASCII → limpia caracteres invisibles
+ * - Code 39: solo A-Z 0-9 y -.$/+%  → convierte a mayúsculas, elimina el resto
+ * - EAN-13: exactamente 13 dígitos → extrae solo números, rellena/recorta, agrega dígito de control
+ * - UPC-A:  exactamente 12 dígitos → mismo proceso que EAN-13 pero 12 dígitos
+ */
+function sanitizeCodeForFormat(raw: string, subtype: BarcodeSubtype): string {
+  switch (subtype) {
+    case "code128":
+      // Code 128 acepta todo ASCII 0-127; quitamos solo caracteres de control no imprimibles
+      return raw.replace(/[^\x20-\x7E]/g, "");
+
+    case "code39": {
+      // Solo alfanumérico mayúsculas + - . $ / + % espacio
+      const clean = raw.toUpperCase().replace(/[^A-Z0-9\-\.\$\/\+\% ]/g, "");
+      return clean || "0";
+    }
+
+    case "ean13": {
+      // Solo dígitos, exactamente 12 + 1 check digit generado
+      const digits = raw.replace(/\D/g, "").padEnd(12, "0").slice(0, 12);
+      const check = ean13CheckDigit(digits);
+      return digits + check;
+    }
+
+    case "upca": {
+      // Solo dígitos, exactamente 11 + 1 check digit generado
+      const digits = raw.replace(/\D/g, "").padEnd(11, "0").slice(0, 11);
+      const check = upcaCheckDigit(digits);
+      return digits + check;
+    }
+
+    default:
+      return raw;
+  }
 }
 
-function generateBarcodeDataUrl(code: string, subtype: BarcodeSubtype): Promise<string> {
-  return new Promise((resolve, reject) => {
-    try {
-      const canvas = document.createElement("canvas");
-      renderBarcodeToCanvas(canvas, code, subtype);
-      resolve(canvas.toDataURL("image/png"));
-    } catch (err) {
-      reject(err);
-    }
-  });
+/** Calcula dígito de control EAN-13 (últimos 12 dígitos → devuelve el 13°) */
+function ean13CheckDigit(digits12: string): string {
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += parseInt(digits12[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  return String((10 - (sum % 10)) % 10);
 }
+
+/** Calcula dígito de control UPC-A (11 dígitos → devuelve el 12°) */
+function upcaCheckDigit(digits11: string): string {
+  let sum = 0;
+  for (let i = 0; i < 11; i++) {
+    sum += parseInt(digits11[i]) * (i % 2 === 0 ? 3 : 1);
+  }
+  return String((10 - (sum % 10)) % 10);
+}
+
+/** Genera el canvas con el código de barras; si falla el formato solicitado hace fallback a code128 */
+function renderBarcodeToCanvas(canvas: HTMLCanvasElement, rawCode: string, subtype: BarcodeSubtype) {
+  const code = sanitizeCodeForFormat(rawCode, subtype);
+  try {
+    bwipjs.toCanvas(canvas, {
+      bcid: BWIP_BCID[subtype],
+      text: code,
+      scale: 3,
+      height: 12,
+      includetext: false,
+    });
+  } catch {
+    // Fallback a code128 con el código original limpio
+    const fallback = rawCode.replace(/[^\x20-\x7E]/g, "") || "0";
+    bwipjs.toCanvas(canvas, {
+      bcid: "code128",
+      text: fallback,
+      scale: 3,
+      height: 12,
+      includetext: false,
+    });
+  }
+}
+
+/** Genera Data URL PNG del código de barras */
+async function generateBarcodeDataUrl(rawCode: string, subtype: BarcodeSubtype): Promise<string> {
+  const canvas = document.createElement("canvas");
+  renderBarcodeToCanvas(canvas, rawCode, subtype);
+  return canvas.toDataURL("image/png");
+}
+
+
 
 export default function GenerateCodes() {
   const [quantity, setQuantity] = useState(50);
@@ -95,8 +161,15 @@ export default function GenerateCodes() {
         ? `[${barcodeSubtype.toUpperCase()}] ${notes}`.trim()
         : notes;
 
-    generateBatchMutation.mutate({ quantity, type: codeType, notes: batchNotes });
+    generateBatchMutation.mutate({
+      quantity,
+      type: codeType,
+      subtype: codeType === "barcode" ? barcodeSubtype : undefined,
+      notes: batchNotes,
+    });
   };
+
+
 
   /** Detecta el subtipo guardado en las notas del lote seleccionado */
   const detectedSubtype = (): BarcodeSubtype => {
