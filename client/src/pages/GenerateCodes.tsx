@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+﻿import React, { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,16 +6,57 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { QrCode, Barcode, Printer, Plus, Settings } from "lucide-react";
+import { QrCode, Printer, Plus, Settings, Info } from "lucide-react";
 import QRCode from "qrcode";
 import bwipjs from "bwip-js";
 import jsPDF from "jspdf";
 
+// ─── Tipos de código soportados ────────────────────────────────────────────────
+type BarcodeSubtype = "code128" | "code39" | "ean13" | "upca";
+type CodeType = "qr" | "barcode";
+
+const BARCODE_SUBTYPES: { value: BarcodeSubtype; label: string; description: string }[] = [
+  { value: "code128", label: "Code 128", description: "Letras + números. Envíos y logística." },
+  { value: "code39", label: "Code 39", description: "Letras mayúsculas + números. Industria e inventarios." },
+  { value: "ean13", label: "EAN-13", description: "13 dígitos. El más usado en supermercados del mundo." },
+  { value: "upca", label: "UPC-A", description: "12 dígitos. Tiendas de América del Norte." },
+];
+
+const BWIP_BCID: Record<BarcodeSubtype, string> = {
+  code128: "code128",
+  code39: "code39",
+  ean13: "ean13",
+  upca: "upca",
+};
+
+function renderBarcodeToCanvas(canvas: HTMLCanvasElement, code: string, subtype: BarcodeSubtype) {
+  bwipjs.toCanvas(canvas, {
+    bcid: BWIP_BCID[subtype],
+    text: code,
+    scale: 3,
+    height: 12,
+    includetext: false,
+    textxalign: "center",
+  });
+}
+
+function generateBarcodeDataUrl(code: string, subtype: BarcodeSubtype): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const canvas = document.createElement("canvas");
+      renderBarcodeToCanvas(canvas, code, subtype);
+      resolve(canvas.toDataURL("image/png"));
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 export default function GenerateCodes() {
   const [quantity, setQuantity] = useState(50);
-  const [codeType, setCodeType] = useState<"qr" | "barcode">("qr");
+  const [codeType, setCodeType] = useState<CodeType>("qr");
+  const [barcodeSubtype, setBarcodeSubtype] = useState<BarcodeSubtype>("code128");
   const [notes, setNotes] = useState("");
-
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
 
   const { data: companyConfig } = trpc.settings.getCompanyConfig.useQuery();
@@ -49,35 +90,35 @@ export default function GenerateCodes() {
       toast.error("Ingresa una cantidad entre 1 y 500");
       return;
     }
+    const batchNotes =
+      codeType === "barcode"
+        ? `[${barcodeSubtype.toUpperCase()}] ${notes}`.trim()
+        : notes;
 
-    generateBatchMutation.mutate({
-      quantity,
-      type: codeType,
-      notes,
-    });
+    generateBatchMutation.mutate({ quantity, type: codeType, notes: batchNotes });
   };
 
-  // Genera un Data URL PNG para un código de barras (Code128) usando bwip-js
-  const generateBarcodeDataUrl = (code: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      try {
-        const canvas = document.createElement("canvas");
-        bwipjs.toCanvas(canvas, {
-          bcid: "code128",
-          text: code,
-          scale: 3,
-          height: 12,
-          includetext: false,
-          textxalign: "center",
-        });
-        resolve(canvas.toDataURL("image/png"));
-      } catch (err) {
-        reject(err);
-      }
-    });
+  /** Detecta el subtipo guardado en las notas del lote seleccionado */
+  const detectedSubtype = (): BarcodeSubtype => {
+    if (!batchCodesData) return "code128";
+    const n = (batchCodesData.batch.notes || "").toUpperCase();
+    if (n.startsWith("[CODE39]")) return "code39";
+    if (n.startsWith("[EAN13]")) return "ean13";
+    if (n.startsWith("[UPCA]")) return "upca";
+    return "code128";
   };
 
-  // Generar la Hoja PDF de etiquetas imprimibles (4 QR o 5 Códigos de Barras por línea)
+  /** Obtiene el label del subtipo de un lote a partir de sus notas */
+  const getSubtypeLabel = (batchNotes: string, batchType: string) => {
+    if (batchType !== "barcode") return "QR";
+    const n = (batchNotes || "").toUpperCase();
+    if (n.startsWith("[CODE39]")) return "Code 39";
+    if (n.startsWith("[EAN13]")) return "EAN-13";
+    if (n.startsWith("[UPCA]")) return "UPC-A";
+    return "Code 128";
+  };
+
+  // ── PDF de impresión ──────────────────────────────────────────────────────────
   const handlePrintPDF = async () => {
     if (!batchCodesData?.codes || batchCodesData.codes.length === 0) {
       toast.error("No hay códigos en este lote para imprimir");
@@ -85,16 +126,16 @@ export default function GenerateCodes() {
     }
 
     const isBarcode = batchCodesData.batch.type === "barcode";
+    const sub = detectedSubtype();
     const companyDisplayName = (companyConfig?.name || "MP SHOP TIENDA ONLINE").toUpperCase();
-    toast.info(`Generando PDF de etiquetas (${isBarcode ? "5 códigos de barra" : "4 QR"} por línea)...`);
+    const subtypeLabel = isBarcode
+      ? BARCODE_SUBTYPES.find((s) => s.value === sub)?.label || "Code 128"
+      : "QR";
 
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
+    toast.info(`Generando PDF (${subtypeLabel})...`);
 
-    // 4 QR por fila o 5 Códigos de Barra por fila en A4
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
     const cols = isBarcode ? 5 : 4;
     const rows = isBarcode ? 12 : 10;
     const labelWidth = isBarcode ? 37 : 46;
@@ -118,42 +159,35 @@ export default function GenerateCodes() {
       const x = startX + col * (labelWidth + gapX);
       const y = startY + row * (labelHeight + gapY);
 
-      // Borde de la etiqueta
       pdf.setDrawColor(210, 215, 220);
       pdf.roundedRect(x, y, labelWidth, labelHeight, 1.5, 1.5);
 
-      // Header con nombre de empresa configurado (recortado si es necesario)
       pdf.setFontSize(isBarcode ? 4.8 : 5.2);
       pdf.setFont("helvetica", "bold");
-      pdf.text(companyDisplayName, x + labelWidth / 2, y + 3.2, { align: "center", maxWidth: labelWidth - 3 });
+      pdf.text(companyDisplayName, x + labelWidth / 2, y + 3.2, {
+        align: "center",
+        maxWidth: labelWidth - 3,
+      });
 
       try {
         if (isBarcode) {
-          // ── CÓDIGO DE BARRAS (5 por fila) ──────────────────────────
-          const barcodeDataUrl = await generateBarcodeDataUrl(codeItem.code);
-
-          // Imagen del barcode
+          const barcodeDataUrl = await generateBarcodeDataUrl(codeItem.code, sub);
           pdf.addImage(barcodeDataUrl, "PNG", x + 2, y + 4.2, labelWidth - 4, 9);
 
-          // Texto del código debajo del barcode
           pdf.setFontSize(6);
           pdf.setFont("courier", "bold");
-          pdf.text(codeItem.code, x + labelWidth / 2, y + 15.8, { align: "center", maxWidth: labelWidth - 2 });
-
-          pdf.setFontSize(4);
-          pdf.setFont("helvetica", "normal");
-          pdf.text("Escanear código", x + labelWidth / 2, y + 18.8, { align: "center" });
-        } else {
-          // ── CÓDIGO QR (4 por fila) ─────────────────────────────────
-          const qrDataUrl = await QRCode.toDataURL(codeItem.code, {
-            margin: 0,
-            width: 70,
+          pdf.text(codeItem.code, x + labelWidth / 2, y + 15.8, {
+            align: "center",
+            maxWidth: labelWidth - 2,
           });
 
-          // QR a la izquierda (15mm x 15mm)
+          pdf.setFontSize(3.8);
+          pdf.setFont("helvetica", "normal");
+          pdf.text(subtypeLabel, x + labelWidth / 2, y + 18.8, { align: "center" });
+        } else {
+          const qrDataUrl = await QRCode.toDataURL(codeItem.code, { margin: 0, width: 70 });
           pdf.addImage(qrDataUrl, "PNG", x + 2, y + 5.5, 15, 15);
 
-          // Texto del código a la derecha del QR
           pdf.setFontSize(6.5);
           pdf.setFont("courier", "bold");
           pdf.text(codeItem.code, x + 18.5, y + 12, { maxWidth: labelWidth - 19.5 });
@@ -164,10 +198,12 @@ export default function GenerateCodes() {
         }
       } catch (err) {
         console.error("Error al renderizar código en PDF", err);
-        // Fallback: mostrar solo el texto
         pdf.setFontSize(6.5);
         pdf.setFont("courier", "bold");
-        pdf.text(codeItem.code, x + labelWidth / 2, y + 14, { align: "center", maxWidth: labelWidth - 3 });
+        pdf.text(codeItem.code, x + labelWidth / 2, y + 14, {
+          align: "center",
+          maxWidth: labelWidth - 3,
+        });
       }
 
       col++;
@@ -177,12 +213,17 @@ export default function GenerateCodes() {
       }
     }
 
-    pdf.save(`Lote_${isBarcode ? "Barcodes_5x" : "QR_4x"}_${batchCodesData.batch.id}.pdf`);
+    pdf.save(`Lote_${subtypeLabel.replace(" ", "")}_${batchCodesData.batch.id}.pdf`);
     toast.success("PDF descargado exitosamente");
   };
 
+  const selectedSubtypeInfo = BARCODE_SUBTYPES.find((s) => s.value === barcodeSubtype);
+  const batchSubtype = batchCodesData ? detectedSubtype() : null;
+  const batchSubtypeInfo = batchSubtype ? BARCODE_SUBTYPES.find((s) => s.value === batchSubtype) : null;
+
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6">
+      {/* Cabecera */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
@@ -194,7 +235,6 @@ export default function GenerateCodes() {
           </p>
         </div>
 
-        {/* Ajuste de preferencia global */}
         <div className="flex items-center gap-2 bg-muted p-2 rounded-lg border">
           <Settings className="h-4 w-4 text-muted-foreground" />
           <span className="text-xs font-medium">Preferencia global:</span>
@@ -214,7 +254,7 @@ export default function GenerateCodes() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Formulario de Generación */}
+        {/* ── Formulario ── */}
         <Card className="lg:col-span-1 border-primary/20">
           <CardHeader>
             <CardTitle className="text-base font-bold flex items-center gap-2">
@@ -236,16 +276,66 @@ export default function GenerateCodes() {
 
               <div>
                 <label className="text-xs font-semibold block mb-1">Tipo de Etiqueta:</label>
-                <Select value={codeType} onValueChange={(v) => setCodeType(v as any)}>
+                <Select value={codeType} onValueChange={(v) => setCodeType(v as CodeType)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="qr">Código QR</SelectItem>
-                    <SelectItem value="barcode">Código de Barras</SelectItem>
+                    <SelectItem value="qr">📱 Código QR</SelectItem>
+                    <SelectItem value="barcode">🔲 Código de Barras</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* ── Selector de formato de código de barras ── */}
+              {codeType === "barcode" && (
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold block">Formato de Código de Barras:</label>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {BARCODE_SUBTYPES.map((sub) => (
+                      <button
+                        key={sub.value}
+                        type="button"
+                        onClick={() => setBarcodeSubtype(sub.value)}
+                        className={`flex items-start gap-2.5 p-2.5 rounded-lg border text-left transition-all ${
+                          barcodeSubtype === sub.value
+                            ? "border-primary bg-primary/10"
+                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span
+                          className={`mt-0.5 h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
+                            barcodeSubtype === sub.value
+                              ? "border-primary"
+                              : "border-slate-300"
+                          }`}
+                        >
+                          {barcodeSubtype === sub.value && (
+                            <span className="h-2 w-2 rounded-full bg-primary block" />
+                          )}
+                        </span>
+                        <div>
+                          <p className={`text-xs font-bold leading-tight ${barcodeSubtype === sub.value ? "text-primary" : ""}`}>
+                            {sub.label}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                            {sub.description}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedSubtypeInfo && (
+                    <div className="flex items-start gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                      <Info className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
+                      <p className="text-[10px] text-blue-700">
+                        <strong>{selectedSubtypeInfo.label}</strong> seleccionado. Se guardará en el PDF con este formato.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="text-xs font-semibold block mb-1">Notas / Descripción del Lote:</label>
@@ -257,13 +347,14 @@ export default function GenerateCodes() {
               </div>
 
               <Button type="submit" className="w-full gap-2" disabled={generateBatchMutation.isPending}>
-                <QrCode className="h-4 w-4" /> Generar Lote de Etiquetas
+                <QrCode className="h-4 w-4" />
+                {generateBatchMutation.isPending ? "Generando..." : "Generar Lote de Etiquetas"}
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        {/* Lotes Existentes e Impresión */}
+        {/* ── Lotes Existentes ── */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base font-bold">Lotes de Códigos Generados</CardTitle>
@@ -288,40 +379,48 @@ export default function GenerateCodes() {
                   <div className="flex justify-between items-start mb-1">
                     <span className="font-bold text-sm">Lote #{b.id}</span>
                     <Badge variant="outline" className="uppercase text-[10px]">
-                      {b.type}
+                      {getSubtypeLabel(b.notes, b.type)}
                     </Badge>
                   </div>
                   <div className="text-xs text-muted-foreground">
                     Cantidad: <span className="font-semibold text-foreground">{b.quantity} etiquetas</span>
                   </div>
-                  {b.notes && <p className="text-xs text-muted-foreground mt-1 italic">{b.notes}</p>}
+                  {b.notes && (
+                    <p className="text-xs text-muted-foreground mt-1 italic truncate">
+                      {b.notes.replace(/^\[[\w\d]+\]\s*/, "")}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
 
-            {/* Previsualización del Lote Seleccionado */}
+            {/* Vista Previa */}
             {batchCodesData && (
               <div className="border-t pt-4">
-                <h4 className="font-bold text-sm mb-2">
-                  Vista Previa del Lote #{batchCodesData.batch.id} ({batchCodesData.codes.length} etiquetas)
-                </h4>
-                <div className={`grid gap-2 max-h-56 overflow-y-auto ${batchCodesData.batch.type === "barcode" ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"}`}>
-                  {batchCodesData.codes.slice(0, 12).map((c: any) => (
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-bold text-sm">
+                    Vista Previa del Lote #{batchCodesData.batch.id} ({batchCodesData.codes.length} etiquetas)
+                  </h4>
+                  {batchCodesData.batch.type === "barcode" && batchSubtypeInfo && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {batchSubtypeInfo.label}
+                    </Badge>
+                  )}
+                </div>
+                <div
+                  className={`grid gap-2 max-h-56 overflow-y-auto ${
+                    batchCodesData.batch.type === "barcode"
+                      ? "grid-cols-2 sm:grid-cols-5"
+                      : "grid-cols-2 sm:grid-cols-4"
+                  }`}
+                >
+                  {batchCodesData.codes.slice(0, 15).map((c: any) => (
                     <div key={c.id} className="p-2 border rounded text-center bg-background">
-                      {/* Vista previa visual del código */}
                       {batchCodesData.batch.type === "barcode" ? (
                         <canvas
                           ref={(canvas) => {
                             if (canvas && c.code) {
-                              try {
-                                bwipjs.toCanvas(canvas, {
-                                  bcid: "code128",
-                                  text: c.code,
-                                  scale: 2,
-                                  height: 8,
-                                  includetext: false,
-                                });
-                              } catch {}
+                              try { renderBarcodeToCanvas(canvas, c.code, detectedSubtype()); } catch {}
                             }
                           }}
                           className="w-full h-8 object-contain"
@@ -341,7 +440,10 @@ export default function GenerateCodes() {
                         />
                       )}
                       <div className="font-mono text-[9px] font-bold truncate mt-1">{c.code}</div>
-                      <Badge variant={c.status === "assigned" ? "default" : "secondary"} className="text-[9px] mt-1">
+                      <Badge
+                        variant={c.status === "assigned" ? "default" : "secondary"}
+                        className="text-[9px] mt-1"
+                      >
                         {c.status === "assigned" ? "Asignado" : "Libre"}
                       </Badge>
                     </div>
@@ -355,3 +457,4 @@ export default function GenerateCodes() {
     </div>
   );
 }
+
