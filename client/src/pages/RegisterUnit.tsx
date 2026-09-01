@@ -15,6 +15,15 @@ import { useBranch } from "@/contexts/BranchContext";
 import { BatchLabelsModal } from "@/components/BatchLabelsModal";
 import { Autocomplete, AutocompleteOption } from "@/components/ui/autocomplete";
 import type { DeviceBrand, DeviceModel, Processor, RamOption, StorageOption, ScreenSize } from "../../../drizzle/schema";
+import {
+  DEFAULT_DEVICE_BRANDS,
+  DEFAULT_DEVICE_MODELS,
+  DEFAULT_PROCESSORS,
+  DEFAULT_RAM_OPTIONS,
+  DEFAULT_STORAGE_OPTIONS,
+  DEFAULT_SCREEN_SIZES,
+} from "../../../shared/deviceCatalogDefaults";
+
 
 type UnitType = "laptop" | "tablet" | "phone" | "monitor" | "charger" | "accessory" | "other";
 
@@ -303,87 +312,6 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     }
   }, [type, initialSpecs]);
 
-  // Handler para cambio de marca (texto libre con autocompletado)
-  const handleBrandChange = (value: string) => {
-    setBrand(value);
-    // Buscar si coincide con alguna marca del catálogo para vincular brandId
-    const matchingBrand = brandsData?.find((b: any) => 
-      sameCatalogText(b.name, value)
-    );
-    if (matchingBrand) {
-      setBrandId(matchingBrand.id);
-    } else {
-      setBrandId(undefined);
-      setModelId(undefined);
-    }
-  };
-
-  // Handler para selección inteligente de modelo (autocompleta marca y todas las specs)
-  const handleModelSelect = (option: AutocompleteOption) => {
-    setModel(option.label);
-    const m = option.metadata;
-    if (!m) return;
-
-    setModelId(m.id);
-
-    // Autocompletar marca si viene en el modelo
-    if (m.brandName) {
-      setBrand(m.brandName);
-      const matchingBrand = brandsData?.find((b: any) => sameCatalogText(b.name, m.brandName));
-      if (matchingBrand) setBrandId(matchingBrand.id);
-      else if (m.brandId) setBrandId(m.brandId);
-    }
-
-    // Autocompletar especificaciones por defecto del modelo
-    if (m.defaultSpecs) {
-      try {
-        const specs = typeof m.defaultSpecs === "string" ? JSON.parse(m.defaultSpecs) : m.defaultSpecs;
-        if (specs && typeof specs === "object") {
-          setCustomSpecs((prev) => {
-            const updated = [...prev];
-            const addedKeys = new Set<string>();
-
-            // Actualizar campos existentes del template
-            for (let i = 0; i < updated.length; i++) {
-              const k = updated[i].key;
-              if (specs[k] !== undefined && specs[k] !== null && String(specs[k]).trim() !== "") {
-                updated[i] = { key: k, value: String(specs[k]) };
-                addedKeys.add(k);
-              }
-            }
-
-            // Añadir campos adicionales de defaultSpecs si no estaban
-            for (const [k, v] of Object.entries(specs)) {
-              if (!addedKeys.has(k) && v !== undefined && v !== null && String(v).trim() !== "") {
-                updated.push({ key: k, value: String(v) });
-              }
-            }
-
-            return updated;
-          });
-          toast.success(`✨ Modelo ${option.label} seleccionado. Especificaciones autocompletadas.`);
-        }
-      } catch (error) {
-        console.error("Error parsing defaultSpecs:", error);
-      }
-    }
-  };
-
-  // Handler para cambio de modelo manual por teclado
-  const handleModelChange = (value: string) => {
-    setModel(value);
-    // Buscar si coincide exactamente con algún modelo para vincular ID
-    const matchingModel = (allModelsData || modelsData)?.find((m: any) => 
-      sameCatalogText(m.name, value) || sameCatalogText(`${m.brandName || ""} ${m.name}`, value)
-    );
-    
-    if (matchingModel) {
-      setModelId(matchingModel.id);
-    } else {
-      setModelId(undefined);
-    }
-  };
-
   const { data: suppliersData } = trpc.suppliers.list.useQuery();
   const { data: globalBalances } = (trpc.finance as any).getGlobalBalances.useQuery();
 
@@ -399,6 +327,116 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
   const { data: storageOptionsData } = trpc.deviceCatalogs.getStorageOptions.useQuery();
   const { data: screenSizesData } = trpc.deviceCatalogs.getScreenSizes.useQuery();
   const utils = trpc.useUtils();
+
+  // Función central para autocompletar especificaciones y marca dado un modelo
+  const applyModelSpecs = useCallback((modelQuery: string, explicitMetadata?: any) => {
+    if (!modelQuery || !modelQuery.trim()) return;
+
+    // Buscar modelo en metadata explícita, catálogo por defecto o base de datos
+    let target = explicitMetadata;
+    if (!target) {
+      target = DEFAULT_DEVICE_MODELS.find(
+        (m) =>
+          sameCatalogText(m.name, modelQuery) ||
+          sameCatalogText(m.fullName, modelQuery) ||
+          sameCatalogText(`${m.brand} ${m.name}`, modelQuery)
+      );
+    }
+    if (!target && (allModelsData || modelsData)) {
+      target = (allModelsData || modelsData)?.find(
+        (m: any) =>
+          sameCatalogText(m.name, modelQuery) ||
+          sameCatalogText(`${m.brandName || ""} ${m.name}`, modelQuery)
+      );
+    }
+
+    if (target) {
+      if (target.id) setModelId(target.id);
+
+      // 1. Autocompletar Marca si está disponible
+      const targetBrand = target.brand || target.brandName;
+      if (targetBrand) {
+        setBrand(targetBrand);
+        const matchingBrand = brandsData?.find((b: any) => sameCatalogText(b.name, targetBrand));
+        if (matchingBrand) setBrandId(matchingBrand.id);
+        else if (target.brandId) setBrandId(target.brandId);
+      }
+
+      // 2. Autocompletar Especificaciones técnicas
+      let specs = target.defaultSpecs;
+      if (typeof specs === "string") {
+        try {
+          specs = JSON.parse(specs);
+        } catch (_) {
+          specs = {};
+        }
+      }
+
+      if (specs && typeof specs === "object" && Object.keys(specs).length > 0) {
+        setCustomSpecs((prev) => {
+          const specMap: Record<string, string> = {};
+          // Mantener valores existentes
+          prev.forEach((item) => {
+            specMap[item.key] = item.value;
+          });
+          // Sobrescribir con las especificaciones del modelo encontrado
+          Object.entries(specs).forEach(([k, v]) => {
+            if (v !== undefined && v !== null && String(v).trim() !== "") {
+              specMap[k] = String(v);
+            }
+          });
+
+          const standardOrder = ["cpu", "ram", "storage", "screenSize", "gpu", "resolution", "os"];
+          const result: Array<{ key: string; value: string }> = [];
+          const usedKeys = new Set<string>();
+
+          standardOrder.forEach((k) => {
+            if (specMap[k] !== undefined) {
+              result.push({ key: k, value: specMap[k] });
+              usedKeys.add(k);
+            }
+          });
+
+          Object.entries(specMap).forEach(([k, v]) => {
+            if (!usedKeys.has(k)) {
+              result.push({ key: k, value: v });
+            }
+          });
+
+          return result;
+        });
+
+        toast.success(`✨ Modelo "${target.name || modelQuery}" autocompletado con éxito.`);
+      }
+    }
+  }, [allModelsData, modelsData, brandsData]);
+
+  // Handler para cambio de marca (texto libre con autocompletado)
+  const handleBrandChange = (value: string) => {
+    setBrand(value);
+    const matchingBrand = brandsData?.find((b: any) => 
+      sameCatalogText(b.name, value)
+    );
+    if (matchingBrand) {
+      setBrandId(matchingBrand.id);
+    } else {
+      setBrandId(undefined);
+    }
+  };
+
+  // Handler para selección inteligente de modelo desde el dropdown
+  const handleModelSelect = (option: AutocompleteOption) => {
+    setModel(option.label);
+    applyModelSpecs(option.label, option.metadata);
+  };
+
+  // Handler para cambio de modelo manual por teclado
+  const handleModelChange = (value: string) => {
+    setModel(value);
+    // Si el texto coincide con algún modelo conocido, aplicar specs inmediatamente
+    applyModelSpecs(value);
+  };
+
 
   const ensureBrandMutation = trpc.deviceCatalogs.ensureBrand.useMutation({
     onSuccess: (savedBrand) => {
@@ -438,52 +476,104 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     onError: (error) => console.error("Error saving screen size to catalog:", error),
   });
 
-  // Convertir datos de catálogos a formato AutocompleteOption
-  const brandOptions: AutocompleteOption[] = useMemo(() => 
-    brandsData?.map((b: any) => ({ value: b.id, label: b.name })) || [],
-    [brandsData]
-  );
+  // Opciones combinadas garantizadas de Marcas (Base de datos + Catálogo por defecto)
+  const brandOptions: AutocompleteOption[] = useMemo(() => {
+    const fromDb = brandsData?.map((b: any) => ({ value: b.id || b.name, label: b.name })) || [];
+    const fromDefaults = DEFAULT_DEVICE_BRANDS.map((name) => ({ value: name, label: name }));
+    const map = new Map<string, AutocompleteOption>();
+    [...fromDefaults, ...fromDb].forEach((opt) => {
+      if (opt.label) map.set(opt.label.toLowerCase(), opt);
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [brandsData]);
 
+  // Opciones combinadas garantizadas de Modelos
   const modelOptions: AutocompleteOption[] = useMemo(() => {
-    const rawList = allModelsData || modelsData || [];
-    const formatted = rawList.map((m: any) => ({
-      value: m.id,
+    const fromDb = (allModelsData || modelsData || []).map((m: any) => ({
+      value: m.id || m.name,
       label: m.name,
-      secondaryLabel: m.brandName || "",
+      secondaryLabel: m.brandName || m.brand || "",
+      metadata: m,
+    }));
+    const fromDefaults = DEFAULT_DEVICE_MODELS.map((m) => ({
+      value: m.name,
+      label: m.name,
+      secondaryLabel: m.brand,
       metadata: m,
     }));
 
-    if (brandId) {
-      // Priorizar los de la marca actual al inicio de la lista
-      const matchingBrand = formatted.filter((m: any) => m.metadata?.brandId === brandId);
-      const otherBrands = formatted.filter((m: any) => m.metadata?.brandId !== brandId);
+    const map = new Map<string, AutocompleteOption>();
+    [...fromDefaults, ...fromDb].forEach((opt) => {
+      const key = `${(opt.secondaryLabel || "").toLowerCase()}___${opt.label.toLowerCase()}`;
+      map.set(key, opt);
+    });
+
+    const allList = Array.from(map.values());
+
+    if (brand && brand.trim()) {
+      const bLower = brand.trim().toLowerCase();
+      const matchingBrand = allList.filter((m) =>
+        (m.secondaryLabel || "").toLowerCase().includes(bLower)
+      );
+      const otherBrands = allList.filter(
+        (m) => !(m.secondaryLabel || "").toLowerCase().includes(bLower)
+      );
       return [...matchingBrand, ...otherBrands];
     }
-    return formatted;
-  }, [allModelsData, modelsData, brandId]);
 
-  const processorOptions: AutocompleteOption[] = useMemo(() => 
-    processorsData?.map((p: any) => ({ value: p.name, label: p.name })) || [],
-    [processorsData]
-  );
+    return allList;
+  }, [allModelsData, modelsData, brand]);
 
-  const ramOptions: AutocompleteOption[] = useMemo(() => 
-    ramOptionsData?.map((r: any) => ({ value: r.capacity, label: r.capacity })) || [],
-    [ramOptionsData]
-  );
+  // Opciones combinadas de Procesadores
+  const processorOptions: AutocompleteOption[] = useMemo(() => {
+    const fromDb = processorsData?.map((p: any) => ({ value: p.name, label: p.name })) || [];
+    const fromDefaults = DEFAULT_PROCESSORS.map((p) => ({ value: p.name, label: p.name }));
+    const map = new Map<string, AutocompleteOption>();
+    [...fromDefaults, ...fromDb].forEach((opt) => {
+      if (opt.label) map.set(opt.label.toLowerCase(), opt);
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [processorsData]);
 
-  const storageOptions: AutocompleteOption[] = useMemo(() => 
-    storageOptionsData?.map((s: any) => ({ value: s.capacity, label: s.capacity })) || [],
-    [storageOptionsData]
-  );
+  // Opciones combinadas de Memoria RAM
+  const ramOptions: AutocompleteOption[] = useMemo(() => {
+    const fromDb = ramOptionsData?.map((r: any) => ({ value: r.capacity, label: r.capacity })) || [];
+    const fromDefaults = DEFAULT_RAM_OPTIONS.map((r) => ({ value: r.capacity, label: r.capacity }));
+    const map = new Map<string, AutocompleteOption>();
+    [...fromDefaults, ...fromDb].forEach((opt) => {
+      if (opt.label) map.set(opt.label.toLowerCase(), opt);
+    });
+    return Array.from(map.values());
+  }, [ramOptionsData]);
 
-  const screenOptions: AutocompleteOption[] = useMemo(() => 
-    screenSizesData?.map((s: any) => ({ 
+  // Opciones combinadas de Almacenamiento
+  const storageOptions: AutocompleteOption[] = useMemo(() => {
+    const fromDb = storageOptionsData?.map((s: any) => ({ value: s.capacity, label: s.capacity })) || [];
+    const fromDefaults = DEFAULT_STORAGE_OPTIONS.map((s) => ({ value: s.capacity, label: s.capacity }));
+    const map = new Map<string, AutocompleteOption>();
+    [...fromDefaults, ...fromDb].forEach((opt) => {
+      if (opt.label) map.set(opt.label.toLowerCase(), opt);
+    });
+    return Array.from(map.values());
+  }, [storageOptionsData]);
+
+  // Opciones combinadas de Pantallas
+  const screenOptions: AutocompleteOption[] = useMemo(() => {
+    const fromDb = screenSizesData?.map((s: any) => ({ 
       value: s.size, 
       label: s.resolution ? `${s.size} (${s.resolution})` : s.size 
-    })) || [],
-    [screenSizesData]
-  );
+    })) || [];
+    const fromDefaults = DEFAULT_SCREEN_SIZES.map((s) => ({ 
+      value: s.size, 
+      label: s.resolution ? `${s.size} (${s.resolution})` : s.size 
+    }));
+    const map = new Map<string, AutocompleteOption>();
+    [...fromDefaults, ...fromDb].forEach((opt) => {
+      if (opt.label) map.set(opt.label.toLowerCase(), opt);
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [screenSizesData]);
+
 
 
   const buildSpecsObject = useCallback((items = customSpecs) => {

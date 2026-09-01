@@ -220,7 +220,7 @@ export function Autocomplete({
       {showSuggestions && filteredOptions.length > 0 && (
         <div
           ref={listRef}
-          className="absolute z-50 w-full bg-white dark:bg-slate-900 border border-t-0 border-primary rounded-b-xl shadow-2xl max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 animate-in fade-in-50 zoom-in-95 duration-100"
+          className="absolute top-full left-0 mt-0.5 z-50 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 animate-in fade-in-50 zoom-in-95 duration-100"
         >
           {filteredOptions.map((option, index) => {
             const isSelected = String(option.label).toLowerCase() === String(inputValue).toLowerCase();
@@ -242,6 +242,7 @@ export function Autocomplete({
                   e.preventDefault();
                   handleSelectOption(option);
                 }}
+                onClick={() => handleSelectOption(option)}
                 onMouseEnter={() => setHighlightedIndex(index)}
               >
                 <div className="flex items-center gap-2 truncate flex-1">
