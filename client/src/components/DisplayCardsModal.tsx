@@ -56,10 +56,16 @@ export function DisplayCardsModal({
   const [selectedUnitIds, setSelectedUnitIds] = useState<number[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Si no se pasan unidades por prop, consultar las unidades disponibles
+  // Consultar unidad individual si se pasa preselectedUnitId
+  const { data: singleUnitData } = trpc.units.getById.useQuery(
+    { id: preselectedUnitId! },
+    { enabled: open && !!preselectedUnitId }
+  );
+
+  // Si no se pasan unidades por prop o faltan, consultar las unidades del sistema (sin restringir estado)
   const { data: unitsList, isLoading: isLoadingUnits } = trpc.units.list.useQuery(
-    { status: "available" },
-    { enabled: open && !propUnits }
+    { limit: 500 },
+    { enabled: open }
   );
 
   const { data: companyConfig } = trpc.settings.getCompanyConfig.useQuery(undefined, { enabled: open });
@@ -69,52 +75,75 @@ export function DisplayCardsModal({
 
   // Lista consolidada de unidades
   const allUnits: DisplayCardUnit[] = useMemo(() => {
-    if (propUnits && propUnits.length > 0) {
-      return propUnits;
-    }
-    const items = unitsList?.items || [];
-    return items.map((u: any) => ({
-      id: u.id,
-      code: u.code,
-      brand: u.brand,
-      model: u.model,
-      type: u.type,
-      salePrice: u.salePrice || 0,
-      specs: typeof u.specs === "object" ? u.specs : (() => {
-        try { return JSON.parse(u.specs || "{}"); } catch { return {}; }
-      })(),
-      damageNotes: u.damageNotes,
-      warrantyDays: u.warrantyDays || 90,
-      tiktokUrl: u.tiktokUrl,
-      status: u.status,
-      branchName: u.branchName,
-    }));
-  }, [propUnits, unitsList]);
+    const list: DisplayCardUnit[] = [];
+    const seenIds = new Set<number>();
 
-  // Si se pasa preselectedUnitId, seleccionarlo por defecto al abrir
-  React.useEffect(() => {
-    if (preselectedUnitId) {
-      setSelectedUnitIds([preselectedUnitId]);
-    } else if (open && selectedUnitIds.length === 0 && allUnits.length > 0) {
-      // Por defecto seleccionar todas las unidades disponibles
-      setSelectedUnitIds(allUnits.map((u) => u.id));
+    const addUnit = (u: any) => {
+      if (!u || !u.id || seenIds.has(u.id)) return;
+      seenIds.add(u.id);
+      list.push({
+        id: u.id,
+        code: u.code || `EQ-${u.id}`,
+        brand: u.brand || "",
+        model: u.model || "",
+        type: u.type || "laptop",
+        salePrice: u.salePrice || 0,
+        specs: typeof u.specs === "object" ? u.specs : (() => {
+          try { return JSON.parse(u.specs || "{}"); } catch { return {}; }
+        })(),
+        damageNotes: u.damageNotes,
+        warrantyDays: u.warrantyDays || 90,
+        tiktokUrl: u.tiktokUrl,
+        status: u.status,
+        branchName: u.branchName,
+      });
+    };
+
+    if (singleUnitData) {
+      addUnit(singleUnitData);
     }
-  }, [preselectedUnitId, open, allUnits]);
+    if (propUnits && propUnits.length > 0) {
+      propUnits.forEach(addUnit);
+    }
+    if (unitsList?.items) {
+      unitsList.items.forEach(addUnit);
+    }
+
+    return list;
+  }, [propUnits, singleUnitData, unitsList]);
+
+  // Si se pasa preselectedUnitId, seleccionarlo por defecto al abrir y reiniciar filtros
+  React.useEffect(() => {
+    if (open) {
+      if (preselectedUnitId) {
+        setSelectedUnitIds([preselectedUnitId]);
+        setTypeFilter("all");
+        setSearch("");
+      } else if (allUnits.length > 0) {
+        setSelectedUnitIds(allUnits.map((u) => u.id));
+      }
+    }
+  }, [preselectedUnitId, open]);
 
   // Filtrar unidades
   const filteredUnits = useMemo(() => {
     return allUnits.filter((u) => {
-      const matchType = typeFilter === "all" || u.type === typeFilter;
+      const matchType =
+        typeFilter === "all" ||
+        (u.type && u.type.toLowerCase() === typeFilter.toLowerCase());
       const q = search.trim().toLowerCase();
+      const s = u.specs || {};
+      const cpuVal = s.cpu || s.processor || s.procesador || "";
       const matchSearch =
         !q ||
-        u.code.toLowerCase().includes(q) ||
-        u.brand.toLowerCase().includes(q) ||
-        u.model.toLowerCase().includes(q) ||
-        (u.specs?.processor || "").toLowerCase().includes(q);
+        (u.code && u.code.toLowerCase().includes(q)) ||
+        (u.brand && u.brand.toLowerCase().includes(q)) ||
+        (u.model && u.model.toLowerCase().includes(q)) ||
+        String(cpuVal).toLowerCase().includes(q);
       return matchType && matchSearch;
     });
   }, [allUnits, typeFilter, search]);
+
 
   const toggleSelectAll = () => {
     if (selectedUnitIds.length === filteredUnits.length) {

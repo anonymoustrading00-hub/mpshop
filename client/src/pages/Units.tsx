@@ -300,6 +300,8 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
   // Estados para Fichas de Exhibición (80x70mm y Carta 8 por hoja)
   const [isDisplayCardsOpen, setIsDisplayCardsOpen] = useState(false);
   const [displayCardsUnitId, setDisplayCardsUnitId] = useState<number | null>(null);
+  const [displayCardsUnit, setDisplayCardsUnit] = useState<any | null>(null);
+
 
   // Estados para Modal e Ingreso a Taller
   const [workshopUnit, setWorkshopUnit] = useState<any>(null);
@@ -974,9 +976,20 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                             </td>
                             <td className="px-2 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="flex justify-end gap-1">
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-purple-700 hover:bg-purple-50" title="Imprimir Ficha de Exhibición (Vitrina)" onClick={() => { setDisplayCardsUnitId(item.firstUnit.id); setIsDisplayCardsOpen(true); }}>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 text-purple-700 hover:bg-purple-50"
+                                  title="Imprimir Ficha de Exhibición (Vitrina)"
+                                  onClick={() => {
+                                    setDisplayCardsUnitId(item.firstUnit.id);
+                                    setDisplayCardsUnit(item.firstUnit);
+                                    setIsDisplayCardsOpen(true);
+                                  }}
+                                >
                                   <Sparkles className="h-3.5 w-3.5" />
                                 </Button>
+
                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-slate-600 hover:bg-slate-100" title="Ver Kardex / Historial" onClick={() => { setKardexUnitId(item.firstUnit.id); setIsKardexOpen(true); }}>
                                   <BookOpen className="h-3.5 w-3.5" />
                                 </Button>
@@ -1379,9 +1392,17 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
         {/* Modal: Fichas de Exhibición / Vitrina (80x70mm y Carta 8 por hoja) */}
         <DisplayCardsModal
           open={isDisplayCardsOpen}
-          onOpenChange={(open) => { setIsDisplayCardsOpen(open); if (!open) setDisplayCardsUnitId(null); }}
+          onOpenChange={(open) => {
+            setIsDisplayCardsOpen(open);
+            if (!open) {
+              setDisplayCardsUnitId(null);
+              setDisplayCardsUnit(null);
+            }
+          }}
+          units={displayCardsUnit ? [displayCardsUnit] : undefined}
           preselectedUnitId={displayCardsUnitId}
         />
+
 
 
         {/* Modal: Catálogo Comercial General (3 productos por hoja A4) */}
