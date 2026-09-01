@@ -465,6 +465,120 @@ async function startServer() {
     }
   });
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // RESET DE BASE DE DATOS (solo en modo DATABASE_URL / producción)
+  // Borra TODOS los datos operativos y conserva únicamente el usuario admin.
+  // Uso: GET /api/admin/reset-db?secret=RESET_SECRET
+  // La variable de entorno RESET_SECRET debe estar configurada en Railway.
+  // ──────────────────────────────────────────────────────────────────────────
+  app.get("/api/admin/reset-db", async (req, res) => {
+    if (!process.env.DATABASE_URL) {
+      return res.status(400).json({ error: "Este endpoint solo funciona con DATABASE_URL configurada." });
+    }
+
+    const secret = process.env.RESET_SECRET || "mpshop-reset-2024";
+    if (req.query.secret !== secret) {
+      return res.status(403).json({ error: "Clave incorrecta. Agrega ?secret=TU_CLAVE a la URL." });
+    }
+
+    let connection: any;
+    try {
+      const mysql = await import("mysql2/promise");
+      connection = await mysql.default.createConnection(process.env.DATABASE_URL);
+
+      // Lista de tablas operativas a vaciar (orden: primero las hijas, luego las padre)
+      const tablesToTruncate = [
+        "sale_items",
+        "sales",
+        "quotation_items",
+        "quotations",
+        "order_items",
+        "orders",
+        "purchase_items",
+        "purchases",
+        "accounts_payable",
+        "accounts_receivable",
+        "credit_payments",
+        "financial_transactions",
+        "cash_closures",
+        "cash_openings",
+        "operational_expenses",
+        "delivery_expenses",
+        "unit_events",
+        "repairs",
+        "warranties",
+        "returns",
+        "units",
+        "generated_codes",
+        "inventory",
+        "movements",
+        "payments",
+        "inventory_transfer_items",
+        "inventory_transfers",
+        "customers",
+        "suppliers",
+      ];
+
+      // Deshabilitar FK checks temporalmente para poder truncar sin orden estricto
+      await connection.query("SET FOREIGN_KEY_CHECKS = 0");
+      for (const table of tablesToTruncate) {
+        try {
+          await connection.query(`TRUNCATE TABLE \`${table}\``);
+          console.log(`[Reset] Truncated: ${table}`);
+        } catch (err: any) {
+          // Si la tabla no existe la ignoramos
+          if (!err.message?.includes("doesn't exist")) {
+            console.warn(`[Reset] Could not truncate ${table}:`, err.message);
+          }
+        }
+      }
+      await connection.query("SET FOREIGN_KEY_CHECKS = 1");
+
+      // Asegurarse que el admin siga existiendo con contraseña "usuario"
+      const bcrypt = await import("bcrypt");
+      const passwordHash = await bcrypt.default.hash("usuario", 10);
+      const adminUsername = process.env.ADMIN_USERNAME || "admin";
+      const adminEmail = process.env.ADMIN_EMAIL || "admin@mpshop.local";
+
+      await connection.query(
+        `INSERT INTO users
+          (openId, username, passwordHash, name, email, loginMethod, role, status,
+           allowedModules, specialPermissions, assignedBranchIds, createdAt, updatedAt, lastSignedIn)
+         VALUES (?, ?, ?, 'Administrador', ?, 'traditional', 'admin', 'active',
+           ?, ?, ?, NOW(), NOW(), NOW())
+         ON DUPLICATE KEY UPDATE
+           passwordHash = VALUES(passwordHash),
+           role = 'admin',
+           status = 'active',
+           allowedModules = VALUES(allowedModules),
+           specialPermissions = VALUES(specialPermissions)`,
+        [
+          `local_${adminUsername}`,
+          adminUsername,
+          passwordHash,
+          adminEmail,
+          JSON.stringify(["sales","catalog","units","repairs","warranties","returns","orders","generate-codes","customers","suppliers","purchases","dashboard-kpis","reports","dashboard","analytics","analysis","finance","accounts-receivable","accounts-payable","expenses","branches","users","delivery-persons"]),
+          JSON.stringify({ canViewPurchaseCost: true, canApplyDiscounts: true, canViewFinancialReports: true, canManageInventory: true, canDeleteRecords: true }),
+          JSON.stringify(["all"]),
+        ]
+      );
+
+      await connection.end();
+
+      return res.json({
+        success: true,
+        message: "✅ Base de datos reiniciada correctamente. Solo el usuario admin se conservó.",
+        admin: { username: adminUsername, password: "usuario" },
+      });
+    } catch (error: any) {
+      console.error("[Reset] Error:", error);
+      try { await connection?.end(); } catch {}
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
+
+
   console.log(`[App] Version ${APP_VERSION} starting...`);
 
   // tRPC API
