@@ -78,7 +78,7 @@ const DELIVERY_ITEMS = [
 ];
 
 /* ─── component ─────────────────────────────────────────────────── */
-export default function MobileMenu() {
+export default function MobileMenu({ triggerClassName }: { triggerClassName?: string }) {
   const { user, logout } = useAuth();
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
@@ -94,20 +94,31 @@ export default function MobileMenu() {
 
       {/* ── Trigger button ─────────────────────────────────────────── */}
       <SheetTrigger asChild>
-        <button
-          aria-label="Abrir menú"
-          className="
-            flex items-center justify-center
-            h-10 w-10 rounded-xl
-            border border-slate-200 bg-white
-            text-slate-600 shadow-sm
-            transition-all duration-200
-            hover:bg-slate-50 hover:text-slate-900 hover:shadow-md
-            active:scale-95
-          "
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        {triggerClassName ? (
+          <button aria-label="Abrir menú" className={triggerClassName}>
+            <div className="flex flex-col items-center justify-center gap-0.5 py-2.5 px-1">
+              <div className="flex items-center justify-center w-8 h-8 rounded-xl">
+                <Menu className="h-5 w-5 shrink-0" />
+              </div>
+              <span className="text-[10px] font-semibold leading-none tracking-tight">Más</span>
+            </div>
+          </button>
+        ) : (
+          <button
+            aria-label="Abrir menú"
+            className="
+              flex items-center justify-center
+              h-10 w-10 rounded-xl
+              border border-slate-200 bg-white
+              text-slate-600 shadow-sm
+              transition-all duration-200
+              hover:bg-slate-50 hover:text-slate-900 hover:shadow-md
+              active:scale-95
+            "
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
       </SheetTrigger>
 
       {/* ── Drawer ─────────────────────────────────────────────────── */}

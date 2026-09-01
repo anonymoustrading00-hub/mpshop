@@ -67,7 +67,7 @@ export default function AnalyticsPage() {
     <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto mb-20 md:mb-10">
       {/* Header */}
       <div>
-        <h1 className="text-4xl font-black text-slate-900 tracking-tight">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
           Análisis <span className="text-blue-600">KPIs</span>
         </h1>
         <p className="text-sm text-slate-500 mt-1.5">Exploración con filtros — pantalla de investigación</p>

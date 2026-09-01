@@ -292,7 +292,7 @@ export default function Purchases() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
               Gestión de <span className="text-blue-600">Compras</span>
             </h1>
             <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 shadow-sm">

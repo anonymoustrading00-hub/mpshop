@@ -279,29 +279,33 @@ export default function Finance() {
 
   return (
 
-    <div className="p-4 space-y-6 max-w-5xl mx-auto mb-20 md:mb-10 min-h-full">
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 no-print">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight"><span className="text-green-600">Finanzas</span></h1>
-            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sucursal:</span>
-              <select
-                value={activeBranchId}
-                onChange={(e) => setActiveBranchId(Number(e.target.value))}
-                className="bg-transparent text-sm font-extrabold text-blue-600 outline-none cursor-pointer"
-              >
-                {branches.map((b: any) => (
-                  <option key={b.id} value={b.id}>
-                    {b.isMainWarehouse ? '🏢 ' : '🏪 '}{b.name}
-                  </option>
-                ))}
-              </select>
+    <div className="p-3 sm:p-4 md:p-6 space-y-5 max-w-5xl mx-auto mb-20 md:mb-10 min-h-full">
+      {/* Header */}
+      <div className="flex flex-col gap-3 no-print">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight"><span className="text-green-600">Finanzas</span></h1>
+              <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2.5 py-1 shadow-sm">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest hidden sm:inline">Sucursal:</span>
+                <select
+                  value={activeBranchId}
+                  onChange={(e) => setActiveBranchId(Number(e.target.value))}
+                  className="bg-transparent text-sm font-extrabold text-blue-600 outline-none cursor-pointer"
+                >
+                  {branches.map((b: any) => (
+                    <option key={b.id} value={b.id}>
+                      {b.isMainWarehouse ? '🏢 ' : '🏪 '}{b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">Resumen de ingresos, egresos y rentabilidad.</p>
           </div>
-          <p className="text-sm text-slate-500 mt-1.5">Resumen de ingresos, egresos y rentabilidad.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        {/* Action buttons - scrollable row on mobile */}
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none flex-nowrap">
           <ArqueoDialog
             expectedCash={expectedDailyCash}
             expectedQr={expectedDailyQr}
@@ -318,8 +322,8 @@ export default function Finance() {
           <OpenCashDialog />
           <AddIncomeDialog />
           <Link href="/expenses">
-            <Button className="gap-2 bg-slate-900 hover:bg-slate-800 text-white h-10 px-4">
-              <Receipt className="h-4 w-4" /> Módulo de Gastos
+            <Button className="gap-2 bg-slate-900 hover:bg-slate-800 text-white h-10 px-3 sm:px-4 whitespace-nowrap text-xs sm:text-sm">
+              <Receipt className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Módulo de</span> Gastos
             </Button>
           </Link>
           <ResetFinanceDialog />
@@ -327,8 +331,7 @@ export default function Finance() {
       </div>
 
 
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
         {/* Caja Efectivo */}
         <Card className="relative overflow-hidden border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[2.5rem] bg-white group transition-all duration-300 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)]">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-emerald-500" />

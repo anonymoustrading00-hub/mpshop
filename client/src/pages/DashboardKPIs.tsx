@@ -109,7 +109,7 @@ export default function DashboardKPIs() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
             Dashboard <span className="text-blue-600">KPIs</span>
           </h1>
           <p className="text-sm text-slate-500 mt-1">

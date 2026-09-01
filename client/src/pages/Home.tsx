@@ -365,35 +365,35 @@ export default function Home() {
   return (
     <div className="page-shell">
       <div className="page-container space-y-6">
-        <section className="section-card p-5 sm:p-6">
+        <section className="section-card p-4 sm:p-5 md:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className="flex flex-wrap items-center gap-5">
-                <img src="/logo.png" alt="MP Shop" className="h-20 w-auto object-contain" />
+              <div className="flex flex-wrap items-center gap-3">
+                <img src="/logo.png" alt="MP Shop" className="h-14 sm:h-20 w-auto object-contain" />
                 <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs font-semibold">
                   {user?.name}
                 </Badge>
               </div>
-              <h1 className="mt-4 text-3xl font-extrabold text-slate-900 sm:text-4xl">
+              <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold text-slate-900 sm:text-4xl">
                 Resumen principal del negocio
               </h1>
-              <p className="mt-2 max-w-3xl text-sm text-muted-foreground sm:text-base">
+              <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground sm:text-base">
                 Aqui tienes primero lo relevante: pedidos por atender, alertas, stock bajo, cobros pendientes y accesos rapidos a cada modulo.
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-wrap gap-2 sm:flex-nowrap">
               <Link href="/orders">
-                <Button className="w-full sm:w-auto">Ver pedidos</Button>
+                <Button className="flex-1 sm:flex-none h-10 px-4">Ver pedidos</Button>
               </Link>
               <Link href="/inventory">
-                <Button variant="outline" className="w-full sm:w-auto">
-                  Revisar inventario
+                <Button variant="outline" className="flex-1 sm:flex-none h-10 px-4">
+                  Inventario
                 </Button>
               </Link>
-              <Button variant="outline" className="w-full sm:w-auto" onClick={logout}>
+              <Button variant="outline" className="flex-1 sm:flex-none h-10 px-3" onClick={logout}>
                 <LogOut className="h-4 w-4" />
-                Cerrar sesion
+                <span className="hidden sm:inline ml-1">Cerrar sesion</span>
               </Button>
             </div>
           </div>
@@ -486,7 +486,7 @@ export default function Home() {
           </div>
           {/* ── Alertas operativas ── */}
           <AlertsPanel />
-          <div className="soft-grid md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3">
             {adminModules.map((module) => (
               <ModuleCard key={module.href} module={module} />
             ))}
@@ -569,13 +569,13 @@ function ModuleCard({ module }: { module: any }) {
     return (
       <a href={module.href} className="block h-full">
         <Card className="touch-card h-full cursor-pointer overflow-hidden border-white/70">
-          <CardContent className="flex h-full items-start gap-4 p-5">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/80 bg-white/90">
-              <Icon className="h-5 w-5 text-slate-900" />
+          <CardContent className="flex h-full items-start gap-3 p-3.5 sm:p-5">
+            <div className="flex h-9 w-9 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl border border-white/80 bg-white/90">
+              <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-slate-900" />
             </div>
             <div className="min-w-0">
-              <p className="text-lg font-bold text-slate-900">{module.title}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{module.description}</p>
+              <p className="text-sm sm:text-lg font-bold text-slate-900 leading-tight">{module.title}</p>
+              <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-muted-foreground line-clamp-2">{module.description}</p>
             </div>
           </CardContent>
         </Card>
@@ -586,13 +586,13 @@ function ModuleCard({ module }: { module: any }) {
   return (
     <Link href={module.href}>
       <Card className="touch-card h-full cursor-pointer overflow-hidden border-white/70">
-        <CardContent className="flex h-full items-start gap-4 p-5">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/80 bg-white/90">
-            <Icon className="h-5 w-5 text-slate-900" />
+        <CardContent className="flex h-full items-start gap-3 p-3.5 sm:p-5">
+          <div className="flex h-9 w-9 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl border border-white/80 bg-white/90">
+            <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-slate-900" />
           </div>
           <div className="min-w-0">
-            <p className="text-lg font-bold text-slate-900">{module.title}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{module.description}</p>
+            <p className="text-sm sm:text-lg font-bold text-slate-900 leading-tight">{module.title}</p>
+            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-muted-foreground line-clamp-2">{module.description}</p>
           </div>
         </CardContent>
       </Card>

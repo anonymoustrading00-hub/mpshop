@@ -1228,7 +1228,7 @@ export default function Sales() {
                
                <div className="relative z-10">
                  <div className="flex flex-wrap items-center gap-3">
-                   <h1 className="text-4xl font-black tracking-tight text-slate-900">Gestión de <span className="text-emerald-500">Ventas</span></h1>
+                   <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-slate-900">Gestión de <span className="text-emerald-500">Ventas</span></h1>
                    <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sucursal:</span>
                      <select

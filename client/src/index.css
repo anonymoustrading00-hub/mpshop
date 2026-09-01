@@ -263,11 +263,19 @@
   }
 
   .page-shell {
-    @apply relative min-h-full px-4 py-4 md:px-6 md:py-6;
+    @apply relative min-h-full px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6;
     /* NOTE: overflow-x-hidden se evita intencionalmente aquí porque en iOS Safari
        bloquea el scroll vertical táctil. Se maneja el overflow horizontal con
        max-width en los contenedores hijos en su lugar. */
     -webkit-overflow-scrolling: touch;
+    /* Espacio para el bottom nav en móvil */
+    padding-bottom: calc(env(safe-area-inset-bottom) + 5rem);
+  }
+
+  @media (min-width: 768px) {
+    .page-shell {
+      padding-bottom: 1.5rem;
+    }
   }
 
   .page-shell::before {
@@ -356,6 +364,73 @@
   .table-scroll::-webkit-scrollbar-thumb {
     background: rgba(148, 163, 184, 0.45);
     border-radius: 999px;
+  }
+
+  /* ─── Responsive Mobile Utilities ─────────────────────────────── */
+
+  /* Touch target mínimo 44px (iOS HIG) */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Tablas con scroll horizontal para móvil */
+  .responsive-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    border-radius: 0.75rem;
+  }
+
+  .responsive-table-wrapper table {
+    min-width: 560px;
+  }
+
+  /* Dialogs full-screen en móvil */
+  @media (max-width: 639px) {
+    [data-slot="dialog-content"] {
+      width: 100vw !important;
+      max-width: 100vw !important;
+      margin: 0 !important;
+      border-radius: 1.5rem 1.5rem 0 0 !important;
+      position: fixed !important;
+      bottom: 0 !important;
+      top: auto !important;
+      left: 0 !important;
+      right: 0 !important;
+      transform: none !important;
+      max-height: 92dvh !important;
+      overflow-y: auto !important;
+    }
+  }
+
+  /* Tarjetas de estadísticas responsivas */
+  .stat-card-grid {
+    @apply grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4;
+  }
+
+  /* Botones de acción en fila móvil */
+  .action-row {
+    @apply flex flex-wrap gap-2;
+  }
+
+  /* Header de página responsivo */
+  .page-header {
+    @apply flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  /* Texto de títulos responsivo */
+  .page-title {
+    @apply text-2xl font-black text-slate-900 sm:text-3xl md:text-4xl tracking-tight;
+  }
+
+  /* scrollbar invisible para navs horizontales */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 
   .production-shell {

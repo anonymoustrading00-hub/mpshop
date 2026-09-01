@@ -229,7 +229,7 @@ export default function Customers() {
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight"><span className="text-blue-600">Clientes</span></h1>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight"><span className="text-blue-600">Clientes</span></h1>
             <p className="text-sm text-slate-500 mt-1.5">
               Seguimiento de frecuencia de compra, deuda, historial y zonas activas.
             </p>

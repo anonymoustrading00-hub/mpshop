@@ -42,6 +42,7 @@ import UsersManagement from "@/pages/UsersManagement";
 import Settings from "@/pages/Settings";
 import GlobalCommandMenu from "@/components/GlobalCommandMenu";
 import { BranchProvider } from "./contexts/BranchContext";
+import MobileBottomNav from "@/components/MobileBottomNav";
 
 function ProtectedRoute({
   component: Component,
@@ -144,6 +145,7 @@ function Router() {
   return (
     <>
       {showTopHeader ? <AppHeader /> : null}
+      <MobileBottomNav />
       <div className="pb-20 md:pb-0">
         <Switch>
           <Route path={"/"} component={Home} />

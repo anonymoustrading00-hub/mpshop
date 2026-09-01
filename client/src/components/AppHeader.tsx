@@ -290,7 +290,29 @@ export default function AppHeader() {
             </span>
           </div>
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {branches.length > 1 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-slate-200 bg-slate-50 text-slate-700" title={`Sucursal: ${activeBranch?.name}`}>
+                  <Store className="h-4 w-4 text-primary" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                {branches.map(branch => (
+                  <DropdownMenuItem 
+                    key={branch.id} 
+                    onClick={() => setActiveBranchId(branch.id)}
+                    className={activeBranchId === branch.id ? "bg-slate-100 font-bold" : ""}
+                  >
+                    {branch.name}
+                    {branch.isWarehouse && <span className="ml-auto text-[10px] text-muted-foreground uppercase">Bodega</span>}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {user?.role === "admin" && (
             <button
               onClick={() => setScannerOpen(true)}
@@ -303,6 +325,7 @@ export default function AppHeader() {
           <MobileMenu />
         </div>
       </div>
+
 
       {/* GlobalScanner modal */}
       {user?.role === "admin" && (
