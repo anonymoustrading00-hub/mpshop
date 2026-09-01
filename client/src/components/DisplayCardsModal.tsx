@@ -130,26 +130,70 @@ export function DisplayCardsModal({
     );
   };
 
-  // Formatear texto de especificaciones
+  // Formatear texto de especificaciones completo para laptops y otros dispositivos
   const getSpecsList = (unit: DisplayCardUnit) => {
     const s = unit.specs || {};
-    const items: { label: string; val: string; icon?: string }[] = [];
+    const items: { label: string; val: string; icon?: string; priority: number }[] = [];
 
-    if (s.processor) items.push({ label: "CPU", val: s.processor, icon: "⚡" });
-    if (s.ram) items.push({ label: "RAM", val: s.ram, icon: "🧠" });
-    if (s.storage) items.push({ label: "DISCO", val: s.storage, icon: "💾" });
-    if (s.screenSize || s.screen) items.push({ label: "PANTALLA", val: s.screenSize || s.screen, icon: "🖥️" });
+    // Procesador
+    const cpu = s.cpu || s.processor || s.procesador || s.Processor || s.CPU;
+    if (cpu) items.push({ label: "PROCESADOR", val: String(cpu), icon: "⚡", priority: 1 });
+
+    // RAM
+    const ram = s.ram || s.RAM || s.memory || s.memoria;
+    if (ram) items.push({ label: "RAM", val: String(ram), icon: "🧠", priority: 2 });
+
+    // Almacenamiento / Disco
+    const storage = s.storage || s.disk || s.disco || s.almacenamiento || s.ssd || s.hdd;
+    if (storage) items.push({ label: "DISCO", val: String(storage), icon: "💾", priority: 3 });
+
+    // Pantalla
+    const screen = s.screenSize || s.screen || s.pantalla || s.display;
+    if (screen) items.push({ label: "PANTALLA", val: String(screen), icon: "🖥️", priority: 4 });
+
+    // Tarjeta Gráfica / Video
+    const gpu = s.gpu || s.graphics || s.video || s.tarjetaGrafica || s.tarjetaDeVideo;
+    if (gpu) items.push({ label: "VIDEO", val: String(gpu), icon: "🎮", priority: 5 });
+
+    // Resolución
+    const res = s.resolution || s.resolucion;
+    if (res) items.push({ label: "RESOLUCIÓN", val: String(res), icon: "📐", priority: 6 });
+
+    // Sistema Operativo
+    const os = s.os || s.sistemaOperativo || s.sistema_operativo || s.so;
+    if (os) items.push({ label: "SISTEMA", val: String(os), icon: "💻", priority: 7 });
+
+    // Batería
     if (s.batteryHealth) {
       const batVal = s.batteryHealth === "plugged_only" ? "Solo con cargador" : `${s.batteryHealth}%`;
-      items.push({ label: "BATERÍA", val: batVal, icon: "🔋" });
+      items.push({ label: "BATERÍA", val: batVal, icon: "🔋", priority: 8 });
     }
+
+    // Estado / Condición
     if (s.conditionGrade || s.condition) {
       const cond = s.conditionGrade || s.condition;
-      items.push({ label: "ESTADO", val: `Grado ${cond} (Seminuevo)`, icon: "✨" });
+      items.push({ label: "ESTADO", val: `Grado ${cond} (Seminuevo)`, icon: "✨", priority: 9 });
     }
-    if (s.graphics) items.push({ label: "VIDEO", val: s.graphics, icon: "🎮" });
 
-    return items;
+    // Otras características dinámicas
+    const knownKeys = new Set([
+      "cpu", "processor", "procesador", "Processor", "CPU",
+      "ram", "RAM", "memory", "memoria",
+      "storage", "disk", "disco", "almacenamiento", "ssd", "hdd",
+      "screenSize", "screen", "pantalla", "display",
+      "gpu", "graphics", "video", "tarjetaGrafica", "tarjetaDeVideo",
+      "resolution", "resolucion",
+      "os", "sistemaOperativo", "sistema_operativo", "so",
+      "batteryHealth", "conditionGrade", "condition"
+    ]);
+
+    Object.entries(s).forEach(([k, v]) => {
+      if (!knownKeys.has(k) && v && String(v).trim()) {
+        items.push({ label: k.toUpperCase(), val: String(v), icon: "🔹", priority: 10 });
+      }
+    });
+
+    return items.sort((a, b) => a.priority - b.priority);
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -195,7 +239,7 @@ export function DisplayCardsModal({
           const cardW = 80;
           const cardH = 70;
 
-          // Fondo blanco con borde suave
+          // Fondo blanco
           doc.setFillColor(255, 255, 255);
           doc.rect(0, 0, cardW, cardH, "F");
 
@@ -206,74 +250,74 @@ export function DisplayCardsModal({
 
           // Cabecera: Nombre de empresa y Código
           doc.setFillColor(15, 23, 42); // Slate 900
-          doc.roundedRect(2, 2, cardW - 4, 8, 1.5, 1.5, "F");
+          doc.roundedRect(2, 2, cardW - 4, 7, 1.5, 1.5, "F");
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(7.5);
+          doc.setFontSize(7);
           doc.setTextColor(255, 255, 255);
-          doc.text(companyName.toUpperCase().slice(0, 24), 4, 6.8);
+          doc.text(companyName.toUpperCase().slice(0, 26), 4, 6.2);
 
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(7.5);
+          doc.setFontSize(7);
           doc.setTextColor(250, 204, 21); // Amber 400
-          doc.text(unit.code, cardW - 4, 6.8, { align: "right" });
+          doc.text(unit.code, cardW - 4, 6.2, { align: "right" });
 
           // Nombre del Equipo (Marca + Modelo)
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(8.5);
+          doc.setFontSize(8);
           doc.setTextColor(15, 23, 42);
           const fullName = `${unit.brand} ${unit.model}`;
-          doc.text(fullName.slice(0, 36), 4, 14);
+          doc.text(fullName.slice(0, 42), 4, 12.5);
 
           // Línea divisoria
           doc.setDrawColor(226, 232, 240);
           doc.setLineWidth(0.2);
-          doc.line(4, 16, cardW - 4, 16);
+          doc.line(4, 14.5, cardW - 4, 14.5);
 
-          // Especificaciones Técnicas
+          // Especificaciones Técnicas (renderiza hasta 7 características en 1 o 2 columnas)
           const specsList = getSpecsList(unit);
-          let ySpec = 20;
-          doc.setFontSize(6.8);
+          let ySpec = 18;
+          doc.setFontSize(6.2);
 
-          specsList.slice(0, 5).forEach((spec) => {
+          specsList.slice(0, 7).forEach((spec) => {
             doc.setFont("helvetica", "bold");
             doc.setTextColor(71, 85, 105); // Slate 600
             doc.text(`${spec.label}:`, 4, ySpec);
 
             doc.setFont("helvetica", "bold");
             doc.setTextColor(15, 23, 42); // Slate 900
-            const maxValLen = 28;
-            doc.text(spec.val.slice(0, maxValLen), 20, ySpec);
+            const maxValLen = 34;
+            doc.text(spec.val.slice(0, maxValLen), 23, ySpec);
 
-            ySpec += 4.2;
+            ySpec += 3.8;
           });
 
           // Franja Inferior: Precio + Garantía + QR
-          const botY = 48;
+          const botY = 49;
           doc.setFillColor(248, 250, 252); // Slate 50
-          doc.roundedRect(2.5, botY, cardW - 5, 18.5, 1.5, 1.5, "F");
+          doc.roundedRect(2.5, botY, cardW - 5, 17.5, 1.5, 1.5, "F");
           doc.setDrawColor(226, 232, 240);
-          doc.roundedRect(2.5, botY, cardW - 5, 18.5, 1.5, 1.5, "S");
+          doc.roundedRect(2.5, botY, cardW - 5, 17.5, 1.5, 1.5, "S");
 
           // Precio
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(6);
+          doc.setFontSize(5.5);
           doc.setTextColor(100, 116, 139);
-          doc.text("PRECIO DE OFERTA", 5, botY + 4.5);
+          doc.text("PRECIO DE OFERTA:", 5, botY + 4.2);
 
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(12);
+          doc.setFontSize(11.5);
           doc.setTextColor(5, 150, 105); // Emerald 600
-          doc.text(`Bs. ${(unit.salePrice / 100).toFixed(2)}`, 5, botY + 11.5);
+          doc.text(`Bs. ${(unit.salePrice / 100).toFixed(2)}`, 5, botY + 10.5);
 
           doc.setFont("helvetica", "normal");
           doc.setFontSize(5.5);
           doc.setTextColor(71, 85, 105);
-          doc.text(`Garantía Real: ${unit.warrantyDays || 90} Días`, 5, botY + 16);
+          doc.text(`Garantía Real: ${unit.warrantyDays || 90} Días`, 5, botY + 15);
 
           // QR Code a la derecha
           const qrImg = qrDataUrls[unit.id];
           if (qrImg) {
-            doc.addImage(qrImg, "PNG", cardW - 19.5, botY + 1.2, 16, 16);
+            doc.addImage(qrImg, "PNG", cardW - 18.5, botY + 1, 15, 15);
           }
         });
 
@@ -281,7 +325,6 @@ export function DisplayCardsModal({
         toast.success(`PDF generado con éxito (${unitsToPrint.length} etiquetas térmicas de 80x70mm)`);
       } else {
         // ── FORMATO HOJA CARTA: 8 FICHAS POR PÁGINA (2 COLUMNAS × 4 FILAS) ───
-        // Carta: 215.9 mm × 279.4 mm
         const doc = new jsPDF({
           orientation: "portrait",
           unit: "mm",
@@ -327,74 +370,74 @@ export function DisplayCardsModal({
 
           // Cabecera
           doc.setFillColor(15, 23, 42); // Slate 900
-          doc.roundedRect(x + 1.5, y + 1.5, cardW - 3, 7.5, 1.5, 1.5, "F");
+          doc.roundedRect(x + 1.5, y + 1.5, cardW - 3, 7, 1.5, 1.5, "F");
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(7);
+          doc.setTextColor(255, 255, 255);
+          doc.text(companyName.toUpperCase().slice(0, 32), x + 3.5, y + 5.8);
 
           doc.setFont("helvetica", "bold");
           doc.setFontSize(7.5);
-          doc.setTextColor(255, 255, 255);
-          doc.text(companyName.toUpperCase().slice(0, 30), x + 3.5, y + 6);
-
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(8);
           doc.setTextColor(250, 204, 21); // Amber 400
-          doc.text(unit.code, x + cardW - 3.5, y + 6, { align: "right" });
+          doc.text(unit.code, x + cardW - 3.5, y + 5.8, { align: "right" });
 
           // Nombre de la Laptop / Equipo
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(9);
+          doc.setFontSize(8.5);
           doc.setTextColor(15, 23, 42);
           const fullName = `${unit.brand} ${unit.model}`;
-          doc.text(fullName.slice(0, 42), x + 3.5, y + 13.5);
+          doc.text(fullName.slice(0, 46), x + 3.5, y + 12.5);
 
           // Línea separadora
           doc.setDrawColor(226, 232, 240);
           doc.setLineWidth(0.2);
-          doc.line(x + 3.5, y + 15.5, x + cardW - 3.5, y + 15.5);
+          doc.line(x + 3.5, y + 14.5, x + cardW - 3.5, y + 14.5);
 
           // Especificaciones
           const specsList = getSpecsList(unit);
-          let ySpec = y + 19.5;
-          doc.setFontSize(7);
+          let ySpec = y + 18;
+          doc.setFontSize(6.5);
 
-          specsList.slice(0, 5).forEach((spec) => {
+          specsList.slice(0, 6).forEach((spec) => {
             doc.setFont("helvetica", "bold");
             doc.setTextColor(100, 116, 139);
             doc.text(`${spec.label}:`, x + 3.5, ySpec);
 
             doc.setFont("helvetica", "bold");
             doc.setTextColor(15, 23, 42);
-            doc.text(spec.val.slice(0, 34), x + 24, ySpec);
+            doc.text(spec.val.slice(0, 42), x + 26, ySpec);
 
-            ySpec += 4;
+            ySpec += 3.7;
           });
 
           // Franja inferior: Precio + Garantía + QR
-          const botY = y + cardH - 18.5;
+          const botY = y + cardH - 17.5;
           doc.setFillColor(248, 250, 252);
-          doc.roundedRect(x + 2, botY, cardW - 4, 16.5, 1.5, 1.5, "F");
+          doc.roundedRect(x + 2, botY, cardW - 4, 15.5, 1.5, 1.5, "F");
           doc.setDrawColor(226, 232, 240);
-          doc.roundedRect(x + 2, botY, cardW - 4, 16.5, 1.5, 1.5, "S");
+          doc.roundedRect(x + 2, botY, cardW - 4, 15.5, 1.5, 1.5, "S");
 
           // Precio
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(6);
+          doc.setFontSize(5.5);
           doc.setTextColor(100, 116, 139);
-          doc.text("PRECIO:", x + 4.5, botY + 4.5);
+          doc.text("PRECIO DE OFERTA:", x + 4, botY + 4);
 
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(11.5);
+          doc.setFontSize(11);
           doc.setTextColor(5, 150, 105);
-          doc.text(`Bs. ${(unit.salePrice / 100).toFixed(2)}`, x + 4.5, botY + 11);
+          doc.text(`Bs. ${(unit.salePrice / 100).toFixed(2)}`, x + 4, botY + 9.8);
 
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(5.5);
+          doc.setFontSize(5.2);
           doc.setTextColor(71, 85, 105);
-          doc.text(`Garantía: ${unit.warrantyDays || 90} Días`, x + 4.5, botY + 14.5);
+          doc.text(`Garantía Real: ${unit.warrantyDays || 90} Días`, x + 4, botY + 13.5);
 
           // QR Code
           const qrImg = qrDataUrls[unit.id];
           if (qrImg) {
-            doc.addImage(qrImg, "PNG", x + cardW - 18, botY + 1, 14.5, 14.5);
+            doc.addImage(qrImg, "PNG", x + cardW - 17.5, botY + 0.8, 14, 14);
           }
         });
 
@@ -409,6 +452,7 @@ export function DisplayCardsModal({
       setIsGenerating(false);
     }
   }, [allUnits, selectedUnitIds, printFormat, companyName, companyPhone]);
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
