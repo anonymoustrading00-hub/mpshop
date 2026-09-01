@@ -306,8 +306,8 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
   // Handler para cambio de marca (texto libre con autocompletado)
   const handleBrandChange = (value: string) => {
     setBrand(value);
-    // Buscar si coincide con alguna marca del catálogo
-    const matchingBrand = brandsData?.find((b: DeviceBrand) => 
+    // Buscar si coincide con alguna marca del catálogo para vincular brandId
+    const matchingBrand = brandsData?.find((b: any) => 
       sameCatalogText(b.name, value)
     );
     if (matchingBrand) {
@@ -315,36 +315,70 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     } else {
       setBrandId(undefined);
       setModelId(undefined);
-      setModel("");
     }
   };
 
-  // Handler para cambio de modelo (texto libre con autocompletado)
+  // Handler para selección inteligente de modelo (autocompleta marca y todas las specs)
+  const handleModelSelect = (option: AutocompleteOption) => {
+    setModel(option.label);
+    const m = option.metadata;
+    if (!m) return;
+
+    setModelId(m.id);
+
+    // Autocompletar marca si viene en el modelo
+    if (m.brandName) {
+      setBrand(m.brandName);
+      const matchingBrand = brandsData?.find((b: any) => sameCatalogText(b.name, m.brandName));
+      if (matchingBrand) setBrandId(matchingBrand.id);
+      else if (m.brandId) setBrandId(m.brandId);
+    }
+
+    // Autocompletar especificaciones por defecto del modelo
+    if (m.defaultSpecs) {
+      try {
+        const specs = typeof m.defaultSpecs === "string" ? JSON.parse(m.defaultSpecs) : m.defaultSpecs;
+        if (specs && typeof specs === "object") {
+          setCustomSpecs((prev) => {
+            const updated = [...prev];
+            const addedKeys = new Set<string>();
+
+            // Actualizar campos existentes del template
+            for (let i = 0; i < updated.length; i++) {
+              const k = updated[i].key;
+              if (specs[k] !== undefined && specs[k] !== null && String(specs[k]).trim() !== "") {
+                updated[i] = { key: k, value: String(specs[k]) };
+                addedKeys.add(k);
+              }
+            }
+
+            // Añadir campos adicionales de defaultSpecs si no estaban
+            for (const [k, v] of Object.entries(specs)) {
+              if (!addedKeys.has(k) && v !== undefined && v !== null && String(v).trim() !== "") {
+                updated.push({ key: k, value: String(v) });
+              }
+            }
+
+            return updated;
+          });
+          toast.success(`✨ Modelo ${option.label} seleccionado. Especificaciones autocompletadas.`);
+        }
+      } catch (error) {
+        console.error("Error parsing defaultSpecs:", error);
+      }
+    }
+  };
+
+  // Handler para cambio de modelo manual por teclado
   const handleModelChange = (value: string) => {
     setModel(value);
-    // Buscar si coincide con algún modelo del catálogo
-    const matchingModel = modelsData?.find((m: DeviceModel) => 
-      sameCatalogText(m.name, value)
+    // Buscar si coincide exactamente con algún modelo para vincular ID
+    const matchingModel = (allModelsData || modelsData)?.find((m: any) => 
+      sameCatalogText(m.name, value) || sameCatalogText(`${m.brandName || ""} ${m.name}`, value)
     );
     
     if (matchingModel) {
       setModelId(matchingModel.id);
-      // Autocompletar specs si el modelo tiene defaultSpecs
-      if (matchingModel.defaultSpecs) {
-        try {
-          const specs = JSON.parse(matchingModel.defaultSpecs);
-          const specsArray: Array<{ key: string; value: string }> = [];
-          
-          Object.entries(specs).forEach(([key, value]) => {
-            specsArray.push({ key, value: value as string });
-          });
-          
-          setCustomSpecs(specsArray);
-          toast.success("Especificaciones autocompletadas del modelo");
-        } catch (error) {
-          console.error("Error parsing defaultSpecs:", error);
-        }
-      }
     } else {
       setModelId(undefined);
     }
@@ -355,6 +389,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
   // Queries para catálogos de autocompletado
   const { data: brandsData } = trpc.deviceCatalogs.getBrands.useQuery();
+  const { data: allModelsData } = trpc.deviceCatalogs.getAllModels.useQuery();
   const { data: modelsData } = trpc.deviceCatalogs.getModelsByBrand.useQuery(
     { brandId: brandId! },
     { enabled: !!brandId }
@@ -376,6 +411,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
   });
   const ensureModelMutation = trpc.deviceCatalogs.ensureModel.useMutation({
     onSuccess: (savedModel) => {
+      utils.deviceCatalogs.getAllModels.invalidate();
       if (savedModel?.brandId) {
         utils.deviceCatalogs.getModelsByBrand.invalidate({ brandId: savedModel.brandId });
       }
@@ -404,37 +440,51 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
   // Convertir datos de catálogos a formato AutocompleteOption
   const brandOptions: AutocompleteOption[] = useMemo(() => 
-    brandsData?.map((b: DeviceBrand) => ({ value: b.id, label: b.name })) || [],
+    brandsData?.map((b: any) => ({ value: b.id, label: b.name })) || [],
     [brandsData]
   );
 
-  const modelOptions: AutocompleteOption[] = useMemo(() => 
-    modelsData?.map((m: DeviceModel) => ({ value: m.id, label: m.name })) || [],
-    [modelsData]
-  );
+  const modelOptions: AutocompleteOption[] = useMemo(() => {
+    const rawList = allModelsData || modelsData || [];
+    const formatted = rawList.map((m: any) => ({
+      value: m.id,
+      label: m.name,
+      secondaryLabel: m.brandName || "",
+      metadata: m,
+    }));
+
+    if (brandId) {
+      // Priorizar los de la marca actual al inicio de la lista
+      const matchingBrand = formatted.filter((m: any) => m.metadata?.brandId === brandId);
+      const otherBrands = formatted.filter((m: any) => m.metadata?.brandId !== brandId);
+      return [...matchingBrand, ...otherBrands];
+    }
+    return formatted;
+  }, [allModelsData, modelsData, brandId]);
 
   const processorOptions: AutocompleteOption[] = useMemo(() => 
-    processorsData?.map((p: Processor) => ({ value: p.name, label: p.name })) || [],
+    processorsData?.map((p: any) => ({ value: p.name, label: p.name })) || [],
     [processorsData]
   );
 
   const ramOptions: AutocompleteOption[] = useMemo(() => 
-    ramOptionsData?.map((r: RamOption) => ({ value: r.capacity, label: r.capacity })) || [],
+    ramOptionsData?.map((r: any) => ({ value: r.capacity, label: r.capacity })) || [],
     [ramOptionsData]
   );
 
   const storageOptions: AutocompleteOption[] = useMemo(() => 
-    storageOptionsData?.map((s: StorageOption) => ({ value: s.capacity, label: s.capacity })) || [],
+    storageOptionsData?.map((s: any) => ({ value: s.capacity, label: s.capacity })) || [],
     [storageOptionsData]
   );
 
   const screenOptions: AutocompleteOption[] = useMemo(() => 
-    screenSizesData?.map((s: ScreenSize) => ({ 
+    screenSizesData?.map((s: any) => ({ 
       value: s.size, 
       label: s.resolution ? `${s.size} (${s.resolution})` : s.size 
     })) || [],
     [screenSizesData]
   );
+
 
   const buildSpecsObject = useCallback((items = customSpecs) => {
     const specsObj: Record<string, string> = {};
@@ -793,7 +843,8 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                   value={brand}
                   onChange={handleBrandChange}
                   onCommit={(value) => void persistBrandToCatalog(value)}
-                  placeholder="Escribir marca (ej: HP, Dell, Lenovo...)"
+                  placeholder="Buscar o escribir marca (ej: HP, Dell, Lenovo, Asus...)"
+                  showSearchIcon
                 />
               </div>
 
@@ -803,11 +854,14 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                   options={modelOptions}
                   value={model}
                   onChange={handleModelChange}
+                  onSelect={handleModelSelect}
                   onCommit={(value) => void persistModelToCatalog(value, buildSpecsObject())}
-                  placeholder="Escribir modelo (ej: ThinkPad X1, EliteBook...)"
+                  placeholder="Buscar o escribir modelo (ej: Victus 15, IdeaPad Slim 3, EliteBook...)"
+                  showSearchIcon
                 />
               </div>
             </div>
+
 
             {/* Serial/IMEI + sugerencia de código */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-4">
@@ -915,9 +969,11 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                             setCustomSpecs(updated);
                           }}
                           onCommit={(value) => void persistSpecValueToCatalog(spec.key, value)}
-                          placeholder={`Escribir ${displayKey.toLowerCase()}...`}
+                          placeholder={`Buscar o escribir ${displayKey.toLowerCase()}...`}
+                          showSearchIcon
                         />
                       </div>
+
                     ) : (
                       <Input
                         placeholder="Valor (ej. Core i5, 8GB)"

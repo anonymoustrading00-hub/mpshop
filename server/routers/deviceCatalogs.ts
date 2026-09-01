@@ -88,6 +88,32 @@ export const deviceCatalogsRouter = router({
     return db.select().from(schema.deviceBrands).orderBy(schema.deviceBrands.name);
   }),
 
+  // Obtener todos los modelos (con nombre de marca y defaultSpecs)
+  getAllModels: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) {
+      return MOCK_DEVICE_MODELS.map(m => {
+        const brand = MOCK_DEVICE_BRANDS.find(b => b.id === m.brandId);
+        return {
+          ...m,
+          brandName: brand?.name || "Generic"
+        };
+      });
+    }
+    const rows = await db
+      .select({
+        id: schema.deviceModels.id,
+        brandId: schema.deviceModels.brandId,
+        name: schema.deviceModels.name,
+        defaultSpecs: schema.deviceModels.defaultSpecs,
+        brandName: schema.deviceBrands.name,
+      })
+      .from(schema.deviceModels)
+      .leftJoin(schema.deviceBrands, eq(schema.deviceModels.brandId, schema.deviceBrands.id))
+      .orderBy(schema.deviceModels.name);
+    return rows;
+  }),
+
   // Obtener modelos por marca
   getModelsByBrand: protectedProcedure
     .input(z.object({ brandId: z.number() }))
@@ -100,6 +126,7 @@ export const deviceCatalogsRouter = router({
         .where(eq(schema.deviceModels.brandId, input.brandId))
         .orderBy(schema.deviceModels.name);
     }),
+
 
   // Obtener un modelo específico (para autocompletar specs)
   getModel: protectedProcedure
