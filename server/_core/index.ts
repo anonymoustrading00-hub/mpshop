@@ -115,6 +115,13 @@ async function startServer() {
     console.log("[StartServer] Skipping ensureTables (no DATABASE_URL, running in demo mode)");
   }
   await seedDefaultAdmin();
+  if (process.env.DATABASE_URL) {
+    const { seedDeviceCatalogs } = await import("../routers/deviceCatalogs");
+    await seedDeviceCatalogs().catch(err =>
+      console.error("[StartServer] seedDeviceCatalogs failed:", err)
+    );
+  }
+
 
   const app = express();
   const server = createServer(app);

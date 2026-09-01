@@ -12,6 +12,15 @@ import {
   MOCK_SCREEN_SIZES,
   syncMocksToDisk,
 } from "../db";
+import {
+  DEFAULT_DEVICE_BRANDS,
+  DEFAULT_DEVICE_MODELS,
+  DEFAULT_PROCESSORS,
+  DEFAULT_RAM_OPTIONS,
+  DEFAULT_STORAGE_OPTIONS,
+  DEFAULT_SCREEN_SIZES,
+} from "../../shared/deviceCatalogDefaults";
+
 
 function normalizeCatalogText(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -421,3 +430,98 @@ export const deviceCatalogsRouter = router({
       return created;
     }),
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Seed: Poblar catálogos con datos por defecto al arrancar el servidor
+// ──────────────────────────────────────────────────────────────────────────────
+export async function seedDeviceCatalogs() {
+
+  const db = await getDb();
+  if (!db) {
+    console.log("[SeedCatalogs] No DB available, skipping.");
+    return;
+  }
+
+  console.log("[SeedCatalogs] Starting catalog seeding...");
+
+  // 1. Marcas
+  for (const brandName of DEFAULT_DEVICE_BRANDS) {
+    try {
+      await db
+        .insert(schema.deviceBrands)
+        .values({ name: brandName })
+        .onDuplicateKeyUpdate({ set: { name: brandName } });
+    } catch (_) {}
+  }
+  console.log(`[SeedCatalogs] Brands done (${DEFAULT_DEVICE_BRANDS.length})`);
+
+  // Mapa nombre → id
+  const dbBrands = await db.select().from(schema.deviceBrands);
+  const brandIdByName: Record<string, number> = {};
+  for (const b of dbBrands) {
+    brandIdByName[b.name.toLowerCase()] = b.id;
+  }
+
+  // 2. Modelos
+  let modelsSeeded = 0;
+  for (const model of DEFAULT_DEVICE_MODELS) {
+    const brandId = brandIdByName[model.brand.toLowerCase()];
+    if (!brandId) continue;
+    try {
+      await db
+        .insert(schema.deviceModels)
+        .values({ brandId, name: model.name, defaultSpecs: JSON.stringify(model.defaultSpecs) })
+        .onDuplicateKeyUpdate({ set: { defaultSpecs: JSON.stringify(model.defaultSpecs) } });
+      modelsSeeded++;
+    } catch (_) {}
+  }
+  console.log(`[SeedCatalogs] Models done (${modelsSeeded})`);
+
+  // 3. Procesadores
+  for (const p of DEFAULT_PROCESSORS) {
+    try {
+      await db
+        .insert(schema.processors)
+        .values({ name: p.name, generation: (p as any).generation ?? null })
+        .onDuplicateKeyUpdate({ set: { name: p.name } });
+    } catch (_) {}
+  }
+  console.log(`[SeedCatalogs] Processors done (${DEFAULT_PROCESSORS.length})`);
+
+  // 4. RAM
+  for (const r of DEFAULT_RAM_OPTIONS) {
+    try {
+      await db
+        .insert(schema.ramOptions)
+        .values({ capacity: r.capacity, type: "Generic" })
+        .onDuplicateKeyUpdate({ set: { capacity: r.capacity } });
+    } catch (_) {}
+  }
+  console.log(`[SeedCatalogs] RAM options done (${DEFAULT_RAM_OPTIONS.length})`);
+
+  // 5. Almacenamiento
+  for (const s of DEFAULT_STORAGE_OPTIONS) {
+    const upper = s.capacity.toUpperCase();
+    const type = upper.includes("SSD") ? "SSD" : upper.includes("HDD") ? "HDD" : "Flash";
+    try {
+      await db
+        .insert(schema.storageOptions)
+        .values({ capacity: s.capacity, type })
+        .onDuplicateKeyUpdate({ set: { capacity: s.capacity } });
+    } catch (_) {}
+  }
+  console.log(`[SeedCatalogs] Storage options done (${DEFAULT_STORAGE_OPTIONS.length})`);
+
+  // 6. Pantallas
+  for (const sc of DEFAULT_SCREEN_SIZES) {
+    try {
+      await db
+        .insert(schema.screenSizes)
+        .values({ size: sc.size, resolution: (sc as any).resolution ?? null })
+        .onDuplicateKeyUpdate({ set: { size: sc.size } });
+    } catch (_) {}
+  }
+  console.log(`[SeedCatalogs] Screen sizes done (${DEFAULT_SCREEN_SIZES.length})`);
+  console.log("[SeedCatalogs] All catalog seeding complete ✓");
+}
+
