@@ -167,7 +167,9 @@ export default function RegisterUnit() {
     model: string;
     type: string;
     salePrice?: number;
+    specs?: any;
   } | null>(null);
+
 
   // Fotos del equipo (base64)
   const [photos, setPhotos] = useState<string[]>([]);
@@ -554,8 +556,10 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
         model,
         type,
         salePrice: salePrice ? Math.round(parseFloat(salePrice) * 100) : undefined,
+        specs: buildSpecsObject(),
       });
       setBatchModalOpen(true);
+
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -1528,8 +1532,10 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
           salePrice={batchCreatedData.salePrice}
           codes={batchCreatedData.codes}
           branchName={branches.find((b: any) => b.id === activeBranchId)?.name || "Sucursal Principal"}
+          specs={batchCreatedData.specs}
         />
       )}
+
 
     </div>
   );

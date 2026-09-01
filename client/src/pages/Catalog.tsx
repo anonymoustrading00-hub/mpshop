@@ -21,6 +21,7 @@ import { useBranch } from "@/contexts/BranchContext";
 import { CommercialCatalogModal } from "@/components/CommercialCatalogModal";
 import { CommercialSheetModal } from "@/components/CommercialSheetModal";
 import { WorkOrderModal } from "@/components/WorkOrderModal";
+import { DisplayCardsModal } from "@/components/DisplayCardsModal";
 
 /* ─── Constants ─────────────────────────────────────────────────── */
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
@@ -506,6 +507,9 @@ export default function Catalog() {
   const [commercialSheetUnitId, setCommercialSheetUnitId] = useState<number | null>(null);
   const [isCommercialSheetOpen, setIsCommercialSheetOpen] = useState(false);
 
+  // Estados para Fichas de Exhibición (80x70mm y Carta 8 por hoja)
+  const [isDisplayCardsOpen, setIsDisplayCardsOpen] = useState(false);
+
   // Estados para Formulario e Impresión de Traspaso a Taller
   const [workshopUnit, setWorkshopUnit] = useState<any>(null);
   const [isWorkshopModalOpen, setIsWorkshopModalOpen] = useState(false);
@@ -827,12 +831,20 @@ export default function Catalog() {
                   </Button>
                 </a>
                 <Button
+                  onClick={() => setIsDisplayCardsOpen(true)}
+                  className="gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-md shadow-purple-200"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Fichas de Exhibición (Vitrina)
+                </Button>
+                <Button
                   onClick={() => setIsCommercialCatalogOpen(true)}
                   className="gap-2 bg-slate-900 hover:bg-black text-white font-bold shadow-md shadow-slate-300"
                 >
                   <FileText className="h-4 w-4 text-blue-400" />
                   Generar Catálogo Comercial
                 </Button>
+
               </div>
             </div>
 
@@ -1554,12 +1566,19 @@ export default function Catalog() {
         </DialogContent>
       </Dialog>
 
+      {/* Modal: Fichas de Exhibición / Vitrina (80x70mm y Carta 8 por hoja) */}
+      <DisplayCardsModal
+        open={isDisplayCardsOpen}
+        onOpenChange={setIsDisplayCardsOpen}
+      />
+
       {/* Modal: Catálogo Comercial General (3 productos por hoja A4) */}
       <CommercialCatalogModal
         open={isCommercialCatalogOpen}
         onOpenChange={setIsCommercialCatalogOpen}
         initialTypeFilter={typeFilter}
       />
+
 
       {/* Modal: Ficha Comercial Individual de Producto */}
       <CommercialSheetModal
