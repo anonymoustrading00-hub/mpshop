@@ -846,4 +846,68 @@ export const financeRouter = router({
       pendingCount: result.filter((u: any) => u.hasOpenBox).length,
     };
   }),
+
+  resetFinancialData: protectedProcedure.mutation(async ({ ctx }) => {
+    if (ctx.user?.role !== "admin") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Solo administradores pueden reiniciar finanzas" });
+    }
+
+    const { getDb } = await import("../db");
+    const db = await getDb();
+
+    if (!db) {
+      const {
+        MOCK_FINANCIAL_TRANSACTIONS,
+        MOCK_CASH_OPENINGS,
+        MOCK_CASH_CLOSURES,
+        MOCK_OPERATIONAL_EXPENSES,
+        MOCK_DELIVERY_EXPENSES,
+        syncMocksToDisk,
+      } = await import("../db");
+      MOCK_FINANCIAL_TRANSACTIONS.length = 0;
+      MOCK_CASH_OPENINGS.length = 0;
+      MOCK_CASH_CLOSURES.length = 0;
+      MOCK_OPERATIONAL_EXPENSES.length = 0;
+      MOCK_DELIVERY_EXPENSES.length = 0;
+      syncMocksToDisk();
+      return { success: true, message: "Finanzas reiniciadas a 0 (Modo Demo)" };
+    }
+
+    const mysql = await import("mysql2/promise");
+    if (process.env.DATABASE_URL) {
+      const connection = await mysql.default.createConnection(process.env.DATABASE_URL);
+      try {
+        await connection.query("SET FOREIGN_KEY_CHECKS = 0");
+        const tables = [
+          "financialTransactions",
+          "financial_transactions",
+          "operationalExpenses",
+          "operational_expenses",
+          "deliveryExpenses",
+          "delivery_expenses",
+          "cash_closures",
+          "cashClosures",
+          "cash_openings",
+          "cashOpenings",
+          "creditPayments",
+          "credit_payments",
+          "accountsPayable",
+          "accounts_payable",
+          "accountsReceivable",
+          "accounts_receivable",
+        ];
+        for (const t of tables) {
+          try {
+            await connection.query(`TRUNCATE TABLE \`${t}\``);
+          } catch (_) {}
+        }
+        await connection.query("SET FOREIGN_KEY_CHECKS = 1");
+      } finally {
+        await connection.end();
+      }
+    }
+
+    return { success: true, message: "Módulo de finanzas reiniciado a 0 exitosamente" };
+  }),
 });
+

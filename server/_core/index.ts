@@ -493,37 +493,68 @@ async function startServer() {
       const mysql = await import("mysql2/promise");
       connection = await mysql.default.createConnection(process.env.DATABASE_URL);
 
-      // Lista de tablas operativas a vaciar (orden: primero las hijas, luego las padre)
+      // Lista exhaustiva de tablas operativas a vaciar (soporta camelCase y snake_case)
       const tablesToTruncate = [
+        // Finanzas y cajas
+        "financialTransactions",
+        "financial_transactions",
+        "operationalExpenses",
+        "operational_expenses",
+        "deliveryExpenses",
+        "delivery_expenses",
+        "accountsPayable",
+        "accounts_payable",
+        "accountsReceivable",
+        "accounts_receivable",
+        "creditPayments",
+        "credit_payments",
+        "cash_closures",
+        "cashClosures",
+        "cash_openings",
+        "cashOpenings",
+        "payments",
+
+        // Ventas y cotizaciones
+        "saleItems",
         "sale_items",
         "sales",
+        "quotationItems",
         "quotation_items",
         "quotations",
+        "orderItems",
         "order_items",
         "orders",
+
+        // Compras y proveedores
+        "purchaseItems",
         "purchase_items",
         "purchases",
-        "accounts_payable",
-        "accounts_receivable",
-        "credit_payments",
-        "financial_transactions",
-        "cash_closures",
-        "cash_openings",
-        "operational_expenses",
-        "delivery_expenses",
+        "suppliers",
+        "customers",
+
+        // Unidades, inventario y códigos
+        "unitEvents",
         "unit_events",
         "repairs",
         "warranties",
         "returns",
         "units",
+        "generatedCodes",
         "generated_codes",
+        "generatedCodeBatches",
+        "generated_code_batches",
         "inventory",
         "movements",
-        "payments",
+        "inventoryTransferItems",
         "inventory_transfer_items",
+        "inventoryTransfers",
         "inventory_transfers",
-        "customers",
-        "suppliers",
+
+        // Logs
+        "auditLog",
+        "audit_log",
+        "gpsTracking",
+        "gps_tracking",
       ];
 
       // Deshabilitar FK checks temporalmente para poder truncar sin orden estricto
@@ -540,6 +571,15 @@ async function startServer() {
         }
       }
       await connection.query("SET FOREIGN_KEY_CHECKS = 1");
+
+      // Repoblar catálogos de laptops y specs para pruebas limpias
+      try {
+        const { seedDeviceCatalogs } = await import("../routers/deviceCatalogs");
+        await seedDeviceCatalogs();
+      } catch (catErr: any) {
+        console.warn("[Reset] Could not re-seed device catalogs:", catErr.message);
+      }
+
 
       // Asegurarse que el admin siga existiendo con contraseña "usuario"
       const bcrypt = await import("bcrypt");
