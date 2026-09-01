@@ -118,6 +118,14 @@ function validateImeiFormat(imei: string): { valid: boolean; reason?: string } {
   return { valid: true };
 }
 
+function normalizeCatalogText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function sameCatalogText(left: unknown, right: unknown) {
+  return String(left || "").trim().toLowerCase() === String(right || "").trim().toLowerCase();
+}
+
 export default function RegisterUnit() {
   const [, setLocation] = useLocation();
   const { activeBranchId, branches } = useBranch();
@@ -298,7 +306,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     setBrand(value);
     // Buscar si coincide con alguna marca del catálogo
     const matchingBrand = brandsData?.find((b: DeviceBrand) => 
-      b.name.toLowerCase() === value.toLowerCase()
+      sameCatalogText(b.name, value)
     );
     if (matchingBrand) {
       setBrandId(matchingBrand.id);
@@ -314,7 +322,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     setModel(value);
     // Buscar si coincide con algún modelo del catálogo
     const matchingModel = modelsData?.find((m: DeviceModel) => 
-      m.name.toLowerCase() === value.toLowerCase()
+      sameCatalogText(m.name, value)
     );
     
     if (matchingModel) {
@@ -353,6 +361,44 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
   const { data: ramOptionsData } = trpc.deviceCatalogs.getRamOptions.useQuery();
   const { data: storageOptionsData } = trpc.deviceCatalogs.getStorageOptions.useQuery();
   const { data: screenSizesData } = trpc.deviceCatalogs.getScreenSizes.useQuery();
+  const utils = trpc.useUtils();
+
+  const ensureBrandMutation = trpc.deviceCatalogs.ensureBrand.useMutation({
+    onSuccess: (savedBrand) => {
+      utils.deviceCatalogs.getBrands.invalidate();
+      if (savedBrand?.name && sameCatalogText(savedBrand.name, brand)) {
+        setBrandId(savedBrand.id);
+      }
+    },
+    onError: (error) => console.error("Error saving brand to catalog:", error),
+  });
+  const ensureModelMutation = trpc.deviceCatalogs.ensureModel.useMutation({
+    onSuccess: (savedModel) => {
+      if (savedModel?.brandId) {
+        utils.deviceCatalogs.getModelsByBrand.invalidate({ brandId: savedModel.brandId });
+      }
+      if (savedModel?.name && sameCatalogText(savedModel.name, model)) {
+        setModelId(savedModel.id);
+      }
+    },
+    onError: (error) => console.error("Error saving model to catalog:", error),
+  });
+  const ensureProcessorMutation = trpc.deviceCatalogs.ensureProcessor.useMutation({
+    onSuccess: () => utils.deviceCatalogs.getProcessors.invalidate(),
+    onError: (error) => console.error("Error saving processor to catalog:", error),
+  });
+  const ensureRamOptionMutation = trpc.deviceCatalogs.ensureRamOption.useMutation({
+    onSuccess: () => utils.deviceCatalogs.getRamOptions.invalidate(),
+    onError: (error) => console.error("Error saving RAM option to catalog:", error),
+  });
+  const ensureStorageOptionMutation = trpc.deviceCatalogs.ensureStorageOption.useMutation({
+    onSuccess: () => utils.deviceCatalogs.getStorageOptions.invalidate(),
+    onError: (error) => console.error("Error saving storage option to catalog:", error),
+  });
+  const ensureScreenSizeMutation = trpc.deviceCatalogs.ensureScreenSize.useMutation({
+    onSuccess: () => utils.deviceCatalogs.getScreenSizes.invalidate(),
+    onError: (error) => console.error("Error saving screen size to catalog:", error),
+  });
 
   // Convertir datos de catálogos a formato AutocompleteOption
   const brandOptions: AutocompleteOption[] = useMemo(() => 
@@ -387,6 +433,109 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     })) || [],
     [screenSizesData]
   );
+
+  const buildSpecsObject = useCallback((items = customSpecs) => {
+    const specsObj: Record<string, string> = {};
+    items.forEach((item) => {
+      const key = normalizeCatalogText(item.key);
+      if (key) {
+        specsObj[key] = normalizeCatalogText(item.value);
+      }
+    });
+    return specsObj;
+  }, [customSpecs]);
+
+  const persistBrandToCatalog = useCallback(async (rawName = brand) => {
+    const name = normalizeCatalogText(rawName);
+    if (!name) return undefined;
+
+    const existing = brandsData?.find((item: DeviceBrand) => sameCatalogText(item.name, name));
+    if (existing) {
+      setBrandId(existing.id);
+      return existing;
+    }
+
+    try {
+      const savedBrand = await ensureBrandMutation.mutateAsync({ name });
+      setBrandId(savedBrand.id);
+      return savedBrand;
+    } catch (error) {
+      console.error("Error saving brand to catalog:", error);
+      return undefined;
+    }
+  }, [brand, brandsData, ensureBrandMutation]);
+
+  const persistModelToCatalog = useCallback(async (
+    rawName = model,
+    specsOverride?: Record<string, string>
+  ) => {
+    const name = normalizeCatalogText(rawName);
+    if (!name) return undefined;
+
+    let resolvedBrandId = brandId;
+    if (!resolvedBrandId) {
+      const savedBrand = await persistBrandToCatalog();
+      resolvedBrandId = savedBrand?.id;
+    }
+    if (!resolvedBrandId) return undefined;
+
+    const existing = modelsData?.find((item: DeviceModel) => sameCatalogText(item.name, name));
+    if (existing) {
+      setModelId(existing.id);
+      return existing;
+    }
+
+    try {
+      const savedModel = await ensureModelMutation.mutateAsync({
+        brandId: resolvedBrandId,
+        brandName: normalizeCatalogText(brand) || undefined,
+        name,
+        defaultSpecs: specsOverride,
+      });
+      setModelId(savedModel.id);
+      return savedModel;
+    } catch (error) {
+      console.error("Error saving model to catalog:", error);
+      return undefined;
+    }
+  }, [brand, brandId, model, modelsData, persistBrandToCatalog, ensureModelMutation]);
+
+  const persistSpecValueToCatalog = useCallback(async (key: string, rawValue: string) => {
+    const value = normalizeCatalogText(rawValue);
+    if (!value) return;
+
+    try {
+      if (key === "cpu" && !processorOptions.some((option) => sameCatalogText(option.label, value))) {
+        await ensureProcessorMutation.mutateAsync({ name: value });
+      } else if (key === "ram" && !ramOptions.some((option) => sameCatalogText(option.label, value))) {
+        await ensureRamOptionMutation.mutateAsync({ capacity: value });
+      } else if (key === "storage" && !storageOptions.some((option) => sameCatalogText(option.label, value))) {
+        await ensureStorageOptionMutation.mutateAsync({ capacity: value });
+      } else if (key === "screenSize" && !screenOptions.some((option) => sameCatalogText(option.label, value))) {
+        await ensureScreenSizeMutation.mutateAsync({ size: value });
+      }
+    } catch (error) {
+      console.error("Error saving spec value to catalog:", error);
+    }
+  }, [
+    ensureProcessorMutation,
+    ensureRamOptionMutation,
+    ensureScreenSizeMutation,
+    ensureStorageOptionMutation,
+    processorOptions,
+    ramOptions,
+    screenOptions,
+    storageOptions,
+  ]);
+
+  const persistCatalogSelections = useCallback(async (specsOverride?: Record<string, string>) => {
+    const specsObj = specsOverride || buildSpecsObject();
+    await Promise.all([
+      persistBrandToCatalog(),
+      persistModelToCatalog(model, specsObj),
+      ...Object.entries(specsObj).map(([key, value]) => persistSpecValueToCatalog(key, value)),
+    ]);
+  }, [buildSpecsObject, model, persistBrandToCatalog, persistModelToCatalog, persistSpecValueToCatalog]);
 
   const codeQuery = trpc.units.getByCode.useQuery(
     { code: scannedCode },
@@ -483,13 +632,8 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     const dPriceCents = discountPrice ? Math.round(parseFloat(discountPrice) * 100) : undefined;
     const wPriceCents = wholesalePrice ? Math.round(parseFloat(wholesalePrice) * 100) : undefined;
 
-    // Convertir specs array a JSON object
-    const specsObj: Record<string, string> = {};
-    customSpecs.forEach((item) => {
-      if (item.key.trim()) {
-        specsObj[item.key.trim()] = item.value.trim();
-      }
-    });
+    const specsObj = buildSpecsObject();
+    void persistCatalogSelections(specsObj);
 
     const defaultStatus = SIMPLE_TYPES.has(type) ? "available" : "in_diagnosis";
 
@@ -644,6 +788,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                   options={brandOptions}
                   value={brand}
                   onChange={handleBrandChange}
+                  onCommit={(value) => void persistBrandToCatalog(value)}
                   placeholder="Escribir marca (ej: HP, Dell, Lenovo...)"
                 />
               </div>
@@ -654,6 +799,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                   options={modelOptions}
                   value={model}
                   onChange={handleModelChange}
+                  onCommit={(value) => void persistModelToCatalog(value, buildSpecsObject())}
                   placeholder="Escribir modelo (ej: ThinkPad X1, EliteBook...)"
                 />
               </div>
@@ -764,6 +910,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                             updated[idx].value = value;
                             setCustomSpecs(updated);
                           }}
+                          onCommit={(value) => void persistSpecValueToCatalog(spec.key, value)}
                           placeholder={`Escribir ${displayKey.toLowerCase()}...`}
                         />
                       </div>
@@ -848,6 +995,17 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                     </label>
                   </div>
                 ))}
+              </div>
+              <div className="pt-2">
+                <label className="text-xs font-semibold block mb-1">
+                  Detalle adicional del equipo:
+                </label>
+                <Textarea
+                  value={damageNotes}
+                  onChange={(e) => setDamageNotes(e.target.value)}
+                  placeholder="Ej: bateria dura 2 horas, cargador generico, pantalla con mancha leve, detalle estetico adicional..."
+                  rows={3}
+                />
               </div>
             </div>
 

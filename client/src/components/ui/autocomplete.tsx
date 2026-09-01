@@ -11,6 +11,7 @@ interface AutocompleteProps {
   options: AutocompleteOption[];
   value?: string;
   onChange: (value: string) => void;
+  onCommit?: (value: string) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -20,6 +21,7 @@ export function Autocomplete({
   options,
   value = "",
   onChange,
+  onCommit,
   placeholder = "Escribir...",
   className,
   disabled = false,
@@ -73,6 +75,12 @@ export function Autocomplete({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if ((!showSuggestions || filteredOptions.length === 0) && e.key === "Enter") {
+      const committedValue = inputValue.trim();
+      if (committedValue) onCommit?.(committedValue);
+      return;
+    }
+
     if (!showSuggestions || filteredOptions.length === 0) return;
 
     switch (e.key) {
@@ -90,6 +98,9 @@ export function Autocomplete({
         e.preventDefault();
         if (highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
           handleSelectOption(filteredOptions[highlightedIndex]);
+        } else {
+          const committedValue = inputValue.trim();
+          if (committedValue) onCommit?.(committedValue);
         }
         break;
       case "Escape":
@@ -106,6 +117,11 @@ export function Autocomplete({
         value={inputValue}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
+        onBlur={() => {
+          const committedValue = inputValue.trim();
+          if (committedValue) onCommit?.(committedValue);
+          setShowSuggestions(false);
+        }}
         onFocus={() => {
           if (inputValue.trim() && filteredOptions.length > 0) {
             setShowSuggestions(true);
@@ -127,6 +143,7 @@ export function Autocomplete({
                   ? "bg-primary text-primary-foreground"
                   : "hover:bg-slate-100"
               )}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleSelectOption(option)}
               onMouseEnter={() => setHighlightedIndex(index)}
             >
