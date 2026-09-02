@@ -1,4 +1,4 @@
-import { and, desc, eq, ne, sql, isNull } from "drizzle-orm";
+import { and, desc, eq, ne, sql, isNull, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import fs from "fs";
@@ -3626,7 +3626,7 @@ export async function getAllSales(branchId?: number) {
   if (!db) {
     let list = MOCK_SALES;
     if (branchId) {
-      list = list.filter((s: any) => (s.branchId || 1) === branchId);
+      list = list.filter((s: any) => !s.branchId || s.branchId === branchId);
     }
     return list.map((sale: any) => {
       return mapSaleWithRelations(sale, MOCK_USERS, MOCK_CUSTOMERS);
@@ -3635,7 +3635,7 @@ export async function getAllSales(branchId?: number) {
 
   let rawSalesQuery = db.select().from(sales).$dynamic();
   if (branchId) {
-    rawSalesQuery = rawSalesQuery.where(eq(sales.branchId, branchId));
+    rawSalesQuery = rawSalesQuery.where(or(eq(sales.branchId, branchId), isNull(sales.branchId)));
   }
 
   const [rawSales, usersList, customersList, branchesList] = await Promise.all([

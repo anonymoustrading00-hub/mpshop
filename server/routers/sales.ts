@@ -68,13 +68,9 @@ export const salesRouter = router({
   list: protectedProcedure
     .input(z.object({ branchId: z.number().optional() }).optional())
     .query(async ({ ctx, input }) => {
-      const branchId = input?.branchId !== undefined ? input.branchId : ctx.branchId;
+      const branchId = input?.branchId;
       const allSales = await getAllSales(branchId);
-      if (ctx.user?.role === "admin") {
-        return allSales;
-      }
-
-      return (allSales as any[]).filter((sale: any) => sale.soldBy === ctx.user?.id);
+      return allSales;
     }),
 
   getDetails: protectedProcedure

@@ -992,23 +992,34 @@ export default function Sales() {
   }, [cartItems, globalDiscountType, globalDiscountValue]);
 
   const filteredSales = useMemo(() => {
-    if (!salesList) return [];
+    if (!salesList || !Array.isArray(salesList)) return [];
 
     return (salesList as any[])
       .filter((sale: any) => {
+        const search = (historySearch || "").trim().toLowerCase();
         const matchesSearch =
-          !historySearch ||
-          sale.saleNumber?.toLowerCase().includes(historySearch.toLowerCase()) ||
-          (sale.customerDisplayName || "").toLowerCase().includes(historySearch.toLowerCase()) ||
-          (sale.sellerName || "").toLowerCase().includes(historySearch.toLowerCase());
+          !search ||
+          (sale.saleNumber || "").toLowerCase().includes(search) ||
+          (sale.customerDisplayName || "").toLowerCase().includes(search) ||
+          (sale.sellerName || "").toLowerCase().includes(search) ||
+          (sale.notes || "").toLowerCase().includes(search);
 
-        const saleDate = sale.createdAt ? new Date(sale.createdAt) : null;
-        const matchesFrom = !historyDateFrom || (saleDate && saleDate >= new Date(historyDateFrom + "T00:00:00"));
-        const matchesTo = !historyDateTo || (saleDate && saleDate <= new Date(historyDateTo + "T23:59:59"));
+        let matchesDate = true;
+        if (historyDateFrom || historyDateTo) {
+          if (!sale.createdAt) {
+            matchesDate = false;
+          } else {
+            const saleDate = new Date(sale.createdAt);
+            if (!isNaN(saleDate.getTime())) {
+              if (historyDateFrom && saleDate < new Date(historyDateFrom + "T00:00:00")) matchesDate = false;
+              if (historyDateTo && saleDate > new Date(historyDateTo + "T23:59:59")) matchesDate = false;
+            }
+          }
+        }
 
         const matchesStatus = historyStatus === "all" || sale.status === historyStatus;
 
-        return matchesSearch && matchesFrom && matchesTo && matchesStatus;
+        return matchesSearch && matchesDate && matchesStatus;
       });
   }, [historyDateFrom, historyDateTo, historySearch, historyStatus, salesList]);
 
