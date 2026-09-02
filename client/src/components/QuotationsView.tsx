@@ -55,7 +55,7 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
   const isMobile = useIsMobile();
   const utils = trpc.useUtils();
 
-  const { data: productsData } = trpc.units.list.useQuery({ status: "available", limit: 200 } as any);
+  const { data: productsData } = trpc.units.list.useQuery({ status: "available", limit: 5000 } as any);
   const { data: customers } = trpc.customers.list.useQuery();
   const { data: quotationsList, isLoading } = trpc.quotations.list.useQuery();
   const { data: companyConfig } = trpc.settings.getCompanyConfig.useQuery();
@@ -120,23 +120,58 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
 
   const products = useMemo(() => {
     const items = (productsData as any)?.items ?? [];
-    return items.map((u: any) => ({
-      id: u.id,
-      name: [u.brand, u.model].filter(Boolean).join(" ").trim() || u.code || `Unidad #${u.id}`,
-      code: u.code,
-      salePrice: u.salePrice ?? u.price ?? 0,
-      discountPrice: u.discountPrice ?? null,
-      wholesalePrice: u.wholesalePrice ?? null,
-      stock: 1,
-    }));
+    return items.map((u: any) => {
+      const specs = typeof u.specs === "object" ? u.specs : {};
+      const specsSummary = [
+        specs.cpu,
+        specs.ram,
+        specs.storage,
+        specs.gpu,
+        specs.screenSize,
+        specs.description,
+        specs.barcode,
+      ].filter(Boolean).join(" · ");
+
+      return {
+        id: u.id,
+        name: [u.brand, u.model].filter(Boolean).join(" ").trim() || u.code || `Unidad #${u.id}`,
+        code: u.code,
+        brand: u.brand || "",
+        model: u.model || "",
+        type: u.type || "other",
+        specsSummary,
+        specs: u.specs,
+        salePrice: u.salePrice ?? u.price ?? 0,
+        discountPrice: u.discountPrice ?? null,
+        wholesalePrice: u.wholesalePrice ?? null,
+        stock: 1,
+      };
+    });
   }, [productsData]);
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     const search = productSearch.trim().toLowerCase();
+    if (!search) return products.slice(0, 60);
+
+    const searchWords = search.split(/\s+/).filter(Boolean);
     return (products as any[])
-      .filter((product: any) => !search || product.name.toLowerCase().includes(search) || product.code.toLowerCase().includes(search))
-      .slice(0, 12);
+      .filter((p: any) => {
+        const fullText = [
+          p.name,
+          p.code,
+          p.brand,
+          p.model,
+          p.type,
+          p.specsSummary,
+          typeof p.specs === "object" ? JSON.stringify(p.specs) : (p.specs || ""),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return searchWords.every((word) => fullText.includes(word));
+      })
+      .slice(0, 80);
   }, [products, productSearch]);
 
   const filteredCustomers = useMemo(() => {
@@ -455,33 +490,72 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
               </Card>
 
               <Card className="border-indigo-100/50">
-                <CardHeader>
-                  <CardTitle className="text-base text-indigo-900">Productos</CardTitle>
+                <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                  <CardTitle className="text-base text-indigo-900">Productos del Catálogo</CardTitle>
+                  <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[11px] font-bold">
+                    {products.length} disponibles
+                  </Badge>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3">
                   <div className="relative">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input 
                       ref={productSearchRef} 
                       value={productSearch} 
                       onChange={e => setProductSearch(e.target.value)} 
-                      placeholder="Buscar producto por nombre o código..." 
-                      className="pl-9 focus-visible:ring-indigo-500"
+                      placeholder="Buscar por marca, modelo, código, especificación o serie..." 
+                      className="pl-9 pr-8 focus-visible:ring-indigo-500"
                     />
+                    {productSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setProductSearch("")}
+                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 text-xs p-1"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
-                  {filteredProducts.length > 0 && (
-                    <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-xl bg-slate-50/50 p-2 grid gap-2">
+                  {filteredProducts.length > 0 ? (
+                    <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-xl bg-slate-50/50 p-2 grid gap-2">
                       {filteredProducts.map((p: any) => (
-                        <button key={p.id} className="flex justify-between items-center w-full text-left p-3 bg-white rounded-lg border hover:border-indigo-300 hover:shadow-sm transition-all" onClick={() => addProductToCart(p)}>
-                          <div>
-                            <p className="font-medium text-sm">{p.name}</p>
-                            <p className="text-xs text-muted-foreground">{p.code}</p>
+                        <button
+                          key={p.id}
+                          className="flex justify-between items-center w-full text-left p-3 bg-white rounded-lg border border-slate-200 hover:border-indigo-400 hover:shadow-sm transition-all group"
+                          onClick={() => addProductToCart(p)}
+                        >
+                          <div className="min-w-0 flex-1 pr-3">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-sm text-slate-900 group-hover:text-indigo-600 transition-colors">
+                                {p.name}
+                              </span>
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-bold">
+                                {p.code}
+                              </span>
+                            </div>
+                            {p.specsSummary && (
+                              <p className="text-xs text-slate-500 truncate mt-0.5">
+                                {p.specsSummary}
+                              </p>
+                            )}
                           </div>
-                          <div className="text-right">
-                            <p className="font-bold text-slate-900">{formatCurrency(p.salePrice)}</p>
+                          <div className="text-right shrink-0 flex items-center gap-2">
+                            <div>
+                              <p className="font-black text-sm text-slate-900">{formatCurrency(p.salePrice)}</p>
+                              {p.wholesalePrice && (
+                                <p className="text-[10px] text-slate-400">Por mayor: {formatCurrency(p.wholesalePrice)}</p>
+                              )}
+                            </div>
+                            <div className="h-7 w-7 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                              <Plus className="h-4 w-4" />
+                            </div>
                           </div>
                         </button>
                       ))}
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center text-xs text-slate-400 border rounded-xl bg-slate-50/30">
+                      No se encontraron productos coincidentes con "{productSearch}".
                     </div>
                   )}
                 </CardContent>

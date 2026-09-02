@@ -219,6 +219,11 @@ export default function Units() {
   const [editSalePrice, setEditSalePrice] = useState("");
   const [editDiscountPrice, setEditDiscountPrice] = useState("");
   const [editWholesalePrice, setEditWholesalePrice] = useState("");
+  const [editPurchasePrice, setEditPurchasePrice] = useState("");
+  const [editCurrentStock, setEditCurrentStock] = useState<number>(1);
+  const [addStockQty, setAddStockQty] = useState<number>(0);
+  const [addStockPaymentMethod, setAddStockPaymentMethod] = useState<"cash" | "qr" | "transfer">("cash");
+  const [updateAllMatchingUnits, setUpdateAllMatchingUnits] = useState<boolean>(true);
   const [editSupplierId, setEditSupplierId] = useState<number | undefined>();
   const [editPurchaseDate, setEditPurchaseDate] = useState("");
   const [editTiktokUrl, setEditTiktokUrl] = useState("");
@@ -583,7 +588,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     }
   };
 
-  const handleOpenEdit = (unit: any) => {
+  const handleOpenEdit = (unit: any, customStock?: number) => {
     setEditUnit(unit);
     setEditBrand(unit.brand || "");
     setEditModel(unit.model || "");
@@ -610,6 +615,24 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     setEditSalePrice(unit.salePrice ? String(unit.salePrice / 100) : "");
     setEditDiscountPrice(unit.discountPrice ? String(unit.discountPrice / 100) : "");
     setEditWholesalePrice(unit.wholesalePrice ? String(unit.wholesalePrice / 100) : "");
+    setEditPurchasePrice(unit.purchasePrice ? String(unit.purchasePrice / 100) : "");
+
+    // Calcular stock actual de unidades activas / no vendidas del mismo modelo/código
+    if (customStock !== undefined) {
+      setEditCurrentStock(customStock);
+    } else {
+      const items = (unitsData?.items as any[]) || [];
+      const matchingCount = items.filter(
+        (u: any) => u.status !== "sold" &&
+          u.brand?.toLowerCase() === (unit.brand || "").toLowerCase() &&
+          u.model?.toLowerCase() === (unit.model || "").toLowerCase()
+      ).length;
+      setEditCurrentStock(matchingCount > 0 ? matchingCount : 1);
+    }
+
+    setAddStockQty(0);
+    setAddStockPaymentMethod("cash");
+    setUpdateAllMatchingUnits(true);
     setEditSupplierId(unit.supplierId || undefined);
     setEditPurchaseDate(unit.purchaseDate || "");
     setEditTiktokUrl(unit.tiktokUrl || "");
@@ -646,6 +669,10 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
       salePrice: editSalePrice ? Math.round(parseFloat(editSalePrice) * 100) : undefined,
       discountPrice: editDiscountPrice ? Math.round(parseFloat(editDiscountPrice) * 100) : undefined,
       wholesalePrice: editWholesalePrice ? Math.round(parseFloat(editWholesalePrice) * 100) : undefined,
+      purchasePrice: editPurchasePrice ? Math.round(parseFloat(editPurchasePrice) * 100) : undefined,
+      addQuantity: addStockQty > 0 ? addStockQty : undefined,
+      addPaymentMethod: addStockPaymentMethod,
+      updateAllMatching: updateAllMatchingUnits,
       supplierId: editSupplierId || undefined,
       purchaseDate: editPurchaseDate || undefined,
       tiktokUrl: editTiktokUrl.trim() || undefined,
@@ -993,7 +1020,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-slate-600 hover:bg-slate-100" title="Ver Kardex / Historial" onClick={() => { setKardexUnitId(item.firstUnit.id); setIsKardexOpen(true); }}>
                                   <BookOpen className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-700 hover:bg-blue-50" title="Editar" onClick={() => handleOpenEdit(item.firstUnit)}>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-700 hover:bg-blue-50" title="Editar" onClick={() => handleOpenEdit(item.firstUnit, item.quantity)}>
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
 
@@ -1747,10 +1774,135 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                   </div>
                 )}
 
+                {/* ─── Stock y Control de Cantidades (Compras a Caja) ─── */}
+                <div className="border-t pt-4 space-y-3 bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 block">Stock & Cantidades:</span>
+                      <span className="text-[11px] text-slate-500">Unidades actualmente disponibles de este producto</span>
+                    </div>
+                    <Badge variant="outline" className="text-xs font-black px-3 py-1 bg-blue-50 text-blue-800 border-blue-200">
+                      📦 Stock Actual: {editCurrentStock} {editCurrentStock === 1 ? "unidad" : "unidades"}
+                    </Badge>
+                  </div>
+
+                  {/* Sección para comprar / ingresar más unidades */}
+                  <div className="bg-white p-3 rounded-xl border border-blue-200/70 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                        <Plus className="h-4 w-4 text-blue-600" />
+                        Comprar / Ingresar Más Unidades a este Artículo:
+                      </label>
+                      {addStockQty > 0 && (
+                        <Badge className="bg-emerald-600 text-white font-bold text-[10px]">
+                          +{addStockQty} a comprar
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                          Cantidad adicional a ingresar:
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="500"
+                            value={addStockQty === 0 ? "" : addStockQty}
+                            onChange={(e) => setAddStockQty(Math.max(0, parseInt(e.target.value) || 0))}
+                            placeholder="0 (ej. +5)"
+                            className="h-9 font-bold text-center border-blue-300"
+                          />
+                          <div className="flex gap-1">
+                            {[1, 5, 10].map((n) => (
+                              <Button
+                                key={n}
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-9 px-2 text-xs font-bold text-blue-700 border-blue-200 hover:bg-blue-50"
+                                onClick={() => setAddStockQty((prev) => prev + n)}
+                              >
+                                +{n}
+                              </Button>
+                            ))}
+                            {addStockQty > 0 && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-9 px-2 text-xs text-red-600 hover:bg-red-50"
+                                onClick={() => setAddStockQty(0)}
+                                title="Reiniciar a 0"
+                              >
+                                ✕
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                          Método de Pago de la Compra (Caja):
+                        </label>
+                        <Select
+                          value={addStockPaymentMethod}
+                          onValueChange={(v: any) => setAddStockPaymentMethod(v)}
+                        >
+                          <SelectTrigger className="h-9 bg-white border-blue-200">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cash">💵 Efectivo (Salida de Caja)</SelectItem>
+                            <SelectItem value="qr">📱 QR (Banco / QR)</SelectItem>
+                            <SelectItem value="transfer">🏦 Transferencia Bancaria</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {addStockQty > 0 && (
+                      <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+                        <div className="flex items-center justify-between font-bold">
+                          <span>💰 Impacto Financiero en Caja:</span>
+                          <span className="text-sm font-black text-amber-950">
+                            −Bs. {(addStockQty * (parseFloat(editPurchasePrice) || 0)).toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-amber-800">
+                          Al guardar se crearán automáticamente {addStockQty} {addStockQty === 1 ? "unidad" : "unidades"} en el inventario y se registrará un egreso por compra de <b>Bs. {(addStockQty * (parseFloat(editPurchasePrice) || 0)).toFixed(2)}</b> en el módulo de Finanzas.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Precios */}
                 <div className="border-t pt-4 space-y-3">
-                  <label className="text-xs font-semibold block">Precios (Bs):</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <label className="text-xs font-semibold block">Precios (Bs):</label>
+                    <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+                      <Checkbox
+                        checked={updateAllMatchingUnits}
+                        onCheckedChange={(c) => setUpdateAllMatchingUnits(!!c)}
+                      />
+                      <span>Actualizar precios en todas las {editCurrentStock} unidades del mismo modelo</span>
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold block mb-1 text-emerald-800">🛒 Precio Compra:</label>
+                      <Input
+                        type="number" step="0.01"
+                        value={editPurchasePrice}
+                        onChange={(e) => setEditPurchasePrice(e.target.value)}
+                        placeholder="ej. 1500.00"
+                        className="border-emerald-300 bg-emerald-50/30 font-medium"
+                      />
+                    </div>
                     <div>
                       <label className="text-xs font-semibold block mb-1 text-blue-700">💰 Precio Unit:</label>
                       <Input
@@ -1758,7 +1910,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         value={editSalePrice}
                         onChange={(e) => setEditSalePrice(e.target.value)}
                         placeholder="ej. 2200.00"
-                        className="border-blue-300"
+                        className="border-blue-300 font-medium"
                       />
                     </div>
                     <div>
@@ -1768,7 +1920,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         value={editDiscountPrice}
                         onChange={(e) => setEditDiscountPrice(e.target.value)}
                         placeholder="ej. 2000.00"
-                        className="border-amber-300"
+                        className="border-amber-300 font-medium"
                       />
                     </div>
                     <div>
@@ -1778,7 +1930,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         value={editWholesalePrice}
                         onChange={(e) => setEditWholesalePrice(e.target.value)}
                         placeholder="ej. 1900.00"
-                        className="border-green-300"
+                        className="border-green-300 font-medium"
                       />
                     </div>
                   </div>

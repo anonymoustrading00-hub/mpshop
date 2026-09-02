@@ -678,7 +678,7 @@ export default function Sales() {
   const [currentPricingMode, setCurrentPricingMode] = useState<"unit" | "discount" | "wholesale">("unit");
 
   const { data: openingStatus } = trpc.finance.hasActiveOpening.useQuery({ paymentMethod: paymentMethod === "credit" ? "cash" : paymentMethod });
-  const { data: unitsList } = trpc.units.list.useQuery({ status: "available" });
+  const { data: unitsList } = trpc.units.list.useQuery({ status: "available", limit: 5000 } as any);
   const products = unitsList?.items?.map((u: any) => ({
     id: u.id,
     name: `${u.brand} ${u.model}`,

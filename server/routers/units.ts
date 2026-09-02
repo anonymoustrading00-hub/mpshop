@@ -24,7 +24,7 @@ import {
 } from "../db";
 import { generatedCodes, units, unitEvents, purchases, purchaseItems, suppliers, financialTransactions, operationalExpenses, users, repairs, warranties, returns, saleItems, sales, systemSettings, branches } from "../../drizzle/schema";
 import * as schema from "../../drizzle/schema";
-import { eq, like, or, and, desc, sql, asc, inArray } from "drizzle-orm";
+import { eq, ne, like, or, and, desc, sql, asc, inArray } from "drizzle-orm";
 import { DEFAULT_COMPANY_CONFIG, readCompanyConfig } from "./settings";
 
 // Tipos de unidad que no requieren diagnóstico (van directo a 'available')
@@ -156,7 +156,7 @@ export const unitsRouter = router({
         .leftJoin(branches, eq(units.branchId, branches.id))
         .where(whereClause)
         .orderBy(desc(units.id))
-        .limit(input?.limit || 100)
+        .limit(input?.limit || 2000)
         .offset(input?.offset || 0);
 
       const countResult = await db
@@ -840,11 +840,20 @@ export const unitsRouter = router({
         notes: z.string().optional(),
         photos: z.string().optional(),
         tiktokUrl: z.string().optional(),
+        addQuantity: z.number().int().min(0).max(500).optional(),
+        addPaymentMethod: z.enum(["cash", "qr", "transfer"]).default("cash"),
+        updateAllMatching: z.boolean().default(false),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
+      const addQty = input.addQuantity || 0;
+      const genPurchaseNumber = (id: number | string) => `COMP-UNIT-${String(id).padStart(6, "0")}`;
+
       if (!db) {
+        const targetUnit = MOCK_UNITS.find((u: any) => u.id === input.id);
+        if (!targetUnit) throw new TRPCError({ code: "NOT_FOUND", message: "Unidad no encontrada" });
+
         const updateData: Record<string, any> = {};
         if (input.brand !== undefined) updateData.brand = input.brand;
         if (input.model !== undefined) updateData.model = input.model;
@@ -864,7 +873,94 @@ export const unitsRouter = router({
         if (input.photos !== undefined) updateData.photos = input.photos;
         if (input.tiktokUrl !== undefined) updateData.tiktokUrl = input.tiktokUrl;
         if (input.status !== undefined) updateData.status = input.status;
+
         await updateUnit(input.id, updateData as any);
+
+        // Si se seleccionó sincronizar precios con todas las unidades del mismo modelo
+        if (input.updateAllMatching) {
+          const matching = MOCK_UNITS.filter(
+            (u: any) => u.id !== input.id && u.status !== "sold" &&
+              u.brand?.toLowerCase() === (input.brand || targetUnit.brand)?.toLowerCase() &&
+              u.model?.toLowerCase() === (input.model || targetUnit.model)?.toLowerCase()
+          );
+          for (const m of matching) {
+            if (input.salePrice !== undefined) m.salePrice = input.salePrice;
+            if (input.discountPrice !== undefined) m.discountPrice = input.discountPrice;
+            if (input.wholesalePrice !== undefined) m.wholesalePrice = input.wholesalePrice;
+            if (input.purchasePrice !== undefined && ctx.user.role === "admin") m.purchasePrice = input.purchasePrice;
+          }
+        }
+
+        // Si se agregó stock adicional (+N unidades) -> Crear unidades y transacción financiera de Egreso
+        if (addQty > 0) {
+          const effectivePurchasePrice = input.purchasePrice !== undefined ? input.purchasePrice : (targetUnit.purchasePrice || 0);
+          const totalPurchaseAmount = effectivePurchasePrice * addQty;
+          let purchaseId: number | null = null;
+
+          if (totalPurchaseAmount > 0) {
+            purchaseId = MOCK_PURCHASES.length + 1;
+            const pNumber = genPurchaseNumber(purchaseId);
+            MOCK_PURCHASES.push({
+              id: purchaseId,
+              supplierId: input.supplierId || targetUnit.supplierId || null,
+              purchaseNumber: pNumber,
+              orderDate: new Date(),
+              totalAmount: totalPurchaseAmount,
+              status: "received",
+              paymentStatus: "paid",
+              paymentMethod: input.addPaymentMethod || "cash",
+              isCredit: 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+
+            MOCK_FINANCIAL_TRANSACTIONS.push({
+              id: MOCK_FINANCIAL_TRANSACTIONS.length + 1,
+              branchId: input.branchId || targetUnit.branchId || 1,
+              type: "expense",
+              category: "purchase",
+              amount: totalPurchaseAmount,
+              paymentMethod: input.addPaymentMethod || "cash",
+              referenceId: purchaseId,
+              userId: ctx.user.id,
+              notes: `Compra adicional (+${addQty} uds.) ${input.brand || targetUnit.brand} ${input.model || targetUnit.model} · ${pNumber}`,
+              createdAt: new Date(),
+            });
+          }
+
+          const baseCode = (targetUnit.code || "ART").split("-")[0];
+          for (let i = 0; i < addQty; i++) {
+            const newUnitId = MOCK_UNITS.length + 1;
+            const unitCode = `${baseCode}-${String(Date.now() % 100000 + i).padStart(5, "0")}`;
+            MOCK_UNITS.push({
+              id: newUnitId,
+              code: unitCode,
+              type: targetUnit.type || "accessory",
+              brand: input.brand || targetUnit.brand,
+              model: input.model || targetUnit.model,
+              specs: updateData.specs || targetUnit.specs,
+              condition: input.condition || targetUnit.condition || 10,
+              batteryHealth: input.batteryHealth || targetUnit.batteryHealth || "n_a",
+              damageChecklist: updateData.damageChecklist || targetUnit.damageChecklist,
+              damageNotes: input.damageNotes || targetUnit.damageNotes,
+              functionalTestPassed: 1,
+              status: "available",
+              purchaseId,
+              purchasePrice: effectivePurchasePrice,
+              salePrice: input.salePrice !== undefined ? input.salePrice : targetUnit.salePrice,
+              discountPrice: input.discountPrice !== undefined ? input.discountPrice : targetUnit.discountPrice,
+              wholesalePrice: input.wholesalePrice !== undefined ? input.wholesalePrice : targetUnit.wholesalePrice,
+              supplierId: input.supplierId || targetUnit.supplierId,
+              branchId: input.branchId || targetUnit.branchId || 1,
+              photos: input.photos || targetUnit.photos,
+              tiktokUrl: input.tiktokUrl || targetUnit.tiktokUrl,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          }
+          syncMocksToDisk();
+        }
+
         return { success: true };
       }
 
@@ -919,6 +1015,108 @@ export const unitsRouter = router({
           toStatus: input.status,
           userId: ctx.user.id,
           notes: input.notes || `Cambio de estado manual a ${input.status}`,
+        });
+      }
+
+      // Sincronizar precios con todas las unidades no vendidas del mismo modelo si se solicita
+      if (input.updateAllMatching) {
+        const syncData: Record<string, any> = {};
+        if (input.salePrice !== undefined) syncData.salePrice = input.salePrice;
+        if (input.discountPrice !== undefined) syncData.discountPrice = input.discountPrice;
+        if (input.wholesalePrice !== undefined) syncData.wholesalePrice = input.wholesalePrice;
+        if (input.purchasePrice !== undefined && ctx.user.role === "admin") syncData.purchasePrice = input.purchasePrice;
+        if (input.specs !== undefined) syncData.specs = JSON.stringify(input.specs);
+        if (input.supplierId !== undefined) syncData.supplierId = input.supplierId;
+
+        if (Object.keys(syncData).length > 0) {
+          await db
+            .update(units)
+            .set(syncData)
+            .where(
+              and(
+                eq(units.brand, input.brand || unit.brand),
+                eq(units.model, input.model || unit.model),
+                ne(units.status, "sold"),
+                ne(units.id, input.id)
+              )
+            );
+        }
+      }
+
+      // Si se especificó addQuantity > 0, insertar nuevas unidades y registrar egreso en Caja / Finanzas
+      if (addQty > 0) {
+        const effectivePurchasePrice = input.purchasePrice !== undefined ? input.purchasePrice : (unit.purchasePrice || 0);
+        const totalPurchaseAmount = effectivePurchasePrice * addQty;
+        const baseCodeClean = (unit.code || "ART").split("-")[0];
+
+        await db.transaction(async (tx: any) => {
+          let purchaseId: number | null = null;
+          const purchaseNumber = genPurchaseNumber(Date.now());
+
+          if (totalPurchaseAmount > 0) {
+            let supplierId = input.supplierId || unit.supplierId;
+            if (!supplierId) {
+              const [genericSup] = await tx.select({ id: suppliers.id }).from(suppliers).where(eq(suppliers.name, "Proveedor Genérico (Compra Directa)")).limit(1);
+              if (genericSup) {
+                supplierId = genericSup.id;
+              } else {
+                const created = await tx.insert(suppliers).values({ name: "Proveedor Genérico (Compra Directa)" });
+                supplierId = (created as any)[0]?.insertId || (created as any)?.insertId || 1;
+              }
+            }
+
+            const purchaseRes: any = await tx.insert(purchases).values({
+              supplierId: supplierId!,
+              purchaseNumber,
+              orderDate: new Date(),
+              totalAmount: totalPurchaseAmount,
+              status: "received",
+              paymentStatus: "paid",
+              paymentMethod: input.addPaymentMethod || "cash",
+              isCredit: 0,
+              branchId: input.branchId || unit.branchId || 1,
+            });
+
+            purchaseId = purchaseRes?.insertId || purchaseRes?.[0]?.insertId;
+
+            // Egreso financiero en Finanzas / Caja
+            await tx.insert(financialTransactions).values({
+              branchId: input.branchId || unit.branchId || 1,
+              type: "expense",
+              category: "purchase",
+              amount: totalPurchaseAmount,
+              paymentMethod: input.addPaymentMethod || "cash",
+              referenceId: purchaseId,
+              userId: ctx.user.id,
+              notes: `Compra adicional (+${addQty} uds.) ${input.brand || unit.brand} ${input.model || unit.model} (${baseCodeClean}) · ${purchaseNumber}`,
+            });
+          }
+
+          for (let i = 0; i < addQty; i++) {
+            const newCode = `${baseCodeClean}-${String(Date.now() % 100000 + i + Math.floor(Math.random() * 900)).padStart(5, "0")}`;
+            await tx.insert(units).values({
+              code: newCode,
+              type: unit.type,
+              brand: input.brand || unit.brand,
+              model: input.model || unit.model,
+              specs: updateData.specs || unit.specs,
+              condition: input.condition || unit.condition || 10,
+              batteryHealth: input.batteryHealth || unit.batteryHealth || "n_a",
+              damageChecklist: updateData.damageChecklist || unit.damageChecklist || JSON.stringify({}),
+              damageNotes: input.damageNotes || unit.damageNotes,
+              functionalTestPassed: 1,
+              status: "available",
+              purchaseId,
+              purchasePrice: effectivePurchasePrice,
+              salePrice: input.salePrice !== undefined ? input.salePrice : unit.salePrice,
+              discountPrice: input.discountPrice !== undefined ? input.discountPrice : unit.discountPrice,
+              wholesalePrice: input.wholesalePrice !== undefined ? input.wholesalePrice : unit.wholesalePrice,
+              supplierId: input.supplierId || unit.supplierId,
+              branchId: input.branchId || unit.branchId || 1,
+              photos: input.photos || unit.photos,
+              tiktokUrl: input.tiktokUrl || unit.tiktokUrl,
+            });
+          }
         });
       }
 
