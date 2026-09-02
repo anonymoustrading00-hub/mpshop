@@ -3933,19 +3933,35 @@ export async function getQuotationItemsByQuotationId(quotationId: number) {
           ...item,
           createdAt,
           productName: unit ? `${unit.brand} ${unit.model}`.trim() : "Unidad desconocida",
-          productCode: unit ? unit.code : "N/A"
+          productCode: unit ? unit.code : "N/A",
+          specs: unit ? unit.specs : null,
+          type: unit ? unit.type : "other",
+          condition: unit ? unit.condition : null,
+          batteryHealth: unit ? unit.batteryHealth : null,
         };
       });
   }
 
   const items = await db.select().from(quotationItems).where(eq(quotationItems.quotationId, quotationId));
   return await Promise.all(items.map(async (item: any) => {
-    const unit = item.unitId ? await db.select({ brand: units.brand, model: units.model, code: units.code }).from(units).where(eq(units.id, item.unitId)).limit(1) : [];
+    const unit = item.unitId ? await db.select({ 
+        brand: units.brand, 
+        model: units.model, 
+        code: units.code,
+        specs: units.specs,
+        type: units.type,
+        condition: units.condition,
+        batteryHealth: units.batteryHealth 
+    }).from(units).where(eq(units.id, item.unitId)).limit(1) : [];
     const u = unit[0];
     return {
       ...item,
       productName: u ? `${u.brand} ${u.model}`.trim() : `Unidad #${item.unitId || item.productId || "?"}`,
-      productCode: u?.code || "N/A"
+      productCode: u?.code || "N/A",
+      specs: u?.specs || null,
+      type: u?.type || "other",
+      condition: u?.condition || null,
+      batteryHealth: u?.batteryHealth || null,
     };
   }));
 }

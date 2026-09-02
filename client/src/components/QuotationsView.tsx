@@ -43,6 +43,8 @@ type CartItem = {
   productId: number;
   productName: string;
   productCode: string;
+  specsSummary?: string;
+  specs?: any;
   stock: number;
   quantity: number;
   basePrice: number;
@@ -65,6 +67,7 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
   const [detailQuotationId, setDetailQuotationId] = useState<number | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [productSearch, setProductSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
@@ -108,6 +111,7 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
   });
 
   const resetForm = () => {
+    setSelectedCategory("all");
     setProductSearch("");
     setCustomerSearch("");
     setSelectedCustomerId(null);
@@ -149,13 +153,45 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
     });
   }, [productsData]);
 
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: products.length,
+      laptop: 0,
+      phone_tablet: 0,
+      monitor: 0,
+      charger: 0,
+      accessory: 0,
+      other: 0,
+    };
+    products.forEach((p: any) => {
+      const t = p.type || "other";
+      if (t === "laptop") counts.laptop++;
+      else if (t === "phone" || t === "tablet") counts.phone_tablet++;
+      else if (t === "monitor") counts.monitor++;
+      else if (t === "charger") counts.charger++;
+      else if (t === "accessory") counts.accessory++;
+      else counts.other++;
+    });
+    return counts;
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     if (!products) return [];
+    let list = products;
+
+    if (selectedCategory !== "all") {
+      if (selectedCategory === "phone_tablet") {
+        list = list.filter((p: any) => p.type === "phone" || p.type === "tablet");
+      } else {
+        list = list.filter((p: any) => (p.type || "other") === selectedCategory);
+      }
+    }
+
     const search = productSearch.trim().toLowerCase();
-    if (!search) return products.slice(0, 60);
+    if (!search) return list.slice(0, 100);
 
     const searchWords = search.split(/\s+/).filter(Boolean);
-    return (products as any[])
+    return list
       .filter((p: any) => {
         const fullText = [
           p.name,
@@ -171,8 +207,8 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
           .toLowerCase();
         return searchWords.every((word) => fullText.includes(word));
       })
-      .slice(0, 80);
-  }, [products, productSearch]);
+      .slice(0, 100);
+  }, [products, productSearch, selectedCategory]);
 
   const filteredCustomers = useMemo(() => {
     if (!customers) return [];
@@ -218,6 +254,8 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
           productId: product.id,
           productName: product.name,
           productCode: product.code,
+          specsSummary: product.specsSummary,
+          specs: product.specs,
           stock: product.stock,
           quantity: 1,
           basePrice: product.salePrice,
@@ -227,7 +265,6 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
         },
       ];
     });
-    setProductSearch("");
   };
 
   const updateCartItem = (productId: number, changes: Partial<CartItem>) => {
@@ -489,22 +526,57 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
                 </CardContent>
               </Card>
 
-              <Card className="border-indigo-100/50">
+              <Card className="border-indigo-100/50 shadow-sm">
                 <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                  <CardTitle className="text-base text-indigo-900">Productos del Catálogo</CardTitle>
-                  <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[11px] font-bold">
-                    {products.length} disponibles
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-base text-indigo-950 font-bold">Catálogo de Productos</CardTitle>
+                    <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[11px] font-black">
+                      {filteredProducts.length} {filteredProducts.length === 1 ? "artículo" : "artículos"}
+                    </Badge>
+                  </div>
+                  <span className="text-xs text-slate-400 font-medium">Total: {products.length} disponibles</span>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {/* Category filter pills */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                    {[
+                      { id: "all", label: "Todos", count: categoryCounts.all },
+                      { id: "laptop", label: "💻 Laptops", count: categoryCounts.laptop },
+                      { id: "phone_tablet", label: "📱 Celulares/Tabs", count: categoryCounts.phone_tablet },
+                      { id: "monitor", label: "🖥️ Monitores", count: categoryCounts.monitor },
+                      { id: "charger", label: "🔌 Cargadores", count: categoryCounts.charger },
+                      { id: "accessory", label: "📦 Accesorios", count: categoryCounts.accessory },
+                      { id: "other", label: "Otros", count: categoryCounts.other },
+                    ].filter(tab => tab.id === "all" || tab.count > 0).map(tab => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setSelectedCategory(tab.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                          selectedCategory === tab.id
+                            ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200/80"
+                        }`}
+                      >
+                        {tab.label}
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                          selectedCategory === tab.id ? "bg-white/20 text-white" : "bg-white text-slate-700"
+                        }`}>
+                          {tab.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Search Bar */}
                   <div className="relative">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input 
                       ref={productSearchRef} 
                       value={productSearch} 
                       onChange={e => setProductSearch(e.target.value)} 
-                      placeholder="Buscar por marca, modelo, código, especificación o serie..." 
-                      className="pl-9 pr-8 focus-visible:ring-indigo-500"
+                      placeholder="Buscar por marca, modelo, código, especificación (CPU, RAM, SSD)..." 
+                      className="pl-9 pr-8 rounded-xl border-slate-200 focus-visible:ring-indigo-500 text-xs sm:text-sm"
                     />
                     {productSearch && (
                       <button
@@ -516,46 +588,54 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
                       </button>
                     )}
                   </div>
+
+                  {/* 2-Column Responsive Compact Grid */}
                   {filteredProducts.length > 0 ? (
-                    <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-xl bg-slate-50/50 p-2 grid gap-2">
+                    <div className="max-h-[380px] overflow-y-auto border border-slate-200/80 rounded-2xl bg-slate-50/60 p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {filteredProducts.map((p: any) => (
-                        <button
+                        <div
                           key={p.id}
-                          className="flex justify-between items-center w-full text-left p-3 bg-white rounded-lg border border-slate-200 hover:border-indigo-400 hover:shadow-sm transition-all group"
-                          onClick={() => addProductToCart(p)}
+                          className="flex flex-col justify-between p-3 bg-white rounded-xl border border-slate-200 hover:border-indigo-400 hover:shadow-md transition-all group"
                         >
-                          <div className="min-w-0 flex-1 pr-3">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-bold text-sm text-slate-900 group-hover:text-indigo-600 transition-colors">
+                          <div>
+                            <div className="flex items-start justify-between gap-1.5">
+                              <span className="font-bold text-sm text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
                                 {p.name}
                               </span>
-                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-bold">
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-bold shrink-0">
                                 {p.code}
                               </span>
                             </div>
+
                             {p.specsSummary && (
-                              <p className="text-xs text-slate-500 truncate mt-0.5">
+                              <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-snug">
                                 {p.specsSummary}
                               </p>
                             )}
                           </div>
-                          <div className="text-right shrink-0 flex items-center gap-2">
+
+                          <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
                             <div>
-                              <p className="font-black text-sm text-slate-900">{formatCurrency(p.salePrice)}</p>
+                              <p className="font-black text-sm text-indigo-950">{formatCurrency(p.salePrice)}</p>
                               {p.wholesalePrice && (
-                                <p className="text-[10px] text-slate-400">Por mayor: {formatCurrency(p.wholesalePrice)}</p>
+                                <p className="text-[10px] text-slate-400">Mayor: {formatCurrency(p.wholesalePrice)}</p>
                               )}
                             </div>
-                            <div className="h-7 w-7 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                              <Plus className="h-4 w-4" />
-                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => addProductToCart(p)}
+                              className="h-7 px-2.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-lg transition-colors gap-1 border border-indigo-200 hover:border-indigo-600 shadow-none"
+                            >
+                              <Plus className="h-3.5 w-3.5" /> Agregar
+                            </Button>
                           </div>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="py-6 text-center text-xs text-slate-400 border rounded-xl bg-slate-50/30">
-                      No se encontraron productos coincidentes con "{productSearch}".
+                    <div className="py-8 text-center text-xs text-slate-400 border border-dashed rounded-2xl bg-slate-50/50">
+                      No se encontraron productos en esta categoría o con la búsqueda actual.
                     </div>
                   )}
                 </CardContent>
@@ -659,11 +739,14 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
                           <div className="min-w-0">
                             <p className="font-semibold text-sm leading-tight text-slate-900">{item.productName}</p>
                             <div className="flex gap-1 mt-1">
-                              <Badge variant={item.pricingType === "unit" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "unit", basePrice: (products as any)?.find((p: any) => p.id === item.productId)?.salePrice || item.basePrice })}>U</Badge>
-                              <Badge variant={item.pricingType === "discount" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "discount", basePrice: (products as any)?.find((p: any) => p.id === item.productId)?.discountPrice || item.basePrice })}>D</Badge>
-                              <Badge variant={item.pricingType === "wholesale" ? "default" : "outline"} className="text-[8px] h-4 px-1" onClick={() => updateCartItem(item.productId, { pricingType: "wholesale", basePrice: (products as any)?.find((p: any) => p.id === item.productId)?.wholesalePrice || item.basePrice })}>M</Badge>
+                              <Badge variant={item.pricingType === "unit" ? "default" : "outline"} className="text-[8px] h-4 px-1 cursor-pointer" onClick={() => updateCartItem(item.productId, { pricingType: "unit", basePrice: (products as any)?.find((p: any) => p.id === item.productId)?.salePrice || item.basePrice })}>U</Badge>
+                              <Badge variant={item.pricingType === "discount" ? "default" : "outline"} className="text-[8px] h-4 px-1 cursor-pointer" onClick={() => updateCartItem(item.productId, { pricingType: "discount", basePrice: (products as any)?.find((p: any) => p.id === item.productId)?.discountPrice || item.basePrice })}>D</Badge>
+                              <Badge variant={item.pricingType === "wholesale" ? "default" : "outline"} className="text-[8px] h-4 px-1 cursor-pointer" onClick={() => updateCartItem(item.productId, { pricingType: "wholesale", basePrice: (products as any)?.find((p: any) => p.id === item.productId)?.wholesalePrice || item.basePrice })}>M</Badge>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">{formatCurrency(item.basePrice)} c/u</p>
+                            {item.specsSummary && (
+                              <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">{item.specsSummary}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-0.5">{formatCurrency(item.basePrice)} c/u</p>
                           </div>
                           <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 -mt-1 -mr-1" onClick={() => removeCartItem(item.productId)}>
                             <XCircle className="h-4 w-4 text-red-400 hover:text-red-600" />
@@ -791,21 +874,56 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
                   <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#f4f4f5', textAlign: 'left' }}>
-                        <th style={{ padding: '10px', borderBottom: '1px solid #ddd' }}>Descripción</th>
+                        <th style={{ padding: '10px', borderBottom: '1px solid #ddd' }}>Descripción / Características</th>
                         <th style={{ padding: '10px', borderBottom: '1px solid #ddd', textAlign: 'center' }}>Cant.</th>
                         <th style={{ padding: '10px', borderBottom: '1px solid #ddd', textAlign: 'right' }}>P. Unit.</th>
                         <th style={{ padding: '10px', borderBottom: '1px solid #ddd', textAlign: 'right' }}>Total</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {detailQuery.data.items.map((item: any) => (
-                        <tr key={item.id}>
-                          <td style={{ padding: '10px', borderBottom: '1px solid #ddd' }}>{item.productName}</td>
-                          <td style={{ padding: '10px', borderBottom: '1px solid #ddd', textAlign: 'center' }}>{item.quantity}</td>
-                          <td style={{ padding: '10px', borderBottom: '1px solid #ddd', textAlign: 'right' }}>{formatCurrency(item.finalUnitPrice || item.basePrice)}</td>
-                          <td style={{ padding: '10px', borderBottom: '1px solid #ddd', textAlign: 'right' }}>{formatCurrency(item.subtotal)}</td>
-                        </tr>
-                      ))}
+                      {detailQuery.data.items.map((item: any) => {
+                        let parsedSpecs: Record<string, any> = {};
+                        if (item.specs) {
+                          try {
+                            parsedSpecs = typeof item.specs === "string" ? JSON.parse(item.specs) : item.specs;
+                          } catch {
+                            parsedSpecs = {};
+                          }
+                        }
+                        const specsList = Object.entries(parsedSpecs)
+                          .filter(([_, v]) => v && String(v).trim() !== "" && String(v) !== "null")
+                          .map(([k, v]) => `${k.toUpperCase()}: ${v}`);
+
+                        return (
+                          <tr key={item.id} style={{ verticalAlign: 'top' }}>
+                            <td style={{ padding: '12px 10px', borderBottom: '1px solid #ddd' }}>
+                              <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#0f172a' }}>
+                                {item.productName}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace', marginTop: '2px' }}>
+                                Código: {item.productCode}
+                              </div>
+                              {specsList.length > 0 && (
+                                <div style={{ marginTop: '6px', fontSize: '11px', color: '#334155', lineHeight: '1.45', background: '#f8fafc', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                                  <strong style={{ color: '#0f172a' }}>Especificaciones Técnicas:</strong>
+                                  <div style={{ marginTop: '3px', color: '#475569' }}>
+                                    {specsList.join("  ·  ")}
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '12px 10px', borderBottom: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>
+                              {item.quantity}
+                            </td>
+                            <td style={{ padding: '12px 10px', borderBottom: '1px solid #ddd', textAlign: 'right', fontSize: '13px' }}>
+                              {formatCurrency(item.finalUnitPrice || item.basePrice)}
+                            </td>
+                            <td style={{ padding: '12px 10px', borderBottom: '1px solid #ddd', textAlign: 'right', fontWeight: 'bold', fontSize: '14px', color: '#0f172a' }}>
+                              {formatCurrency(item.subtotal)}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
 
@@ -865,24 +983,44 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Descripción</TableHead>
+                          <TableHead>Descripción / Características</TableHead>
                           <TableHead className="text-center">Cant.</TableHead>
                           <TableHead className="text-right">P. Unit.</TableHead>
                           <TableHead className="text-right">Subtotal</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {detailQuery.data.items.map((item: any) => (
-                          <TableRow key={item.id}>
-                            <TableCell>
-                              <div className="font-medium">{item.productName}</div>
-                              <div className="text-xs text-muted-foreground">{item.productCode}</div>
-                            </TableCell>
-                            <TableCell className="text-center">{item.quantity}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(item.finalUnitPrice || item.basePrice)}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(item.subtotal)}</TableCell>
-                          </TableRow>
-                        ))}
+                        {detailQuery.data.items.map((item: any) => {
+                          let parsedSpecs: Record<string, any> = {};
+                          if (item.specs) {
+                            try {
+                              parsedSpecs = typeof item.specs === "string" ? JSON.parse(item.specs) : item.specs;
+                            } catch {
+                              parsedSpecs = {};
+                            }
+                          }
+                          const specsList = Object.entries(parsedSpecs)
+                            .filter(([_, v]) => v && String(v).trim() !== "" && String(v) !== "null")
+                            .map(([k, v]) => `${k.toUpperCase()}: ${v}`);
+
+                          return (
+                            <TableRow key={item.id} className="align-top">
+                              <TableCell className="py-3">
+                                <div className="font-bold text-slate-900">{item.productName}</div>
+                                <div className="text-xs font-mono text-slate-500">{item.productCode}</div>
+                                {specsList.length > 0 && (
+                                  <div className="mt-1.5 text-xs text-slate-600 bg-slate-100/80 p-2 rounded-lg border border-slate-200/60 leading-relaxed">
+                                    <span className="font-bold text-slate-800">Especificaciones: </span>
+                                    {specsList.join(" · ")}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center font-bold py-3">{item.quantity}</TableCell>
+                              <TableCell className="text-right py-3">{formatCurrency(item.finalUnitPrice || item.basePrice)}</TableCell>
+                              <TableCell className="text-right font-black text-slate-900 py-3">{formatCurrency(item.subtotal)}</TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
