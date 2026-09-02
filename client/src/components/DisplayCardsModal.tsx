@@ -41,6 +41,7 @@ const TYPE_LABELS: Record<string, string> = {
   phone: "Celulares",
   tablet: "Tablets",
   monitor: "Monitores",
+  charger: "Cargadores",
   accessory: "Accesorios",
 };
 

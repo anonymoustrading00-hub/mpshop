@@ -1177,7 +1177,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                             <div className="flex items-start justify-between gap-1">
                               <div className="min-w-0">
                                 <p className="font-black text-sm text-slate-800 truncate">{g.brand} {g.model}</p>
-                                <p className="text-[10px] text-slate-400 capitalize">{g.type} · {g.units.length} unidades</p>
+                                <p className="text-[10px] text-slate-400 capitalize">{TYPE_LABEL[g.type] || g.type} · {g.units.length} unidades</p>
                               </div>
                               {g.available > 0 && <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 font-black text-xs shrink-0">{g.available} disp.</Badge>}
                             </div>

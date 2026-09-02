@@ -24,6 +24,7 @@ const TYPE_LABELS: Record<string, string> = {
   phone: "Celulares",
   tablet: "Tablets",
   monitor: "Monitores",
+  charger: "Cargadores",
   accessory: "Accesorios",
 };
 
@@ -531,7 +532,7 @@ function CatalogPageContent({ pageItems, pageIndex, totalPages, company }: { pag
                     {unit.tiktokUrl && <span style={{ fontSize: "10px", fontWeight: 700, background: "#fce7f3", color: "#9d174d", padding: "2px 8px", borderRadius: "6px" }}>🎵 Video TikTok</span>}
                   </div>
                   <div style={{ fontWeight: 900, fontSize: "17px", color: "#0f172a", letterSpacing: "-0.3px", lineHeight: "1.2" }}>{unit.brand} {unit.model}</div>
-                  {unit.type && <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 600, marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{unit.type === "laptop" ? "LAPTOP / COMPUTADOR PORTATIL" : unit.type === "phone" ? "TELEFONO INTELIGENTE" : unit.type === "tablet" ? "TABLET" : unit.type === "monitor" ? "MONITOR" : unit.type}</div>}
+                  {unit.type && <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 600, marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{unit.type === "laptop" ? "LAPTOP / COMPUTADOR PORTATIL" : unit.type === "phone" ? "TELEFONO INTELIGENTE" : unit.type === "tablet" ? "TABLET" : unit.type === "monitor" ? "MONITOR" : unit.type === "charger" ? "CARGADOR" : unit.type === "accessory" ? "ACCESORIO" : unit.type}</div>}
                 </div>
                 {Object.keys(specs).length > 0 && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px", background: "#f8fafc", borderRadius: "10px", padding: "8px 12px", border: "1px solid #e2e8f0", margin: "6px 0" }}>

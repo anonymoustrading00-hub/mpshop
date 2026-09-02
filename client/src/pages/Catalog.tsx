@@ -32,6 +32,16 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   returned:     { label: "Devuelta (RMA)",  color: "text-purple-700",bg: "bg-purple-100 border-purple-300",icon: Package },
 };
 
+const TYPE_LABEL_MAP: Record<string, string> = {
+  laptop: "Laptop",
+  tablet: "Tablet",
+  phone: "Celular",
+  monitor: "Monitor",
+  charger: "Cargador",
+  accessory: "Accesorio",
+  other: "Otro",
+};
+
 const BATTERY_LABEL: Record<string, string> = {
   "100": "🔋 100%",
   "90": "🔋 90%",
@@ -353,7 +363,7 @@ function GroupedProductCard({
           {/* Badge de Tipo de Producto en la esquina superior izquierda */}
           <div className="absolute top-2 left-2 z-10">
             <Badge variant="outline" className="bg-white/90 backdrop-blur-sm text-slate-700 font-bold text-[10px] border-slate-200 uppercase tracking-wider">
-              {group.type}
+              {TYPE_LABEL_MAP[group.type] || group.type}
             </Badge>
           </div>
 
@@ -1074,7 +1084,7 @@ export default function Catalog() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <Badge variant="outline" className="text-[10px] uppercase font-bold text-slate-600 bg-slate-50">
-                              {group.type}
+                              {TYPE_LABEL_MAP[group.type] || group.type}
                             </Badge>
                             {group.availableCount > 0 ? (
                               <Badge className="bg-emerald-600 text-white font-bold text-xs gap-1">
