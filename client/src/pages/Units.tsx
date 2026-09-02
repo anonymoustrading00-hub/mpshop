@@ -13,8 +13,10 @@ import {
   Laptop, HardDrive, QrCode, Search, Wrench, Shield, ArrowRightLeft, Plus, Cpu, Battery,
   Activity, ShoppingBag, ShoppingCart, CheckCircle, Package, Printer, Pencil, Trash2, X, BookOpen, Video,
   ExternalLink, Play, FileText, Sparkles, Camera, ImagePlus,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Boxes, Layers, Table, Grid, List
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Boxes, Layers, Table, Grid, List,
+  Wallet, Landmark, Smartphone, Tablet, Monitor, Plug, MoreHorizontal, AlertTriangle, TrendingUp, DollarSign, Minus
 } from "lucide-react";
+import { formatCurrency } from "@/lib/currency";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useBranch } from "@/contexts/BranchContext";
 import { UnitKardex } from "@/components/UnitKardex";
@@ -22,6 +24,28 @@ import { CommercialCatalogModal } from "@/components/CommercialCatalogModal";
 import { CommercialSheetModal } from "@/components/CommercialSheetModal";
 import { WorkOrderModal } from "@/components/WorkOrderModal";
 import { DisplayCardsModal } from "@/components/DisplayCardsModal";
+
+const TYPE_LABEL: Record<string, string> = {
+  laptop: "Laptop",
+  tablet: "Tablet",
+  phone: "Celular",
+  monitor: "Monitor",
+  charger: "Cargador",
+  accessory: "Accesorio / Repuesto",
+  other: "Otro",
+};
+
+const TYPE_ICON: Record<string, React.ReactNode> = {
+  laptop: <Laptop className="h-4 w-4" />,
+  tablet: <Tablet className="h-4 w-4" />,
+  phone: <Smartphone className="h-4 w-4" />,
+  monitor: <Monitor className="h-4 w-4" />,
+  charger: <Plug className="h-4 w-4" />,
+  accessory: <Package className="h-4 w-4" />,
+  other: <MoreHorizontal className="h-4 w-4" />,
+};
+
+const TYPES_WITH_BATTERY = new Set(["laptop", "tablet", "phone"]);
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
   in_diagnosis: { label: "En Diagnóstico", color: "text-amber-700", bg: "bg-amber-100 border-amber-300", icon: Activity },
@@ -207,6 +231,7 @@ export default function Units() {
   const handleSearchChange = (v: string) => { setSearch(v); setPage(1); };
   const handleTypeChange   = (v: string) => { setTypeFilter(v); setPage(1); };
   const handleStatusChange = (v: string) => { setStatusFilter(v); setPage(1); };
+  const [editType, setEditType] = useState<string>("laptop");
   const [editBrand, setEditBrand] = useState("");
   const [editModel, setEditModel] = useState("");
   const [editCondition, setEditCondition] = useState("8");
@@ -227,6 +252,7 @@ export default function Units() {
   const [editSupplierId, setEditSupplierId] = useState<number | undefined>();
   const [editPurchaseDate, setEditPurchaseDate] = useState("");
   const [editTiktokUrl, setEditTiktokUrl] = useState("");
+  const { data: globalBalances } = (trpc.finance as any).getGlobalBalances.useQuery();
 
   // Fotos del equipo en edición (base64)
   const [editPhotos, setEditPhotos] = useState<string[]>([]);
@@ -590,6 +616,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
   const handleOpenEdit = (unit: any, customStock?: number) => {
     setEditUnit(unit);
+    setEditType(unit.type || "laptop");
     setEditBrand(unit.brand || "");
     setEditModel(unit.model || "");
     setEditCondition(String(unit.condition || 8));
@@ -1647,182 +1674,404 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
         {/* ══════════ MODAL: EDITAR UNIDAD ══════════ */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-blue-700">
-                <Pencil className="h-5 w-5" />
-                Editar Unidad — <span className="font-mono text-primary">{editUnit?.code}</span>
-              </DialogTitle>
-            </DialogHeader>
+          <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto p-0 rounded-3xl border-0 shadow-2xl bg-white">
+            {/* Header */}
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shadow-sm">
+                  <Pencil className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-black text-slate-900">Editar Unidad e Inventario</h2>
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-blue-100/70 text-blue-800 border border-blue-200">
+                      {editUnit?.code}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Modifica detalles técnicos, precios, fotografías y gestiona stock con impacto en caja
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {editUnit && (
+                  <Badge variant="outline" className="hidden sm:inline-flex capitalize font-bold text-[11px] px-2.5 py-1 bg-slate-50">
+                    {TYPE_ICON[editUnit.type] || <Package className="h-3.5 w-3.5" />}
+                    <span className="ml-1.5">{TYPE_LABEL[editUnit.type] || editUnit.type}</span>
+                  </Badge>
+                )}
+              </div>
+            </div>
 
             {editUnit && (
-              <div className="space-y-5 py-2 text-sm">
+              <div className="p-6 space-y-6 text-sm">
 
-                {/* Marca y Modelo */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-semibold block mb-1">Marca *</label>
-                    <Input value={editBrand} onChange={(e) => setEditBrand(e.target.value)} placeholder="Lenovo, Dell, HP..." />
+                {/* ─── 1. Tipo, Marca y Modelo ─── */}
+                <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200/80 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <Laptop className="h-4 w-4 text-blue-600" />
+                    Información Básica del Producto
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold block mb-1">Modelo *</label>
-                    <Input value={editModel} onChange={(e) => setEditModel(e.target.value)} placeholder="ThinkPad T490..." />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Marca *</label>
+                      <Input
+                        value={editBrand}
+                        onChange={(e) => setEditBrand(e.target.value)}
+                        placeholder="Lenovo, Dell, HP, Apple..."
+                        className="bg-white rounded-xl border-slate-200 font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Modelo *</label>
+                      <Input
+                        value={editModel}
+                        onChange={(e) => setEditModel(e.target.value)}
+                        placeholder="ThinkPad T490, Latitude 5420..."
+                        className="bg-white rounded-xl border-slate-200 font-medium"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* Specs clave-valor */}
-                <div className="space-y-2 border-t pt-4">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-semibold">Especificaciones Técnicas:</label>
-                    <Button type="button" variant="outline" size="sm" className="gap-1 text-xs"
-                      onClick={() => setEditSpecs([...editSpecs, { key: "", value: "" }])}>
-                      <Plus className="h-3 w-3" /> Agregar
+                {/* ─── 2. Especificaciones Técnicas (Specs) ─── */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      <Cpu className="h-4 w-4 text-indigo-600" />
+                      Especificaciones Técnicas
+                      <span className="text-slate-400 font-normal">({editSpecs.length})</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1 text-xs font-bold text-indigo-700 border-indigo-200 hover:bg-indigo-50 rounded-xl"
+                      onClick={() => setEditSpecs([...editSpecs, { key: "", value: "" }])}
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Agregar Atributo
                     </Button>
                   </div>
-                  <div className="space-y-2">
-                    {editSpecs.map((spec, idx) => (
-                      <div key={idx} className="flex gap-2 items-center">
-                        <Input
-                          placeholder="Atributo (cpu, ram...)"
-                          value={spec.key}
-                          onChange={(e) => {
-                            const updated = [...editSpecs];
-                            updated[idx].key = e.target.value;
-                            setEditSpecs(updated);
-                          }}
-                          className="w-1/3"
-                        />
-                        <Input
-                          placeholder="Valor (Core i5, 8GB...)"
-                          value={spec.value}
-                          onChange={(e) => {
-                            const updated = [...editSpecs];
-                            updated[idx].value = e.target.value;
-                            setEditSpecs(updated);
-                          }}
-                          className="flex-1"
-                        />
-                        <Button type="button" variant="ghost" size="icon"
-                          onClick={() => setEditSpecs(editSpecs.filter((_, i) => i !== idx))}>
-                          <X className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
 
-                {/* Condición y Batería (solo laptops) */}
-                {editUnit.type === "laptop" && (
-                  <div className="grid grid-cols-2 gap-4 border-t pt-4">
-                    <div>
-                      <label className="text-xs font-semibold block mb-1">Estado Estético (1-10):</label>
-                      <Select value={editCondition} onValueChange={setEditCondition}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {[10,9,8,7,6,5,4,3,2,1].map(n => (
-                            <SelectItem key={n} value={String(n)}>
-                              {n}/10 {n >= 8 ? "(Excelente)" : n >= 6 ? "(Aceptable)" : "(Detalles)"}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  {editSpecs.length === 0 ? (
+                    <div className="py-4 text-center text-xs text-slate-400 border border-dashed rounded-xl bg-slate-50/50">
+                      Sin especificaciones adicionales. Haz clic en "Agregar Atributo" (ej. CPU, RAM, Almacenamiento).
                     </div>
-                    <div>
-                      <label className="text-xs font-semibold block mb-1">Estado de Batería:</label>
-                      <Select value={editBatteryHealth} onValueChange={(v) => setEditBatteryHealth(v)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="100">100%</SelectItem>
-                          <SelectItem value="90">90%</SelectItem>
-                          <SelectItem value="80">80%</SelectItem>
-                          <SelectItem value="70">70%</SelectItem>
-                          <SelectItem value="60">60%</SelectItem>
-                          <SelectItem value="50">50%</SelectItem>
-                          <SelectItem value="40">40%</SelectItem>
-                          <SelectItem value="plugged_only">Solo conectada</SelectItem>
-                          <SelectItem value="n_a">N/A</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                )}
-
-                {/* Damage Checklist */}
-                {editUnit && (
-                  <div className="space-y-2 border-t pt-4">
-                    <label className="text-xs font-semibold block">Checklist de Daños / Observaciones:</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {Object.entries(CHECKLIST_BY_TYPE[editUnit.type] || CHECKLIST_BY_TYPE.other).map(([key, label]) => (
-                        <div key={key} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`edit-check-${key}`}
-                            checked={!!editDamageChecklist[key]}
-                            onCheckedChange={(c) => setEditDamageChecklist({ ...editDamageChecklist, [key]: !!c })}
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                      {editSpecs.map((spec, idx) => (
+                        <div key={idx} className="flex gap-2 items-center bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+                          <Input
+                            placeholder="Atributo (ej. cpu, ram)"
+                            value={spec.key}
+                            onChange={(e) => {
+                              const updated = [...editSpecs];
+                              updated[idx].key = e.target.value;
+                              setEditSpecs(updated);
+                            }}
+                            className="w-2/5 h-8 text-xs font-bold uppercase tracking-wider bg-white rounded-lg border-slate-200"
                           />
-                          <label htmlFor={`edit-check-${key}`} className="text-xs capitalize cursor-pointer">
-                            {label}
-                          </label>
+                          <Input
+                            placeholder="Valor (ej. Core i7 16GB)"
+                            value={spec.value}
+                            onChange={(e) => {
+                              const updated = [...editSpecs];
+                              updated[idx].value = e.target.value;
+                              setEditSpecs(updated);
+                            }}
+                            className="flex-1 h-8 text-xs bg-white rounded-lg border-slate-200 font-medium"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg shrink-0"
+                            onClick={() => setEditSpecs(editSpecs.filter((_, i) => i !== idx))}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       ))}
                     </div>
-                    <Textarea
-                      placeholder="Notas adicionales sobre el estado del equipo..."
-                      value={editDamageNotes}
-                      onChange={(e) => setEditDamageNotes(e.target.value)}
-                      rows={2}
-                    />
+                  )}
+                </div>
+
+                {/* ─── 3. Condición Estética y Batería ─── */}
+                {TYPES_WITH_BATTERY.has(editUnit.type as any) && (
+                  <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200/80 space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      <Battery className="h-4 w-4 text-emerald-600" />
+                      Estado Estético y Batería
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Estado Estético (1 al 10):</label>
+                        <Select value={editCondition} onValueChange={setEditCondition}>
+                          <SelectTrigger className="bg-white rounded-xl border-slate-200 h-9 font-bold">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((n) => (
+                              <SelectItem key={n} value={String(n)}>
+                                <span className="font-black">{n}/10</span>{" "}
+                                <span className="text-slate-500 font-normal">
+                                  {n >= 8 ? "(Excelente / Como nuevo)" : n >= 6 ? "(Buen estado / Aceptable)" : "(Con detalles estéticos)"}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Salud de Batería:</label>
+                        <Select value={editBatteryHealth} onValueChange={(v) => setEditBatteryHealth(v)}>
+                          <SelectTrigger className="bg-white rounded-xl border-slate-200 h-9 font-bold">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="100">🔋 100% (Nueva / Óptima)</SelectItem>
+                            <SelectItem value="90">🔋 90% - 99% (Muy Buena)</SelectItem>
+                            <SelectItem value="80">🔋 80% - 89% (Buena)</SelectItem>
+                            <SelectItem value="70">🪫 70% - 79% (Regular)</SelectItem>
+                            <SelectItem value="60">🪫 60% - 69% (Desgaste)</SelectItem>
+                            <SelectItem value="50">🪫 50% o menos</SelectItem>
+                            <SelectItem value="plugged_only">🔌 Solo funciona conectada</SelectItem>
+                            <SelectItem value="n_a">N/A (Sin Batería / Fija)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                {/* ─── Stock y Control de Cantidades (Compras a Caja) ─── */}
-                <div className="border-t pt-4 space-y-3 bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 block">Stock & Cantidades:</span>
-                      <span className="text-[11px] text-slate-500">Unidades actualmente disponibles de este producto</span>
+                {/* ─── 4. Checklist de Daños / Observaciones ─── */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    <Shield className="h-4 w-4 text-amber-600" />
+                    Checklist de Daños / Observaciones Estéticas
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    {Object.entries(CHECKLIST_BY_TYPE[editUnit.type] || CHECKLIST_BY_TYPE.laptop).map(([key, label]) => {
+                      const isChecked = !!editDamageChecklist[key];
+                      return (
+                        <label
+                          key={key}
+                          htmlFor={`edit-check-${key}`}
+                          className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
+                            isChecked
+                              ? "bg-amber-50/80 border-amber-300 text-amber-950 font-bold"
+                              : "bg-slate-50/50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                          }`}
+                        >
+                          <Checkbox
+                            id={`edit-check-${key}`}
+                            checked={isChecked}
+                            onCheckedChange={(c) => setEditDamageChecklist({ ...editDamageChecklist, [key]: !!c })}
+                            className="rounded"
+                          />
+                          <span className="text-xs truncate">{label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <Textarea
+                    placeholder="Notas o detalles adicionales sobre el estado físico y estético del equipo..."
+                    value={editDamageNotes}
+                    onChange={(e) => setEditDamageNotes(e.target.value)}
+                    rows={2}
+                    className="rounded-xl border-slate-200 text-xs bg-slate-50/40 focus:bg-white"
+                  />
+                </div>
+
+                {/* ─── 5. Precios y Margen de Ganancia ─── */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      <DollarSign className="h-4 w-4 text-emerald-600" />
+                      Precios de Compra y Venta (Bs)
                     </div>
-                    <Badge variant="outline" className="text-xs font-black px-3 py-1 bg-blue-50 text-blue-800 border-blue-200">
+                    <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
+                      <Checkbox
+                        checked={updateAllMatchingUnits}
+                        onCheckedChange={(c) => setUpdateAllMatchingUnits(!!c)}
+                        className="rounded"
+                      />
+                      <span className="font-semibold text-slate-700">
+                        Actualizar precios en las {editCurrentStock} unidades de este modelo
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {/* Precio Compra */}
+                    <div className="p-3 rounded-xl border-2 border-emerald-200 bg-emerald-50/40 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-emerald-900 uppercase">🛒 Precio Compra:</label>
+                        <Badge variant="outline" className="text-[9px] font-black bg-white text-emerald-800 border-emerald-300">
+                          Costo
+                        </Badge>
+                      </div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editPurchasePrice}
+                        onChange={(e) => setEditPurchasePrice(e.target.value)}
+                        placeholder="0.00"
+                        className="h-9 font-black text-emerald-950 bg-white border-emerald-300 rounded-lg text-base"
+                      />
+                    </div>
+
+                    {/* Precio Venta */}
+                    <div className="p-3 rounded-xl border-2 border-blue-200 bg-blue-50/40 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-blue-900 uppercase">💰 Precio Unitario:</label>
+                        <Badge variant="outline" className="text-[9px] font-black bg-white text-blue-800 border-blue-300">
+                          Público
+                        </Badge>
+                      </div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editSalePrice}
+                        onChange={(e) => setEditSalePrice(e.target.value)}
+                        placeholder="0.00"
+                        className="h-9 font-black text-blue-950 bg-white border-blue-300 rounded-lg text-base"
+                      />
+                    </div>
+
+                    {/* Precio Descuento */}
+                    <div className="p-3 rounded-xl border-2 border-amber-200 bg-amber-50/40 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-amber-900 uppercase">🏷️ Precio Descuento:</label>
+                        <Badge variant="outline" className="text-[9px] font-black bg-white text-amber-800 border-amber-300">
+                          Oferta
+                        </Badge>
+                      </div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editDiscountPrice}
+                        onChange={(e) => setEditDiscountPrice(e.target.value)}
+                        placeholder="0.00"
+                        className="h-9 font-black text-amber-950 bg-white border-amber-300 rounded-lg text-base"
+                      />
+                    </div>
+
+                    {/* Precio por Mayor */}
+                    <div className="p-3 rounded-xl border-2 border-teal-200 bg-teal-50/40 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-teal-900 uppercase">📦 Precio por Mayor:</label>
+                        <Badge variant="outline" className="text-[9px] font-black bg-white text-teal-800 border-teal-300">
+                          Mayorista
+                        </Badge>
+                      </div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editWholesalePrice}
+                        onChange={(e) => setEditWholesalePrice(e.target.value)}
+                        placeholder="0.00"
+                        className="h-9 font-black text-teal-950 bg-white border-teal-300 rounded-lg text-base"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Margen de ganancia calculado */}
+                  {editPurchasePrice && editSalePrice && (
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                        <TrendingUp className="h-4 w-4 text-emerald-600" />
+                        Margen Bruto Estimado por Unidad:
+                      </div>
+                      {(() => {
+                        const cost = parseFloat(editPurchasePrice) || 0;
+                        const price = parseFloat(editSalePrice) || 0;
+                        const diff = price - cost;
+                        const pct = cost > 0 ? Math.round((diff / cost) * 100) : 0;
+                        return (
+                          <Badge className={`font-black text-xs ${diff >= 0 ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
+                            {diff >= 0 ? "+" : ""}Bs. {diff.toFixed(2)} ({pct}%)
+                          </Badge>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+
+                {/* ─── 6. Control de Stock y Compras Adicionales (Caja / Finanzas) ─── */}
+                <div className="bg-gradient-to-br from-blue-50/80 via-slate-50 to-indigo-50/60 p-4 rounded-2xl border-2 border-blue-200/90 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <div className="flex items-center gap-2 text-xs font-black text-blue-950 uppercase tracking-wider">
+                        <Boxes className="h-4 w-4 text-blue-600" />
+                        Stock & Compras a Caja
+                      </div>
+                      <p className="text-[11px] text-slate-600">
+                        Unidades físicas en inventario y registro de nuevas compras que afectan la caja
+                      </p>
+                    </div>
+                    <Badge className="bg-blue-600 text-white font-black text-xs px-3 py-1 shadow-sm">
                       📦 Stock Actual: {editCurrentStock} {editCurrentStock === 1 ? "unidad" : "unidades"}
                     </Badge>
                   </div>
 
-                  {/* Sección para comprar / ingresar más unidades */}
-                  <div className="bg-white p-3 rounded-xl border border-blue-200/70 shadow-sm space-y-3">
+                  {/* Panel de ingreso / compra de stock */}
+                  <div className="bg-white p-4 rounded-2xl border border-blue-200/80 shadow-sm space-y-4">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                      <label className="text-xs font-black text-blue-900 flex items-center gap-1.5 uppercase tracking-wide">
                         <Plus className="h-4 w-4 text-blue-600" />
-                        Comprar / Ingresar Más Unidades a este Artículo:
+                        Ingresar / Comprar Más Unidades (+Stock):
                       </label>
                       {addStockQty > 0 && (
-                        <Badge className="bg-emerald-600 text-white font-bold text-[10px]">
+                        <Badge className="bg-emerald-600 text-white font-black text-xs animate-pulse">
                           +{addStockQty} a comprar
                         </Badge>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Cantidad Stepper */}
                       <div>
-                        <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                          Cantidad adicional a ingresar:
+                        <label className="text-[11px] font-bold text-slate-700 block mb-1.5">
+                          Cantidad de unidades adicionales a ingresar:
                         </label>
                         <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-10 w-10 p-0 text-slate-700 border-slate-300 rounded-xl"
+                            onClick={() => setAddStockQty((prev) => Math.max(0, prev - 1))}
+                            disabled={addStockQty <= 0}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
                           <Input
                             type="number"
                             min="0"
                             max="500"
                             value={addStockQty === 0 ? "" : addStockQty}
                             onChange={(e) => setAddStockQty(Math.max(0, parseInt(e.target.value) || 0))}
-                            placeholder="0 (ej. +5)"
-                            className="h-9 font-bold text-center border-blue-300"
+                            placeholder="0"
+                            className="h-10 font-black text-center text-lg border-blue-300 rounded-xl max-w-[100px]"
                           />
-                          <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-10 w-10 p-0 text-blue-700 border-blue-300 rounded-xl"
+                            onClick={() => setAddStockQty((prev) => prev + 1)}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                          <div className="flex gap-1 ml-auto">
                             {[1, 5, 10].map((n) => (
                               <Button
                                 key={n}
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                className="h-9 px-2 text-xs font-bold text-blue-700 border-blue-200 hover:bg-blue-50"
+                                className="h-10 px-2.5 text-xs font-black text-blue-700 border-blue-200 hover:bg-blue-50 rounded-xl"
                                 onClick={() => setAddStockQty((prev) => prev + n)}
                               >
                                 +{n}
@@ -1833,7 +2082,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                                 type="button"
                                 size="sm"
                                 variant="ghost"
-                                className="h-9 px-2 text-xs text-red-600 hover:bg-red-50"
+                                className="h-10 px-2 text-xs text-red-600 hover:bg-red-50 rounded-xl"
                                 onClick={() => setAddStockQty(0)}
                                 title="Reiniciar a 0"
                               >
@@ -1844,161 +2093,162 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         </div>
                       </div>
 
+                      {/* Método de pago selector con Saldos */}
                       <div>
-                        <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                          Método de Pago de la Compra (Caja):
+                        <label className="text-[11px] font-bold text-slate-700 block mb-1.5">
+                          Forma de Pago de la Compra (Caja):
                         </label>
-                        <Select
-                          value={addStockPaymentMethod}
-                          onValueChange={(v: any) => setAddStockPaymentMethod(v)}
-                        >
-                          <SelectTrigger className="h-9 bg-white border-blue-200">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="cash">💵 Efectivo (Salida de Caja)</SelectItem>
-                            <SelectItem value="qr">📱 QR (Banco / QR)</SelectItem>
-                            <SelectItem value="transfer">🏦 Transferencia Bancaria</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="grid grid-cols-3 gap-2">
+                          {/* Efectivo */}
+                          <button
+                            type="button"
+                            onClick={() => setAddStockPaymentMethod("cash")}
+                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all text-center ${
+                              addStockPaymentMethod === "cash"
+                                ? "border-emerald-500 bg-emerald-50/80 shadow-sm"
+                                : "border-slate-200 bg-white hover:border-emerald-300"
+                            }`}
+                          >
+                            <div className="flex items-center gap-1">
+                              <Wallet className={`h-3.5 w-3.5 ${addStockPaymentMethod === "cash" ? "text-emerald-600" : "text-slate-400"}`} />
+                              <span className={`text-[10px] font-black uppercase ${addStockPaymentMethod === "cash" ? "text-emerald-800" : "text-slate-600"}`}>
+                                Efectivo
+                              </span>
+                            </div>
+                            <p className="text-[10px] font-black text-emerald-700 tabular-nums">
+                              {formatCurrency(globalBalances?.cash ?? 0)}
+                            </p>
+                          </button>
+
+                          {/* QR */}
+                          <button
+                            type="button"
+                            onClick={() => setAddStockPaymentMethod("qr")}
+                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all text-center ${
+                              addStockPaymentMethod === "qr"
+                                ? "border-blue-500 bg-blue-50/80 shadow-sm"
+                                : "border-slate-200 bg-white hover:border-blue-300"
+                            }`}
+                          >
+                            <div className="flex items-center gap-1">
+                              <QrCode className={`h-3.5 w-3.5 ${addStockPaymentMethod === "qr" ? "text-blue-600" : "text-slate-400"}`} />
+                              <span className={`text-[10px] font-black uppercase ${addStockPaymentMethod === "qr" ? "text-blue-800" : "text-slate-600"}`}>
+                                QR
+                              </span>
+                            </div>
+                            <p className="text-[10px] font-black text-blue-700 tabular-nums">
+                              {formatCurrency(globalBalances?.qr ?? 0)}
+                            </p>
+                          </button>
+
+                          {/* Banco */}
+                          <button
+                            type="button"
+                            onClick={() => setAddStockPaymentMethod("transfer")}
+                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all text-center ${
+                              addStockPaymentMethod === "transfer"
+                                ? "border-purple-500 bg-purple-50/80 shadow-sm"
+                                : "border-slate-200 bg-white hover:border-purple-300"
+                            }`}
+                          >
+                            <div className="flex items-center gap-1">
+                              <Landmark className={`h-3.5 w-3.5 ${addStockPaymentMethod === "transfer" ? "text-purple-600" : "text-slate-400"}`} />
+                              <span className={`text-[10px] font-black uppercase ${addStockPaymentMethod === "transfer" ? "text-purple-800" : "text-slate-600"}`}>
+                                Banco
+                              </span>
+                            </div>
+                            <p className="text-[10px] font-black text-purple-700 tabular-nums">
+                              {formatCurrency(globalBalances?.transfer ?? 0)}
+                            </p>
+                          </button>
+                        </div>
                       </div>
                     </div>
 
+                    {/* Alerta de Impacto Financiero en Caja */}
                     {addStockQty > 0 && (
-                      <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
-                        <div className="flex items-center justify-between font-bold">
-                          <span>💰 Impacto Financiero en Caja:</span>
-                          <span className="text-sm font-black text-amber-950">
+                      <div className="p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-300/80 text-amber-950 space-y-2 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black flex items-center gap-1.5 uppercase tracking-wide">
+                            <DollarSign className="h-4 w-4 text-amber-700" />
+                            Egreso Automático en Finanzas / Caja:
+                          </span>
+                          <span className="text-base font-black text-amber-950 tabular-nums bg-amber-100/90 px-3 py-0.5 rounded-lg border border-amber-300">
                             −Bs. {(addStockQty * (parseFloat(editPurchasePrice) || 0)).toFixed(2)}
                           </span>
                         </div>
-                        <p className="text-[11px] text-amber-800">
-                          Al guardar se crearán automáticamente {addStockQty} {addStockQty === 1 ? "unidad" : "unidades"} en el inventario y se registrará un egreso por compra de <b>Bs. {(addStockQty * (parseFloat(editPurchasePrice) || 0)).toFixed(2)}</b> en el módulo de Finanzas.
+                        <p className="text-xs text-amber-900 leading-relaxed">
+                          Al guardar se crearán automáticamente <b>{addStockQty} {addStockQty === 1 ? "unidad" : "unidades"}</b> con códigos únicos secuenciales en el inventario y se registrará <b>1 orden de compra</b> con egreso de caja por <b>Bs. {(addStockQty * (parseFloat(editPurchasePrice) || 0)).toFixed(2)}</b> ({addStockPaymentMethod === "cash" ? "Efectivo" : addStockPaymentMethod === "qr" ? "QR" : "Transferencia"}).
                         </p>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Precios */}
-                <div className="border-t pt-4 space-y-3">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <label className="text-xs font-semibold block">Precios (Bs):</label>
-                    <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
-                      <Checkbox
-                        checked={updateAllMatchingUnits}
-                        onCheckedChange={(c) => setUpdateAllMatchingUnits(!!c)}
-                      />
-                      <span>Actualizar precios en todas las {editCurrentStock} unidades del mismo modelo</span>
-                    </label>
+                {/* ─── 7. Proveedor y Fecha de Compra ─── */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    <Package className="h-4 w-4 text-slate-600" />
+                    Información de Proveedor y Compra
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <div>
-                      <label className="text-xs font-semibold block mb-1 text-emerald-800">🛒 Precio Compra:</label>
-                      <Input
-                        type="number" step="0.01"
-                        value={editPurchasePrice}
-                        onChange={(e) => setEditPurchasePrice(e.target.value)}
-                        placeholder="ej. 1500.00"
-                        className="border-emerald-300 bg-emerald-50/30 font-medium"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold block mb-1 text-blue-700">💰 Precio Unit:</label>
-                      <Input
-                        type="number" step="0.01"
-                        value={editSalePrice}
-                        onChange={(e) => setEditSalePrice(e.target.value)}
-                        placeholder="ej. 2200.00"
-                        className="border-blue-300 font-medium"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold block mb-1 text-amber-700">🏷️ Precio Descuento:</label>
-                      <Input
-                        type="number" step="0.01"
-                        value={editDiscountPrice}
-                        onChange={(e) => setEditDiscountPrice(e.target.value)}
-                        placeholder="ej. 2000.00"
-                        className="border-amber-300 font-medium"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold block mb-1 text-green-700">📦 Precio Mayor:</label>
-                      <Input
-                        type="number" step="0.01"
-                        value={editWholesalePrice}
-                        onChange={(e) => setEditWholesalePrice(e.target.value)}
-                        placeholder="ej. 1900.00"
-                        className="border-green-300 font-medium"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Proveedor y Fecha de Compra */}
-                <div className="border-t pt-4 space-y-3">
-                  <label className="text-xs font-semibold block">Información de Compra:</label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-semibold block mb-1">Proveedor:</label>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Proveedor:</label>
                       <Select
                         value={editSupplierId ? String(editSupplierId) : ""}
                         onValueChange={(v) => setEditSupplierId(v ? parseInt(v) : undefined)}
                       >
-                        <SelectTrigger><SelectValue placeholder="Seleccionar proveedor..." /></SelectTrigger>
+                        <SelectTrigger className="bg-white rounded-xl border-slate-200 h-9 font-medium">
+                          <SelectValue placeholder="Seleccionar proveedor..." />
+                        </SelectTrigger>
                         <SelectContent>
                           {(suppliersData as any[])?.map((s: any) => (
-                            <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                            <SelectItem key={s.id} value={String(s.id)}>
+                              {s.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
-                      <label className="text-xs font-semibold block mb-1">Fecha de Compra:</label>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Fecha de Compra:</label>
                       <Input
                         type="date"
                         value={editPurchaseDate}
                         onChange={(e) => setEditPurchaseDate(e.target.value)}
                         max={new Date().toISOString().split("T")[0]}
+                        className="bg-white rounded-xl border-slate-200 h-9 font-medium"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* ─── Fotografías del Equipo ─── */}
-                <div className="space-y-3 border-t pt-4">
+                {/* ─── 8. Fotografías del Equipo ─── */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold flex items-center gap-1.5 text-slate-800">
+                    <label className="text-xs font-bold flex items-center gap-2 text-slate-800 uppercase tracking-wider">
                       <Camera className="h-4 w-4 text-blue-600" />
-                      Fotografías del Equipo:
-                      <span className="text-muted-foreground font-normal">({editPhotos.length}/8)</span>
+                      Fotografías del Equipo
+                      <span className="text-slate-400 font-normal">({editPhotos.length}/8)</span>
                     </label>
                   </div>
 
-                  {/* Photo buttons */}
+                  {/* Botones para fotos */}
                   <div className="flex flex-wrap gap-2">
-                    {/* Camera capture — celular */}
                     <button
                       type="button"
                       onClick={() => editPhotoCameraInputRef.current?.click()}
-                      className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors shadow-sm"
+                      className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors shadow-sm"
                     >
-                      <Camera className="h-3.5 w-3.5" />
-                      Tomar Foto
+                      <Camera className="h-3.5 w-3.5" /> Tomar Foto
                     </button>
-
-                    {/* File upload — galería / pc */}
                     <button
                       type="button"
                       onClick={() => editPhotoFileInputRef.current?.click()}
-                      className="flex items-center gap-2 px-3.5 py-2 rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-semibold transition-colors"
+                      className="flex items-center gap-2 px-3.5 py-2 rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-bold transition-colors"
                     >
-                      <ImagePlus className="h-3.5 w-3.5 text-blue-600" />
-                      Subir desde Galería / PC
+                      <ImagePlus className="h-3.5 w-3.5 text-blue-600" /> Subir desde Galería / PC
                     </button>
-
-                    {/* Hidden inputs */}
                     <input
                       ref={editPhotoCameraInputRef}
                       type="file"
@@ -2020,20 +2270,20 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
                   {/* Photo previews */}
                   {editPhotos.length > 0 && (
-                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 pt-1">
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5 pt-2">
                       {editPhotos.map((photo, idx) => (
-                        <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 shadow-sm">
+                        <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm">
                           <img src={photo} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
                           <button
                             type="button"
                             onClick={() => removeEditPhoto(idx)}
-                            className="absolute top-1 right-1 w-5 h-5 bg-red-600 rounded-full text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                            className="absolute top-1 right-1 w-6 h-6 bg-red-600 rounded-full text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
                             title="Eliminar foto"
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-3.5 w-3.5" />
                           </button>
                           {idx === 0 && (
-                            <div className="absolute bottom-0 left-0 right-0 bg-blue-600 text-white text-[9px] text-center py-0.5 font-bold">
+                            <div className="absolute bottom-0 left-0 right-0 bg-blue-600 text-white text-[9px] text-center py-0.5 font-black">
                               PRINCIPAL
                             </div>
                           )}
@@ -2041,56 +2291,90 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                       ))}
                     </div>
                   )}
-
-                  {editPhotos.length === 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      📸 Sin fotografías registradas. Sube imágenes para que aparezcan en el Catálogo Comercial y Ficha de Producto.
-                    </p>
-                  )}
                 </div>
 
-                {/* Video de TikTok */}
-                <div className="border-t pt-4 space-y-2.5 bg-gradient-to-br from-[#0b0f19] via-[#111827] to-[#0b0f19] text-white p-3.5 sm:p-4 rounded-2xl border border-pink-500/30">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold flex items-center gap-1.5 text-white">
-                      <span className="p-1 bg-pink-500/20 text-pink-400 rounded-md">🎵</span> Video de TikTok del Equipo:
-                    </label>
+                {/* ─── 9. Video de TikTok ─── */}
+                <div className="space-y-3 bg-gradient-to-br from-[#0b0f19] via-[#111827] to-[#0b0f19] text-white p-4 rounded-2xl shadow-md border border-pink-500/30">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-gradient-to-br from-pink-500/25 to-rose-600/20 text-pink-400 rounded-xl border border-pink-500/40 flex items-center justify-center shadow-inner">
+                        <Video className="h-5 w-5 text-pink-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-black text-white tracking-wide">Video de TikTok del Equipo</h3>
+                          <Badge className="bg-gradient-to-r from-pink-500 to-rose-600 text-white font-bold text-[10px] px-2 py-0.5 border-none">
+                            🎵 TikTok
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-slate-300 mt-0.5">
+                          Link al video mostrando el funcionamiento, unboxing o estado estético real.
+                        </p>
+                      </div>
+                    </div>
+
                     {editTiktokUrl.trim() && (
-                      <a
-                        href={editTiktokUrl.startsWith("http") ? editTiktokUrl : `https://${editTiktokUrl}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-bold text-pink-300 hover:text-pink-200 flex items-center gap-1 bg-pink-500/20 px-2.5 py-1 rounded-lg border border-pink-500/30"
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const url = editTiktokUrl.trim();
+                          if (url.startsWith("http://") || url.startsWith("https://")) {
+                            window.open(url, "_blank", "noopener,noreferrer");
+                          } else {
+                            window.open(`https://${url}`, "_blank", "noopener,noreferrer");
+                          }
+                        }}
+                        className="bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border-pink-500/40 font-bold text-xs h-8 gap-1.5 self-start sm:self-auto shrink-0 shadow-sm"
                       >
-                        <Play className="h-3 w-3 fill-current" /> Probar Video
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
+                        <Play className="h-3.5 w-3.5 fill-current" /> Probar Enlace
+                        <ExternalLink className="h-3 w-3 ml-0.5" />
+                      </Button>
                     )}
                   </div>
-                  <Input
-                    value={editTiktokUrl}
-                    onChange={(e) => setEditTiktokUrl(e.target.value)}
-                    placeholder="https://www.tiktok.com/@mpshop/video/... o https://vm.tiktok.com/..."
-                    className="dark-input !bg-[#050811] !text-white placeholder:!text-slate-500 !border-slate-700 focus:!border-pink-500 focus:!ring-2 focus:!ring-pink-500/30 text-xs font-mono h-10 rounded-xl"
-                  />
-                  <p className="text-[10px] text-slate-400">
-                    💡 Enlace de TikTok con la prueba de funcionamiento, batería o unboxing del equipo.
-                  </p>
+
+                  <div className="relative flex items-center">
+                    <Input
+                      value={editTiktokUrl}
+                      onChange={(e) => setEditTiktokUrl(e.target.value)}
+                      placeholder="https://www.tiktok.com/@mpshop/video/... o https://vm.tiktok.com/..."
+                      className="dark-input !bg-[#050811] !text-white placeholder:!text-slate-500 !border-slate-700 focus:!border-pink-500 focus:!ring-2 focus:!ring-pink-500/30 text-xs font-mono h-10 pr-9 rounded-xl transition-all"
+                    />
+                    {editTiktokUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setEditTiktokUrl("")}
+                        className="absolute right-3 text-slate-400 hover:text-white transition-colors"
+                        title="Limpiar"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
+
               </div>
             )}
 
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
+            {/* Footer */}
+            <div className="sticky bottom-0 z-20 bg-white/95 backdrop-blur-md px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setIsEditOpen(false)}
+                className="h-10 px-5 rounded-xl text-slate-700 font-bold"
+              >
+                Cancelar
+              </Button>
               <Button
                 onClick={handleSaveEdit}
                 disabled={updateUnitMutation.isPending}
-                className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                className="h-10 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2 shadow-md shadow-blue-200"
               >
                 <CheckCircle className="h-4 w-4" />
                 {updateUnitMutation.isPending ? "Guardando..." : "Guardar Cambios"}
               </Button>
-            </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
 
