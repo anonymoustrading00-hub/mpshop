@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DollarSign, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, Receipt, WalletCards, Wallet, Printer, Eye, FileText, CheckCircle2, XCircle, AlertTriangle, History, Download, X, ArrowRightLeft, QrCode, Landmark, User, BadgeCheck, RotateCcw } from "lucide-react";
+import { DollarSign, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, Receipt, WalletCards, Wallet, Printer, Eye, FileText, CheckCircle2, XCircle, AlertTriangle, History, Download, X, ArrowRightLeft, QrCode, Landmark, User, BadgeCheck } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency, parseInputAmount } from "@/lib/currency";
@@ -326,7 +326,6 @@ export default function Finance() {
               <Receipt className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Módulo de</span> Gastos
             </Button>
           </Link>
-          <ResetFinanceDialog />
         </div>
       </div>
 
@@ -1940,62 +1939,4 @@ function BasicTransactionDialog({ transaction, onClose, onPrint }: { transaction
   );
 }
 
-function ResetFinanceDialog() {
-  const [open, setOpen] = useState(false);
-  const utils = trpc.useUtils();
-  const resetMutation = (trpc.finance as any).resetFinancialData.useMutation({
-    onSuccess: () => {
-      toast.success("✅ Módulo de finanzas reiniciado a Bs. 0,00 correctamente");
-      utils.finance.getTransactions.invalidate();
-      utils.finance.getCashOpenings.invalidate();
-      if ((utils.finance as any).getGlobalBalances) {
-        (utils.finance as any).getGlobalBalances.invalidate();
-      }
-      utils.stats.invalidate();
-      setOpen(false);
-    },
-    onError: (err: any) => {
-      toast.error(err.message || "Error al reiniciar finanzas");
-    },
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          className="gap-1.5 border-rose-200 text-rose-700 hover:bg-rose-50 hover:border-rose-300 h-10 px-3 text-xs font-bold"
-          title="Vaciar movimientos y poner saldos en 0"
-        >
-          <RotateCcw className="h-3.5 w-3.5" /> Poner a Bs. 0
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <div className="mx-auto w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 mb-2">
-            <RotateCcw className="h-6 w-6" />
-          </div>
-          <DialogTitle className="text-center text-lg font-black text-slate-900">
-            ¿Reiniciar todas las finanzas a Bs. 0,00?
-          </DialogTitle>
-          <DialogDescription className="text-center text-xs text-slate-600 mt-2">
-            Esta acción vaciará todos los registros de <strong>ingresos, egresos, gastos, compras financieras y aperturas de caja</strong> para dejar todas las cuentas (Efectivo, QR, Banco) limpias en <strong>Bs. 0,00</strong> y comenzar pruebas desde cero.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="flex gap-2 sm:justify-center mt-4">
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={resetMutation.isPending}>
-            Cancelar
-          </Button>
-          <Button
-            onClick={() => resetMutation.mutate()}
-            disabled={resetMutation.isPending}
-            className="bg-rose-600 hover:bg-rose-700 text-white font-bold gap-2"
-          >
-            {resetMutation.isPending ? "Reiniciando..." : "Sí, poner finanzas en Bs. 0"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
