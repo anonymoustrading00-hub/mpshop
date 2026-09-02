@@ -837,24 +837,12 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
 
       {/* DETAILS & PDF DIALOG */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-[80vw] max-h-[90vh] overflow-y-auto">
-          {detailQuery.isLoading ? <div className="p-8 text-center">Cargando detalles...</div> : detailQuery.data ? (
-            <div className="space-y-6">
-              <div className="flex justify-between">
-                <h2 className="text-2xl font-bold">Detalle {detailQuery.data.quotation.quotationNumber}</h2>
-                <div className="space-x-2">
-                  {onSelectQuotation && detailQuery.data.quotation.status === 'pending' && (
-                    <Button onClick={handleLoadToSale} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
-                      <CopyPlus className="w-4 h-4" /> Cargar a Venta
-                    </Button>
-                  )}
-                  <Button variant="outline" onClick={handleExportPDF}><Printer className="w-4 h-4 mr-2"/> PDF</Button>
-                  {detailQuery.data.quotation.status === 'pending' && (
-                     <Button variant="destructive" onClick={() => updateStatusMutation.mutate({ quotationId: detailQuery.data.quotation.id, status: 'rejected' })}>Rechazar</Button>
-                  )}
-                </div>
-              </div>
-              
+        <DialogContent className="w-[min(900px,96vw)] max-w-none max-h-[90vh] overflow-hidden p-0 gap-0 rounded-2xl">
+          {detailQuery.isLoading ? (
+            <div className="p-8 text-center text-slate-400">Cargando detalles...</div>
+          ) : detailQuery.data ? (
+            <div className="flex flex-col h-full max-h-[90vh]">
+
               {/* HIDDEN PDF TEMPLATE */}
               <div className="absolute left-[-9999px] top-[-9999px] w-[800px]">
                 <div ref={printRef} style={{ padding: '40px', fontFamily: 'sans-serif', color: '#111', background: 'white' }}>
@@ -876,12 +864,10 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
                       {detailQuery.data.quotation.validUntil && <p style={{ margin: '5px 0 0 0' }}><strong>Válido hasta:</strong> {new Date(detailQuery.data.quotation.validUntil).toLocaleDateString()}</p>}
                     </div>
                   </div>
-
                   <div style={{ marginBottom: '30px' }}>
                     <h3 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #ddd', paddingBottom: '5px' }}>Preparado para:</h3>
                     <p style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>{detailQuery.data.quotation.customerDisplayName}</p>
                   </div>
-
                   <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#f4f4f5', textAlign: 'left' }}>
@@ -894,164 +880,211 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
                     <tbody>
                       {detailQuery.data.items.map((item: any) => {
                         let parsedSpecs: Record<string, any> = {};
-                        if (item.specs) {
-                          try {
-                            parsedSpecs = typeof item.specs === "string" ? JSON.parse(item.specs) : item.specs;
-                          } catch {
-                            parsedSpecs = {};
-                          }
-                        }
-                        const specsList = Object.entries(parsedSpecs)
-                          .filter(([_, v]) => v && String(v).trim() !== "" && String(v) !== "null")
-                          .map(([k, v]) => `${k.toUpperCase()}: ${v}`);
-
+                        if (item.specs) { try { parsedSpecs = typeof item.specs === "string" ? JSON.parse(item.specs) : item.specs; } catch { parsedSpecs = {}; } }
+                        const specsList = Object.entries(parsedSpecs).filter(([_, v]) => v && String(v).trim() !== "" && String(v) !== "null").map(([k, v]) => `${k.toUpperCase()}: ${v}`);
                         return (
                           <tr key={item.id} style={{ verticalAlign: 'top' }}>
                             <td style={{ padding: '12px 10px', borderBottom: '1px solid #ddd' }}>
-                              <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#0f172a' }}>
-                                {item.productName}
-                              </div>
-                              <div style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace', marginTop: '2px' }}>
-                                Código: {item.productCode}
-                              </div>
+                              <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#0f172a' }}>{item.productName}</div>
+                              <div style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace', marginTop: '2px' }}>Código: {item.productCode}</div>
                               {specsList.length > 0 && (
                                 <div style={{ marginTop: '6px', fontSize: '11px', color: '#334155', lineHeight: '1.45', background: '#f8fafc', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                                   <strong style={{ color: '#0f172a' }}>Especificaciones Técnicas:</strong>
-                                  <div style={{ marginTop: '3px', color: '#475569' }}>
-                                    {specsList.join("  ·  ")}
-                                  </div>
+                                  <div style={{ marginTop: '3px', color: '#475569' }}>{specsList.join("  ·  ")}</div>
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '12px 10px', borderBottom: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>
-                              {item.quantity}
-                            </td>
-                            <td style={{ padding: '12px 10px', borderBottom: '1px solid #ddd', textAlign: 'right', fontSize: '13px' }}>
-                              {formatCurrency(item.finalUnitPrice || item.basePrice)}
-                            </td>
-                            <td style={{ padding: '12px 10px', borderBottom: '1px solid #ddd', textAlign: 'right', fontWeight: 'bold', fontSize: '14px', color: '#0f172a' }}>
-                              {formatCurrency(item.subtotal)}
-                            </td>
+                            <td style={{ padding: '12px 10px', borderBottom: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>{item.quantity}</td>
+                            <td style={{ padding: '12px 10px', borderBottom: '1px solid #ddd', textAlign: 'right', fontSize: '13px' }}>{formatCurrency(item.finalUnitPrice || item.basePrice)}</td>
+                            <td style={{ padding: '12px 10px', borderBottom: '1px solid #ddd', textAlign: 'right', fontWeight: 'bold', fontSize: '14px', color: '#0f172a' }}>{formatCurrency(item.subtotal)}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
-
                   <div style={{ width: '300px', marginLeft: 'auto', marginBottom: '30px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
-                      <span>Subtotal:</span>
-                      <strong>{formatCurrency(detailQuery.data.quotation.subtotal)}</strong>
-                    </div>
-                    {detailQuery.data.quotation.discountAmount > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', color: 'red' }}>
-                        <span>Descuento:</span>
-                        <strong>-{formatCurrency(detailQuery.data.quotation.discountAmount)}</strong>
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderTop: '2px solid #111', fontSize: '18px', marginTop: '10px' }}>
-                      <span><strong>Total:</strong></span>
-                      <strong>{formatCurrency(detailQuery.data.quotation.total)}</strong>
-                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}><span>Subtotal:</span><strong>{formatCurrency(detailQuery.data.quotation.subtotal)}</strong></div>
+                    {detailQuery.data.quotation.discountAmount > 0 && (<div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', color: 'red' }}><span>Descuento:</span><strong>-{formatCurrency(detailQuery.data.quotation.discountAmount)}</strong></div>)}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderTop: '2px solid #111', fontSize: '18px', marginTop: '10px' }}><span><strong>Total:</strong></span><strong>{formatCurrency(detailQuery.data.quotation.total)}</strong></div>
                   </div>
-
                   <div style={{ marginTop: '50px', fontSize: '12px', color: '#555' }}>
-                    {detailQuery.data.quotation.termsAndConditions && (
-                      <div style={{ marginBottom: '15px' }}>
-                        <strong>Términos y Condiciones:</strong><br/>
-                        {detailQuery.data.quotation.termsAndConditions}
-                      </div>
-                    )}
-                    <div style={{ borderTop: '1px solid #ddd', paddingTop: '10px' }}>
-                      Documento generado por: {detailQuery.data.quotation.creatorName}
-                    </div>
+                    {detailQuery.data.quotation.termsAndConditions && (<div style={{ marginBottom: '15px' }}><strong>Términos y Condiciones:</strong><br/>{detailQuery.data.quotation.termsAndConditions}</div>)}
+                    <div style={{ borderTop: '1px solid #ddd', paddingTop: '10px' }}>Documento generado por: {detailQuery.data.quotation.creatorName}</div>
                   </div>
                 </div>
               </div>
-              
-              {/* VISIBLE PREVIEW */}
-              <div className="border rounded-md p-4 bg-slate-50 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Cliente</p>
-                    <p className="font-semibold">{detailQuery.data.quotation.customerDisplayName}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Total</p>
-                    <p className="font-semibold">{formatCurrency(detailQuery.data.quotation.total)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Estado</p>
-                    <Badge variant={detailQuery.data.quotation.status === 'accepted' ? 'default' : detailQuery.data.quotation.status === 'rejected' ? 'destructive' : 'secondary'}>
-                      {detailQuery.data.quotation.status === 'accepted' ? 'Aceptada' : detailQuery.data.quotation.status === 'rejected' ? 'Rechazada' : 'Pendiente'}
-                    </Badge>
-                  </div>
-                </div>
 
-                {detailQuery.data.items.length > 0 && (
+              {/* ── VISIBLE DETAIL REDESIGN ─────────────────────── */}
+
+              {/* Header bar */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-xl bg-indigo-50 flex items-center justify-center">
+                    <FileText className="h-4 w-4 text-indigo-600" />
+                  </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Productos</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Cotización</p>
+                    <h2 className="text-lg font-black text-slate-900 leading-tight">{detailQuery.data.quotation.quotationNumber}</h2>
+                  </div>
+                  <Badge variant={detailQuery.data.quotation.status === 'accepted' ? 'default' : detailQuery.data.quotation.status === 'rejected' ? 'destructive' : 'secondary'} className="ml-2 text-xs">
+                    {detailQuery.data.quotation.status === 'accepted' ? '✓ Aceptada' : detailQuery.data.quotation.status === 'rejected' ? '✗ Rechazada' : '⏳ Pendiente'}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  {onSelectQuotation && detailQuery.data.quotation.status === 'pending' && (
+                    <Button onClick={handleLoadToSale} size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 h-8 text-xs">
+                      <CopyPlus className="w-3.5 h-3.5" /> Cargar a Venta
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={handleExportPDF} className="h-8 text-xs gap-1.5">
+                    <Printer className="w-3.5 h-3.5"/> PDF
+                  </Button>
+                  {detailQuery.data.quotation.status === 'pending' && (
+                    <Button variant="destructive" size="sm" className="h-8 text-xs" onClick={() => updateStatusMutation.mutate({ quotationId: detailQuery.data.quotation.id, status: 'rejected' })}>
+                      Rechazar
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Body: two-column layout */}
+              <div className="flex flex-1 min-h-0 overflow-hidden">
+
+                {/* LEFT: Items table */}
+                <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                  {/* Meta row */}
+                  <div className="flex items-center gap-6 px-6 py-3 bg-slate-50 border-b border-slate-100 shrink-0">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cliente</span>
+                      <p className="text-sm font-bold text-slate-900 leading-tight mt-0.5">{detailQuery.data.quotation.customerDisplayName}</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Fecha</span>
+                      <p className="text-sm font-semibold text-slate-700 leading-tight mt-0.5">{new Date(detailQuery.data.quotation.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    {detailQuery.data.quotation.validUntil && (
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Válido hasta</span>
+                        <p className="text-sm font-semibold text-slate-700 leading-tight mt-0.5">{new Date(detailQuery.data.quotation.validUntil).toLocaleDateString()}</p>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Creado por</span>
+                      <p className="text-sm font-semibold text-slate-700 leading-tight mt-0.5">{detailQuery.data.quotation.creatorName}</p>
+                    </div>
+                  </div>
+
+                  {/* Items table — scrolls internally if many products */}
+                  <div className="flex-1 overflow-y-auto">
                     <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Descripción / Características</TableHead>
-                          <TableHead className="text-center">Cant.</TableHead>
-                          <TableHead className="text-right">P. Unit.</TableHead>
-                          <TableHead className="text-right">Subtotal</TableHead>
+                      <TableHeader className="sticky top-0 z-10">
+                        <TableRow className="bg-white border-b-2 border-slate-200">
+                          <TableHead className="text-xs font-bold text-slate-600 pl-6">Producto / Características</TableHead>
+                          <TableHead className="text-center text-xs font-bold text-slate-600 w-16">Cant.</TableHead>
+                          <TableHead className="text-right text-xs font-bold text-slate-600 w-28">P. Unit.</TableHead>
+                          <TableHead className="text-right text-xs font-bold text-slate-600 w-28 pr-6">Subtotal</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {detailQuery.data.items.map((item: any) => {
                           let parsedSpecs: Record<string, any> = {};
-                          if (item.specs) {
-                            try {
-                              parsedSpecs = typeof item.specs === "string" ? JSON.parse(item.specs) : item.specs;
-                            } catch {
-                              parsedSpecs = {};
-                            }
-                          }
-                          const specsList = Object.entries(parsedSpecs)
-                            .filter(([_, v]) => v && String(v).trim() !== "" && String(v) !== "null")
-                            .map(([k, v]) => `${k.toUpperCase()}: ${v}`);
-
+                          if (item.specs) { try { parsedSpecs = typeof item.specs === "string" ? JSON.parse(item.specs) : item.specs; } catch { parsedSpecs = {}; } }
+                          const specsList = Object.entries(parsedSpecs).filter(([_, v]) => v && String(v).trim() !== "" && String(v) !== "null").map(([k, v]) => `${k.toUpperCase()}: ${v}`);
                           return (
-                            <TableRow key={item.id} className="align-top">
-                              <TableCell className="py-3">
-                                <div className="font-bold text-slate-900">{item.productName}</div>
-                                <div className="text-xs font-mono text-slate-500">{item.productCode}</div>
+                            <TableRow key={item.id} className="align-top hover:bg-slate-50/60">
+                              <TableCell className="py-3 pl-6">
+                                <div className="font-bold text-sm text-slate-900">{item.productName}</div>
+                                <div className="text-[11px] font-mono text-slate-400 mt-0.5">{item.productCode}</div>
                                 {specsList.length > 0 && (
-                                  <div className="mt-1.5 text-xs text-slate-600 bg-slate-100/80 p-2 rounded-lg border border-slate-200/60 leading-relaxed">
-                                    <span className="font-bold text-slate-800">Especificaciones: </span>
-                                    {specsList.join(" · ")}
+                                  <div className="mt-1.5 text-[11px] text-slate-600 bg-indigo-50/60 px-2.5 py-1.5 rounded-lg border border-indigo-100 leading-relaxed">
+                                    <span className="font-bold text-indigo-800">Specs: </span>
+                                    <span className="text-slate-600">{specsList.join(" · ")}</span>
                                   </div>
                                 )}
                               </TableCell>
-                              <TableCell className="text-center font-bold py-3">{item.quantity}</TableCell>
-                              <TableCell className="text-right py-3">{formatCurrency(item.finalUnitPrice || item.basePrice)}</TableCell>
-                              <TableCell className="text-right font-black text-slate-900 py-3">{formatCurrency(item.subtotal)}</TableCell>
+                              <TableCell className="text-center font-black text-slate-800 py-3 text-sm">{item.quantity}</TableCell>
+                              <TableCell className="text-right text-slate-600 py-3 text-sm">{formatCurrency(item.finalUnitPrice || item.basePrice)}</TableCell>
+                              <TableCell className="text-right font-black text-indigo-900 py-3 text-sm pr-6">{formatCurrency(item.subtotal)}</TableCell>
                             </TableRow>
                           );
                         })}
                       </TableBody>
                     </Table>
                   </div>
-                )}
 
-                {detailQuery.data.quotation.notes && (
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Notas</p>
-                    <p className="text-sm whitespace-pre-wrap">{detailQuery.data.quotation.notes}</p>
-                  </div>
-                )}
+                  {/* Terms footer */}
+                  {(detailQuery.data.quotation.termsAndConditions || detailQuery.data.quotation.notes) && (
+                    <div className="border-t border-slate-100 px-6 py-3 bg-slate-50 shrink-0 space-y-1">
+                      {detailQuery.data.quotation.termsAndConditions && (
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          <span className="font-bold text-slate-700">Términos: </span>
+                          {detailQuery.data.quotation.termsAndConditions}
+                        </p>
+                      )}
+                      {detailQuery.data.quotation.notes && (
+                        <p className="text-[11px] text-slate-500 italic">
+                          <span className="font-bold not-italic text-slate-700">Nota: </span>
+                          {detailQuery.data.quotation.notes}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-                {detailQuery.data.quotation.termsAndConditions && (
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Términos y Condiciones</p>
-                    <p className="text-sm whitespace-pre-wrap text-muted-foreground">{detailQuery.data.quotation.termsAndConditions}</p>
+                {/* RIGHT: Summary panel */}
+                <div className="w-56 shrink-0 border-l border-slate-100 bg-slate-50 flex flex-col justify-between p-5">
+                  <div className="space-y-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Resumen</p>
+
+                    {/* Items count */}
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-500">Artículos</span>
+                      <span className="font-bold text-slate-800">{detailQuery.data.items.length}</span>
+                    </div>
+
+                    {/* Subtotal */}
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-500">Subtotal</span>
+                      <span className="font-semibold text-slate-700">{formatCurrency(detailQuery.data.quotation.subtotal)}</span>
+                    </div>
+
+                    {/* Discount */}
+                    {detailQuery.data.quotation.discountAmount > 0 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-red-500">Descuento</span>
+                        <span className="font-semibold text-red-500">−{formatCurrency(detailQuery.data.quotation.discountAmount)}</span>
+                      </div>
+                    )}
+
+                    {/* Divider */}
+                    <div className="border-t-2 border-slate-200" />
+
+                    {/* Total */}
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Total</p>
+                      <p className="text-2xl font-black text-indigo-900">{formatCurrency(detailQuery.data.quotation.total)}</p>
+                    </div>
                   </div>
-                )}
+
+                  {/* Bottom actions */}
+                  <div className="space-y-2 mt-6">
+                    <Button variant="outline" size="sm" onClick={handleExportPDF} className="w-full h-8 text-xs gap-1.5 border-slate-200">
+                      <Printer className="w-3.5 h-3.5"/> Descargar PDF
+                    </Button>
+                    {onSelectQuotation && detailQuery.data.quotation.status === 'pending' && (
+                      <Button onClick={handleLoadToSale} size="sm" className="w-full h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700">
+                        <CopyPlus className="w-3.5 h-3.5" /> Cargar a Venta
+                      </Button>
+                    )}
+                    {detailQuery.data.quotation.status === 'pending' && (
+                      <Button variant="destructive" size="sm" className="w-full h-8 text-xs" onClick={() => updateStatusMutation.mutate({ quotationId: detailQuery.data.quotation.id, status: 'rejected' })}>
+                        Rechazar Cotización
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
               </div>
-
             </div>
           ) : null}
         </DialogContent>
