@@ -9,7 +9,10 @@ import {
   getSaleById,
   getSaleItemsBySaleId,
   markSalePaymentCompleted,
+  getDb,
 } from "../db";
+import { units } from "../../drizzle/schema";
+import { eq, inArray } from "drizzle-orm";
 import { ensureCustomerRecord } from "./customer_utils";
 
 const discountTypeSchema = z.enum(["none", "percentage", "fixed"]);
@@ -122,6 +125,23 @@ export const salesRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // ─── VALIDACIÓN SERVIDOR: verificar que todas las unidades existen y están disponibles ───
+      const db = await getDb();
+      if (db) {
+        const unitIds = input.items.map((i) => i.unitId);
+        const foundUnits = await db.select({ id: units.id, status: units.status }).from(units).where(inArray(units.id, unitIds));
+        const foundMap = new Map(foundUnits.map((u: { id: number; status: string }) => [u.id, u.status]));
+        for (const item of input.items) {
+          const status = foundMap.get(item.unitId);
+          if (!status) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: `La unidad ID ${item.unitId} no existe en el catálogo. Revisa el carrito de venta.` });
+          }
+          if (status !== "available") {
+            throw new TRPCError({ code: "BAD_REQUEST", message: `La unidad ID ${item.unitId} no está disponible (estado: ${status}). Es posible que ya fue vendida.` });
+          }
+        }
+      }
+
       const normalizedItems = input.items.map((item) => {
         const pricing = getLinePricing(item.basePrice, 1, item.discountType, item.discountValue);
 

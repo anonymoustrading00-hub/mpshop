@@ -1874,7 +1874,7 @@ export default function Sales() {
                   </div>
 
                   {/* Resultados de búsqueda flotantes/desplegables */}
-                  {productSearch.length > 0 && (
+                  {productSearch.trim().length >= 2 && (
                     <div className="absolute left-0 right-0 top-full mt-1.5 z-40 rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden max-h-52 overflow-y-auto p-2">
                       {groupedProducts.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
