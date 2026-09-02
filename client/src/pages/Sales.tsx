@@ -54,9 +54,60 @@ import {
   CreditCard,
   AlertTriangle,
   Phone,
+  Info,
   X
 } from "lucide-react";
 import { useBranch } from "@/contexts/BranchContext";
+
+function getUnitTypeBadge(type?: string) {
+  const t = (type || "").toLowerCase();
+  switch (t) {
+    case "charger":
+      return { label: "Cargador", icon: "🔌", color: "bg-amber-50 text-amber-700 border-amber-200" };
+    case "laptop":
+      return { label: "Laptop", icon: "💻", color: "bg-blue-50 text-blue-700 border-blue-200" };
+    case "monitor":
+      return { label: "Monitor", icon: "🖥️", color: "bg-purple-50 text-purple-700 border-purple-200" };
+    case "desktop":
+      return { label: "PC Escritorio", icon: "🖥️", color: "bg-indigo-50 text-indigo-700 border-indigo-200" };
+    case "phone":
+    case "tablet":
+      return { label: "Celular / Tab", icon: "📱", color: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+    case "printer":
+      return { label: "Impresora", icon: "🖨️", color: "bg-slate-50 text-slate-700 border-slate-200" };
+    case "component":
+      return { label: "Componente", icon: "⚙️", color: "bg-zinc-50 text-zinc-700 border-zinc-200" };
+    case "accessory":
+      return { label: "Accesorio", icon: "📦", color: "bg-orange-50 text-orange-700 border-orange-200" };
+    default:
+      return { label: type ? (type === "charger" ? "Cargador" : type) : "Equipo", icon: "📦", color: "bg-slate-50 text-slate-700 border-slate-200" };
+  }
+}
+
+function getSpecsSummary(specs: any, damageNotes?: string): string {
+  if (!specs) return damageNotes || "";
+  if (typeof specs === "string") return specs;
+  if (typeof specs === "object") {
+    const parts: string[] = [];
+    if (specs.watts) parts.push(`${specs.watts}W`);
+    if (specs.voltage && specs.amperage) parts.push(`${specs.voltage}V ${specs.amperage}A`);
+    else if (specs.voltage) parts.push(`${specs.voltage}V`);
+    else if (specs.amperage) parts.push(`${specs.amperage}A`);
+    if (specs.connector) parts.push(specs.connector);
+    if (specs.cpu) parts.push(specs.cpu);
+    if (specs.ram) parts.push(specs.ram);
+    if (specs.storage) parts.push(specs.storage);
+    if (specs.screen) parts.push(specs.screen);
+    if (specs.gpu) parts.push(specs.gpu);
+    if (parts.length > 0) return parts.join(" • ");
+    return Object.entries(specs)
+      .filter(([k, v]) => v && typeof v !== "object" && k !== "id")
+      .map(([k, v]) => `${k}: ${v}`)
+      .slice(0, 3)
+      .join(" • ");
+  }
+  return damageNotes || "";
+}
 
 type DiscountType = "none" | "percentage" | "fixed";
 type PaymentMethod = "cash" | "qr" | "transfer" | "credit";
@@ -66,6 +117,16 @@ type CartItem = {
   productId: number;
   productName: string;
   productCode: string;
+  unitType?: string;
+  brand?: string;
+  model?: string;
+  specs?: any;
+  serialNumber?: string;
+  condition?: string;
+  damageNotes?: string;
+  location?: string;
+  purchasePrice?: number;
+  rawUnit?: any;
   stock: number;
   quantity: number;
   basePrice: number;
@@ -676,6 +737,8 @@ export default function Sales() {
   const [warrantyDays, setWarrantyDays] = useState(30);
   const [innerProductSearch, setInnerProductSearch] = useState("");
   const [currentPricingMode, setCurrentPricingMode] = useState<"unit" | "discount" | "wholesale">("unit");
+  const [selectedUnitForDetail, setSelectedUnitForDetail] = useState<any>(null);
+  const [isUnitDetailOpen, setIsUnitDetailOpen] = useState(false);
 
   const { data: openingStatus } = trpc.finance.hasActiveOpening.useQuery({ paymentMethod: paymentMethod === "credit" ? "cash" : paymentMethod });
   const { data: unitsList } = trpc.units.list.useQuery({ status: "available", limit: 5000 } as any);
@@ -870,13 +933,23 @@ export default function Sales() {
     id: u.id,
     name: `${u.brand} ${u.model}`,
     code: u.code,
+    brand: u.brand,
+    model: u.model,
+    unitType: u.type,
+    specs: u.specs,
+    serialNumber: u.serialNumber,
+    condition: u.condition,
+    damageNotes: u.damageNotes,
+    location: u.location,
     salePrice: u.salePrice || 0,
     wholesalePrice: u.wholesalePrice || u.salePrice || 0,
     discountPrice: u.discountPrice || u.salePrice || 0,
+    purchasePrice: u.purchasePrice || 0,
     price: u.salePrice || 0,
     status: u.status,
     category: "unit",
     stock: 1,
+    rawUnit: u,
   });
 
   // Total available units (for empty state messaging)
@@ -921,21 +994,22 @@ export default function Sales() {
   const filteredSales = useMemo(() => {
     if (!salesList) return [];
 
-    return (salesList as any[]).filter((sale: any) => {
-      const matchesSearch =
-        !historySearch ||
-        sale.saleNumber?.toLowerCase().includes(historySearch.toLowerCase()) ||
-        (sale.customerDisplayName || "").toLowerCase().includes(historySearch.toLowerCase()) ||
-        (sale.sellerName || "").toLowerCase().includes(historySearch.toLowerCase());
+    return (salesList as any[])
+      .filter((sale: any) => {
+        const matchesSearch =
+          !historySearch ||
+          sale.saleNumber?.toLowerCase().includes(historySearch.toLowerCase()) ||
+          (sale.customerDisplayName || "").toLowerCase().includes(historySearch.toLowerCase()) ||
+          (sale.sellerName || "").toLowerCase().includes(historySearch.toLowerCase());
 
-      const saleDate = sale.createdAt ? new Date(sale.createdAt) : null;
-      const matchesFrom = !historyDateFrom || (saleDate && saleDate >= new Date(historyDateFrom + "T00:00:00"));
-      const matchesTo = !historyDateTo || (saleDate && saleDate <= new Date(historyDateTo + "T23:59:59"));
+        const saleDate = sale.createdAt ? new Date(sale.createdAt) : null;
+        const matchesFrom = !historyDateFrom || (saleDate && saleDate >= new Date(historyDateFrom + "T00:00:00"));
+        const matchesTo = !historyDateTo || (saleDate && saleDate <= new Date(historyDateTo + "T23:59:59"));
 
-      const matchesStatus = historyStatus === "all" || sale.status === historyStatus;
+        const matchesStatus = historyStatus === "all" || sale.status === historyStatus;
 
-      return matchesSearch && matchesFrom && matchesTo && matchesStatus;
-    });
+        return matchesSearch && matchesFrom && matchesTo && matchesStatus;
+      });
   }, [historyDateFrom, historyDateTo, historySearch, historyStatus, salesList]);
 
   const handlePricingModeChange = (mode: "unit" | "discount" | "wholesale") => {
@@ -994,6 +1068,16 @@ export default function Sales() {
           productId: product.id,
           productName: product.name,
           productCode: product.code,
+          unitType: product.unitType || product.rawUnit?.type,
+          brand: product.brand || product.rawUnit?.brand,
+          model: product.model || product.rawUnit?.model,
+          specs: product.specs || product.rawUnit?.specs,
+          serialNumber: product.serialNumber || product.rawUnit?.serialNumber,
+          condition: product.condition || product.rawUnit?.condition,
+          damageNotes: product.damageNotes || product.rawUnit?.damageNotes,
+          location: product.location || product.rawUnit?.location,
+          purchasePrice: product.purchasePrice || product.rawUnit?.purchasePrice,
+          rawUnit: product.rawUnit || product,
           stock: isUnit ? 1 : product.stock,
           quantity: 1,
           basePrice: calculatedBasePrice,
@@ -1774,6 +1858,8 @@ export default function Sales() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {groupedProducts.map((group) => {
                             const u = group.representative;
+                            const typeInfo = getUnitTypeBadge(u.type);
+                            const specsText = getSpecsSummary(u.specs, u.damageNotes);
                             const activePrice =
                               currentPricingMode === "discount" ? (u.discountPrice || u.salePrice || 0) :
                               currentPricingMode === "wholesale" ? (u.wholesalePrice || u.salePrice || 0) :
@@ -1795,8 +1881,19 @@ export default function Sales() {
                                 onClick={() => remaining > 0 && addGroupToCart(group)}
                               >
                                 <div className="min-w-0 flex-1 pr-2">
+                                  <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                                    <Badge variant="outline" className={`font-bold text-[9px] px-1.5 py-0.2 ${typeInfo.color}`}>
+                                      {typeInfo.icon} {typeInfo.label}
+                                    </Badge>
+                                    {u.code && (
+                                      <span className="font-mono text-[9px] text-slate-500 font-semibold">{u.code}</span>
+                                    )}
+                                  </div>
                                   <p className="font-bold text-slate-900 text-xs truncate">{u.brand} {u.model}</p>
-                                  <p className="text-[10px] text-slate-400">
+                                  {specsText && (
+                                    <p className="text-[10px] text-slate-500 truncate font-medium">{specsText}</p>
+                                  )}
+                                  <p className="text-[10px] text-slate-400 mt-0.5">
                                     {remaining > 0 ? `${remaining} disp.` : "Agotado"}
                                     {alreadyInCart > 0 && <span className="text-amber-600 ml-1">({alreadyInCart} en carrito)</span>}
                                   </p>
@@ -1845,85 +1942,123 @@ export default function Sales() {
                         <p className="text-[10px] text-slate-400">Usa el buscador superior para agregar productos</p>
                       </div>
                     ) : (
-                      computedCart.items.map((item) => (
-                        <div
-                          key={item.productId}
-                          className="flex items-center justify-between gap-2 p-2 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-50 text-xs transition-colors"
-                        >
-                          {/* Info Producto */}
-                          <div className="min-w-0 flex-1">
-                            <p className="font-bold text-slate-800 truncate">{item.productName}</p>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              {/* Selector de Precio Unit / Desc / Mayor */}
-                              <div className="flex bg-slate-200/80 p-0.5 rounded text-[9px] font-bold">
-                                <button
-                                  type="button"
-                                  onClick={() => updateCartItem(item.productId, { pricingType: "unit", basePrice: products?.find((p: any) => p.id === item.productId)?.salePrice || item.basePrice })}
-                                  className={`px-1.5 py-0.2 rounded ${item.pricingType === "unit" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"}`}
-                                >
-                                  U
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateCartItem(item.productId, { pricingType: "discount", basePrice: products?.find((p: any) => p.id === item.productId)?.discountPrice || item.basePrice })}
-                                  className={`px-1.5 py-0.2 rounded ${item.pricingType === "discount" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"}`}
-                                >
-                                  D
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateCartItem(item.productId, { pricingType: "wholesale", basePrice: products?.find((p: any) => p.id === item.productId)?.wholesalePrice || item.basePrice })}
-                                  className={`px-1.5 py-0.2 rounded ${item.pricingType === "wholesale" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"}`}
-                                >
-                                  M
-                                </button>
-                              </div>
-                              <span className="text-slate-500 font-mono text-[11px]">{formatCurrency(item.basePrice)}</span>
-                            </div>
-                          </div>
+                      computedCart.items.map((item) => {
+                        const typeInfo = getUnitTypeBadge(item.unitType || item.rawUnit?.type);
+                        const specsText = getSpecsSummary(item.specs || item.rawUnit?.specs, item.damageNotes || item.rawUnit?.damageNotes);
+                        const unitObj = item.rawUnit || products?.find((p: any) => p.id === item.productId) || item;
 
-                          {/* Cantidad */}
-                          <div className="flex items-center gap-1 bg-white px-1 py-0.5 rounded-lg border border-slate-200">
-                            <button
-                              type="button"
-                              className="h-5 w-5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-600"
-                              onClick={() => updateCartItem(item.productId, { quantity: Math.max(1, item.quantity - 1) })}
-                            >
-                              <Minus className="h-2.5 w-2.5" />
-                            </button>
-                            <input
-                              type="number"
-                              min="1"
-                              max={item.stock}
-                              value={item.quantity}
-                              onFocus={(e) => e.target.select()}
-                              onChange={(e) => updateCartItem(item.productId, { quantity: Math.max(1, parseInt(e.target.value || "1", 10)) })}
-                              className="w-7 text-center font-bold text-xs bg-transparent border-none p-0 focus:outline-none"
-                            />
-                            <button
-                              type="button"
-                              className="h-5 w-5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-600"
-                              onClick={() => updateCartItem(item.productId, { quantity: Math.min(item.stock, item.quantity + 1) })}
-                            >
-                              <Plus className="h-2.5 w-2.5" />
-                            </button>
-                          </div>
-
-                          {/* Subtotal */}
-                          <div className="w-20 text-right shrink-0">
-                            <span className="font-bold text-slate-900 text-xs block">{formatCurrency(item.subtotal)}</span>
-                          </div>
-
-                          {/* Eliminar */}
-                          <button
-                            type="button"
-                            onClick={() => removeCartItem(item.productId)}
-                            className="h-6 w-6 rounded-md hover:bg-red-50 text-slate-300 hover:text-red-500 flex items-center justify-center shrink-0"
+                        return (
+                          <div
+                            key={item.productId}
+                            className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-slate-200/90 bg-slate-50/70 hover:bg-slate-50 text-xs transition-all shadow-2xs"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ))
+                            {/* Info Producto */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <Badge variant="outline" className={`font-bold text-[9px] px-1.5 py-0.2 shrink-0 ${typeInfo.color}`}>
+                                  {typeInfo.icon} {typeInfo.label}
+                                </Badge>
+                                {item.productCode && (
+                                  <Badge variant="outline" className="font-mono text-[9px] px-1.5 py-0.2 bg-white text-slate-600 border-slate-200 shrink-0">
+                                    {item.productCode}
+                                  </Badge>
+                                )}
+                                <p className="font-bold text-slate-900 truncate text-xs">{item.productName}</p>
+                              </div>
+
+                              {/* Características resumidas */}
+                              {specsText && (
+                                <p className="text-[10px] text-slate-500 truncate mt-0.5 font-medium">
+                                  {specsText}
+                                </p>
+                              )}
+
+                              <div className="flex items-center gap-1.5 mt-1">
+                                {/* Selector de Precio Unit / Desc / Mayor */}
+                                <div className="flex bg-slate-200/80 p-0.5 rounded text-[9px] font-bold">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCartItem(item.productId, { pricingType: "unit", basePrice: products?.find((p: any) => p.id === item.productId)?.salePrice || item.basePrice })}
+                                    className={`px-1.5 py-0.2 rounded ${item.pricingType === "unit" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"}`}
+                                  >
+                                    U
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCartItem(item.productId, { pricingType: "discount", basePrice: products?.find((p: any) => p.id === item.productId)?.discountPrice || item.basePrice })}
+                                    className={`px-1.5 py-0.2 rounded ${item.pricingType === "discount" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"}`}
+                                  >
+                                    D
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCartItem(item.productId, { pricingType: "wholesale", basePrice: products?.find((p: any) => p.id === item.productId)?.wholesalePrice || item.basePrice })}
+                                    className={`px-1.5 py-0.2 rounded ${item.pricingType === "wholesale" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"}`}
+                                  >
+                                    M
+                                  </button>
+                                </div>
+                                <span className="text-slate-600 font-mono text-[11px] font-semibold">{formatCurrency(item.basePrice)}</span>
+                              </div>
+                            </div>
+
+                            {/* Botón Ver Detalles (donde el usuario dibujó en rojo) */}
+                            <button
+                              type="button"
+                              title="Ver características y detalles completos del equipo"
+                              onClick={() => {
+                                setSelectedUnitForDetail(unitObj);
+                                setIsUnitDetailOpen(true);
+                              }}
+                              className="h-7 px-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-[10px] flex items-center gap-1 transition-colors shrink-0"
+                            >
+                              <Info className="h-3 w-3" />
+                              <span className="hidden sm:inline">Detalles</span>
+                            </button>
+
+                            {/* Cantidad */}
+                            <div className="flex items-center gap-1 bg-white px-1 py-0.5 rounded-lg border border-slate-200 shrink-0">
+                              <button
+                                type="button"
+                                className="h-5 w-5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-600"
+                                onClick={() => updateCartItem(item.productId, { quantity: Math.max(1, item.quantity - 1) })}
+                              >
+                                <Minus className="h-2.5 w-2.5" />
+                              </button>
+                              <input
+                                type="number"
+                                min="1"
+                                max={item.stock}
+                                value={item.quantity}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => updateCartItem(item.productId, { quantity: Math.max(1, parseInt(e.target.value || "1", 10)) })}
+                                className="w-7 text-center font-bold text-xs bg-transparent border-none p-0 focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                className="h-5 w-5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-600"
+                                onClick={() => updateCartItem(item.productId, { quantity: Math.min(item.stock, item.quantity + 1) })}
+                              >
+                                <Plus className="h-2.5 w-2.5" />
+                              </button>
+                            </div>
+
+                            {/* Subtotal */}
+                            <div className="w-18 text-right shrink-0">
+                              <span className="font-bold text-slate-900 text-xs block">{formatCurrency(item.subtotal)}</span>
+                            </div>
+
+                            {/* Eliminar */}
+                            <button
+                              type="button"
+                              onClick={() => removeCartItem(item.productId)}
+                              className="h-6 w-6 rounded-md hover:bg-red-50 text-slate-300 hover:text-red-500 flex items-center justify-center shrink-0"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -2420,6 +2555,162 @@ export default function Sales() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal de Detalle Completo de Equipo/Producto en Venta ── */}
+      <Dialog open={isUnitDetailOpen} onOpenChange={setIsUnitDetailOpen}>
+        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-3xl border-slate-200 bg-white p-5 sm:p-6 shadow-2xl">
+          {selectedUnitForDetail && (() => {
+            const unit = selectedUnitForDetail.rawUnit || selectedUnitForDetail;
+            const typeInfo = getUnitTypeBadge(unit.type || unit.unitType);
+            const specs = typeof unit.specs === "object" ? unit.specs : {};
+            const isCharger = (unit.type || unit.unitType) === "charger";
+
+            return (
+              <div className="space-y-4">
+                <DialogHeader className="pb-3 border-b border-slate-100">
+                  <div className="flex items-center justify-between gap-2">
+                    <Badge variant="outline" className={`font-bold text-xs px-2.5 py-0.5 ${typeInfo.color}`}>
+                      {typeInfo.icon} {typeInfo.label}
+                    </Badge>
+                    {unit.code && (
+                      <Badge variant="outline" className="font-mono text-xs bg-slate-50 text-slate-700 border-slate-300">
+                        {unit.code}
+                      </Badge>
+                    )}
+                  </div>
+                  <DialogTitle className="text-xl font-black text-slate-900 mt-2">
+                    {unit.brand} {unit.model}
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-slate-500">
+                    Ficha técnica completa y detalles del inventario
+                  </DialogDescription>
+                </DialogHeader>
+
+                {/* Precios Disponibles */}
+                <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 text-center">
+                  <div className="p-2 bg-white rounded-xl border border-slate-100 shadow-2xs">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase">Unitario</p>
+                    <p className="text-sm font-black text-slate-900 mt-0.5">{formatCurrency(unit.salePrice || 0)}</p>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-slate-100 shadow-2xs">
+                    <p className="text-[9px] font-bold text-emerald-600 uppercase">Descuento</p>
+                    <p className="text-sm font-black text-emerald-700 mt-0.5">{formatCurrency(unit.discountPrice || unit.salePrice || 0)}</p>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-slate-100 shadow-2xs">
+                    <p className="text-[9px] font-bold text-blue-600 uppercase">Por Mayor</p>
+                    <p className="text-sm font-black text-blue-700 mt-0.5">{formatCurrency(unit.wholesalePrice || unit.salePrice || 0)}</p>
+                  </div>
+                </div>
+
+                {/* Especificaciones Técnicas */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Especificaciones Técnicas
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {isCharger ? (
+                      <>
+                        {specs.watts && (
+                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                            <span className="text-[10px] text-slate-400 block font-bold">POTENCIA</span>
+                            <span className="font-bold text-slate-800">{specs.watts}W</span>
+                          </div>
+                        )}
+                        {(specs.voltage || specs.amperage) && (
+                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                            <span className="text-[10px] text-slate-400 block font-bold">VOLTAJE / AMPERAJE</span>
+                            <span className="font-bold text-slate-800">{specs.voltage ? `${specs.voltage}V` : ""} {specs.amperage ? `${specs.amperage}A` : ""}</span>
+                          </div>
+                        )}
+                        {specs.connector && (
+                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 col-span-2">
+                            <span className="text-[10px] text-slate-400 block font-bold">TIPO DE CONECTOR / PUNTA</span>
+                            <span className="font-bold text-slate-800">{specs.connector}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {specs.cpu && (
+                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                            <span className="text-[10px] text-slate-400 block font-bold">PROCESADOR (CPU)</span>
+                            <span className="font-bold text-slate-800">{specs.cpu}</span>
+                          </div>
+                        )}
+                        {specs.ram && (
+                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                            <span className="text-[10px] text-slate-400 block font-bold">MEMORIA RAM</span>
+                            <span className="font-bold text-slate-800">{specs.ram}</span>
+                          </div>
+                        )}
+                        {specs.storage && (
+                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                            <span className="text-[10px] text-slate-400 block font-bold">ALMACENAMIENTO</span>
+                            <span className="font-bold text-slate-800">{specs.storage}</span>
+                          </div>
+                        )}
+                        {specs.screen && (
+                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                            <span className="text-[10px] text-slate-400 block font-bold">PANTALLA</span>
+                            <span className="font-bold text-slate-800">{specs.screen}</span>
+                          </div>
+                        )}
+                        {specs.gpu && (
+                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 col-span-2">
+                            <span className="text-[10px] text-slate-400 block font-bold">TARJETA DE VIDEO (GPU)</span>
+                            <span className="font-bold text-slate-800">{specs.gpu}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {unit.serialNumber && (
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 col-span-2">
+                        <span className="text-[10px] text-slate-400 block font-bold">NÚMERO DE SERIE (S/N)</span>
+                        <span className="font-mono font-bold text-slate-800">{unit.serialNumber}</span>
+                      </div>
+                    )}
+
+                    {unit.condition && (
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="text-[10px] text-slate-400 block font-bold">CONDICIÓN</span>
+                        <span className="font-bold text-slate-800 capitalize">
+                          {unit.condition === "new" ? "Nuevo" : unit.condition === "refurbished" ? "Reacondicionado" : "Usado"}
+                        </span>
+                      </div>
+                    )}
+
+                    {unit.location && (
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="text-[10px] text-slate-400 block font-bold">UBICACIÓN / VITRINA</span>
+                        <span className="font-bold text-slate-800">{unit.location}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Notas o Daños */}
+                {unit.damageNotes && (
+                  <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-xs">
+                    <span className="text-[10px] font-bold text-amber-800 uppercase block mb-0.5">Observaciones / Detalles</span>
+                    <p className="text-amber-900">{unit.damageNotes}</p>
+                  </div>
+                )}
+
+                <DialogFooter className="pt-2">
+                  <Button
+                    type="button"
+                    onClick={() => setIsUnitDetailOpen(false)}
+                    className="w-full bg-slate-900 hover:bg-slate-800 font-bold"
+                  >
+                    Cerrar Detalle
+                  </Button>
+                </DialogFooter>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
         </TabsContent>
