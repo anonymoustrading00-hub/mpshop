@@ -189,25 +189,26 @@
     box-shadow: inset 4px 0 0 0 var(--color-primary);
   }
 
-  /* Inputs muy coloridos al interactuar */
-  input:not([type="checkbox"]):not([type="radio"]), 
-  textarea, 
-  select {
+  /* Inputs muy coloridos al interactuar (excluyendo inputs oscuros o personalizados) */
+  input:not([type="checkbox"]):not([type="radio"]):not([class*="dark"]):not([class*="text-white"]):not([class*="bg-slate"]):not([class*="bg-black"]):not([class*="bg-zinc"]):not([class*="bg-white/"]):not(.dark-input), 
+  textarea:not([class*="dark"]):not([class*="text-white"]):not([class*="bg-slate"]):not([class*="bg-black"]):not([class*="bg-zinc"]):not([class*="bg-white/"]):not(.dark-input), 
+  select:not([class*="dark"]):not([class*="text-white"]):not([class*="bg-slate"]):not([class*="bg-black"]):not([class*="bg-zinc"]):not([class*="bg-white/"]):not(.dark-input) {
     @apply transition-all duration-200;
   }
-  input:not([type="checkbox"]):not([type="radio"]):hover, 
-  textarea:hover, 
-  select:hover {
+  input:not([type="checkbox"]):not([type="radio"]):not([class*="dark"]):not([class*="text-white"]):not([class*="bg-slate"]):not([class*="bg-black"]):not([class*="bg-zinc"]):not([class*="bg-white/"]):not(.dark-input):hover, 
+  textarea:not([class*="dark"]):not([class*="text-white"]):not([class*="bg-slate"]):not([class*="bg-black"]):not([class*="bg-zinc"]):not([class*="bg-white/"]):not(.dark-input):hover, 
+  select:not([class*="dark"]):not([class*="text-white"]):not([class*="bg-slate"]):not([class*="bg-black"]):not([class*="bg-zinc"]):not([class*="bg-white/"]):not(.dark-input):hover {
     border-color: var(--color-primary) !important;
     background-color: color-mix(in srgb, var(--color-primary) 4%, white) !important;
   }
-  input:not([type="checkbox"]):not([type="radio"]):focus, 
-  textarea:focus, 
-  select:focus {
+  input:not([type="checkbox"]):not([type="radio"]):not([class*="dark"]):not([class*="text-white"]):not([class*="bg-slate"]):not([class*="bg-black"]):not([class*="bg-zinc"]):not([class*="bg-white/"]):not(.dark-input):focus, 
+  textarea:not([class*="dark"]):not([class*="text-white"]):not([class*="bg-slate"]):not([class*="bg-black"]):not([class*="bg-zinc"]):not([class*="bg-white/"]):not(.dark-input):focus, 
+  select:not([class*="dark"]):not([class*="text-white"]):not([class*="bg-slate"]):not([class*="bg-black"]):not([class*="bg-zinc"]):not([class*="bg-white/"]):not(.dark-input):focus {
     border-color: var(--color-primary) !important;
     background-color: #fff !important;
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 35%, transparent) !important;
   }
+
 
   /* Animación súper táctil y brillo para botones */
   button:not(:disabled), 

@@ -1598,20 +1598,20 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
             </div>
 
             {/* ─── Video de TikTok del Equipo ─── */}
-            <div className="space-y-3 border-t pt-4 bg-gradient-to-br from-slate-900 via-slate-800 to-black text-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-700/60">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-pink-500/20 text-pink-400 rounded-xl border border-pink-500/30 flex items-center justify-center">
+            <div className="space-y-3 bg-gradient-to-br from-[#0b0f19] via-[#111827] to-[#0b0f19] text-white p-4 sm:p-5 rounded-2xl shadow-md border border-pink-500/30">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-gradient-to-br from-pink-500/25 to-rose-600/20 text-pink-400 rounded-xl border border-pink-500/40 flex items-center justify-center shadow-inner">
                     <Video className="h-5 w-5 text-pink-400" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-black text-white tracking-wide">Video de TikTok del Equipo</h3>
-                      <Badge className="bg-pink-500 hover:bg-pink-600 text-white font-bold text-[10px] px-2 py-0.5 border-none">
+                      <Badge className="bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-bold text-[10px] px-2 py-0.5 border-none shadow-sm">
                         🎵 TikTok
                       </Badge>
                     </div>
-                    <p className="text-[11px] text-slate-300">
+                    <p className="text-[11px] text-slate-300 mt-0.5">
                       Link al video mostrando el funcionamiento, unboxing o estado estético real.
                     </p>
                   </div>
@@ -1630,7 +1630,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         window.open(`https://${url}`, "_blank", "noopener,noreferrer");
                       }
                     }}
-                    className="bg-white/10 hover:bg-white/20 text-white border-white/20 font-bold text-xs h-8 gap-1.5 self-start sm:self-auto"
+                    className="bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border-pink-500/40 font-bold text-xs h-8 gap-1.5 self-start sm:self-auto shrink-0 shadow-sm"
                   >
                     <Play className="h-3.5 w-3.5 fill-current" /> Probar Enlace
                     <ExternalLink className="h-3 w-3 ml-0.5" />
@@ -1638,18 +1638,29 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                 )}
               </div>
 
-              <div className="relative">
+              <div className="relative flex items-center">
                 <Input
                   value={tiktokUrl}
                   onChange={(e) => setTiktokUrl(e.target.value)}
-                  placeholder="https://www.tiktok.com/@vitalia/video/73829183921... o https://vm.tiktok.com/..."
-                  className="bg-white/5 border-slate-600 text-white placeholder:text-slate-400 text-xs font-mono h-10 focus:border-pink-500 focus:ring-pink-500"
+                  placeholder="https://www.tiktok.com/@mpshop/video/73829183921... o https://vm.tiktok.com/..."
+                  className="dark-input !bg-[#050811] !text-white placeholder:!text-slate-500 !border-slate-700 focus:!border-pink-500 focus:!ring-2 focus:!ring-pink-500/30 text-xs font-mono h-11 pr-9 rounded-xl transition-all"
                 />
+                {tiktokUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setTiktokUrl("")}
+                    className="absolute right-2.5 p-1 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+                    title="Limpiar enlace"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
-              <p className="text-[10px] text-slate-400">
-                💡 Este enlace creará un botón interactivo en el catálogo y Kardex para que cualquier vendedor o cliente pueda ver el video de TikTok al instante.
+              <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                <span>💡</span> Este enlace creará un botón interactivo en el catálogo y Kardex para que cualquier vendedor o cliente pueda ver el video de TikTok al instante.
               </p>
             </div>
+
 
             <Button onClick={handleSaveUnit} className="w-full gap-2 text-base py-5 font-black bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200" disabled={createUnitMutation.isPending}>
               <CheckCircle className="h-5 w-5" />

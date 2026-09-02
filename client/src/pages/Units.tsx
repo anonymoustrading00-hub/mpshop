@@ -1898,17 +1898,17 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                 </div>
 
                 {/* Video de TikTok */}
-                <div className="border-t pt-4 space-y-2">
+                <div className="border-t pt-4 space-y-2.5 bg-gradient-to-br from-[#0b0f19] via-[#111827] to-[#0b0f19] text-white p-3.5 sm:p-4 rounded-2xl border border-pink-500/30">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold flex items-center gap-1.5 text-slate-800">
-                      <span className="text-pink-500 font-black">🎵</span> Video Demostrativo en TikTok:
+                    <label className="text-xs font-bold flex items-center gap-1.5 text-white">
+                      <span className="p-1 bg-pink-500/20 text-pink-400 rounded-md">🎵</span> Video de TikTok del Equipo:
                     </label>
                     {editTiktokUrl.trim() && (
                       <a
                         href={editTiktokUrl.startsWith("http") ? editTiktokUrl : `https://${editTiktokUrl}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs font-bold text-pink-600 hover:text-pink-700 flex items-center gap-1"
+                        className="text-xs font-bold text-pink-300 hover:text-pink-200 flex items-center gap-1 bg-pink-500/20 px-2.5 py-1 rounded-lg border border-pink-500/30"
                       >
                         <Play className="h-3 w-3 fill-current" /> Probar Video
                         <ExternalLink className="h-3 w-3" />
@@ -1918,11 +1918,11 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                   <Input
                     value={editTiktokUrl}
                     onChange={(e) => setEditTiktokUrl(e.target.value)}
-                    placeholder="https://www.tiktok.com/@vitalia/video/... o https://vm.tiktok.com/..."
-                    className="text-xs font-mono"
+                    placeholder="https://www.tiktok.com/@mpshop/video/... o https://vm.tiktok.com/..."
+                    className="dark-input !bg-[#050811] !text-white placeholder:!text-slate-500 !border-slate-700 focus:!border-pink-500 focus:!ring-2 focus:!ring-pink-500/30 text-xs font-mono h-10 rounded-xl"
                   />
-                  <p className="text-[10px] text-muted-foreground">
-                    Enlace de TikTok con la prueba de funcionamiento, batería o unboxing del equipo.
+                  <p className="text-[10px] text-slate-400">
+                    💡 Enlace de TikTok con la prueba de funcionamiento, batería o unboxing del equipo.
                   </p>
                 </div>
               </div>
