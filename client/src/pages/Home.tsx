@@ -221,19 +221,22 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="glass-panel p-6 sm:p-7">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary/80">
-                Credenciales demo
-              </p>
-              <div className="mt-5 grid gap-4">
-                <CredentialRow label="Usuario" value="admin" />
-                <CredentialRow label="Contrasena" value="admin123" />
+            <div className="glass-panel p-6 sm:p-7 flex flex-col justify-between">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary/80">
+                  Módulos incluidos
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Sistema completo para control de inventario, punto de venta, compras y finanzas.
+                </p>
               </div>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <FeaturePill label="Unidades" />
                 <FeaturePill label="Catálogo" />
                 <FeaturePill label="Clientes" />
                 <FeaturePill label="Ventas" />
+                <FeaturePill label="Finanzas" />
+                <FeaturePill label="Taller" />
               </div>
             </div>
           </div>

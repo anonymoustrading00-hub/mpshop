@@ -73,7 +73,7 @@ async function seedDefaultAdmin() {
   }
 
   const username = process.env.ADMIN_USERNAME || "admin";
-  const password = process.env.ADMIN_PASSWORD || "admin123";
+  const password = process.env.ADMIN_PASSWORD || "MPShop2026Admin!";
   const name = process.env.ADMIN_NAME || "Administrador";
   const email = process.env.ADMIN_EMAIL || "admin@mpshop.local";
   const connection = await mysql.createConnection(process.env.DATABASE_URL);
@@ -85,11 +85,12 @@ async function seedDefaultAdmin() {
         (openId, username, passwordHash, name, email, loginMethod, role, status, createdAt, updatedAt, lastSignedIn)
        VALUES (?, ?, ?, ?, ?, 'traditional', 'admin', 'active', NOW(), NOW(), NOW())
        ON DUPLICATE KEY UPDATE
+        passwordHash = VALUES(passwordHash),
         status = 'active',
         role = 'admin'`,
       [`local_${username}`, username, passwordHash, name, email]
     );
-    console.log(`[Seed] Admin user verified/ready: ${username}`);
+    console.log(`[Seed] Admin user verified/ready: ${username} (password synced)`);
   } catch (err: any) {
     console.error("[Seed] Error creating admin user:", err.message);
   } finally {
@@ -581,9 +582,10 @@ async function startServer() {
       }
 
 
-      // Asegurarse que el admin siga existiendo con contraseña "usuario"
+      // Asegurarse que el admin siga existiendo con contraseña MPShop2026Admin!
       const bcrypt = await import("bcrypt");
-      const passwordHash = await bcrypt.default.hash("usuario", 10);
+      const adminPassword = process.env.ADMIN_PASSWORD || "MPShop2026Admin!";
+      const passwordHash = await bcrypt.default.hash(adminPassword, 10);
       const adminUsername = process.env.ADMIN_USERNAME || "admin";
       const adminEmail = process.env.ADMIN_EMAIL || "admin@mpshop.local";
 

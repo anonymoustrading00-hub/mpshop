@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -118,17 +118,6 @@ export default function Login() {
                    ) : "Iniciar sesión"}
                  </Button>
                </form>
- 
-               <div className="rounded-[2rem] border border-slate-100 bg-slate-50/50 p-5">
-                 <div className="mb-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
-                   <ShieldCheck className="h-3.5 w-3.5" />
-                   Acceso de administración
-                 </div>
-                 <div className="grid gap-3 sm:grid-cols-2">
-                   <CredentialPill label="Usuario" value="admin" />
-                   <CredentialPill label="Contraseña" value="admin123" />
-                 </div>
-               </div>
              </CardContent>
  
              <CardFooter className="justify-center border-t border-slate-100 bg-slate-50/30 px-8 py-6 text-center">
@@ -142,14 +131,5 @@ export default function Login() {
            </Card>
        </div>
      </div>
-  );
-}
-
-function CredentialPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-white/70 bg-white/85 px-3 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-      <code className="mt-1 block text-sm font-bold text-slate-900">{value}</code>
-    </div>
   );
 }
