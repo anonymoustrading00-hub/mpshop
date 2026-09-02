@@ -112,8 +112,8 @@ export const statsRouter = router({
       }).optional()
     )
     .query(async ({ ctx, input }) => {
-      if (ctx.user?.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN" });
+      if (!ctx.user) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
       }
 
       const period = input?.period || "month";
@@ -139,10 +139,25 @@ export const statsRouter = router({
       ]);
 
       // ── Helper rango de fechas ─────────────────────────────────────────
-      const inPeriod = (dateStr: any) => {
-        if (!dateStr) return false;
-        const d = new Date(dateStr);
+      const inPeriod = (dateVal: any) => {
+        if (!dateVal) return false;
+        const d = dateVal instanceof Date ? dateVal : new Date(dateVal);
+        if (isNaN(d.getTime())) return false;
         return d >= startDate && d <= endDate;
+      };
+
+      const safeDateStr = (dateVal: any): string => {
+        if (!dateVal) return new Date().toISOString().split("T")[0];
+        if (dateVal instanceof Date) {
+          return isNaN(dateVal.getTime()) ? new Date().toISOString().split("T")[0] : dateVal.toISOString().split("T")[0];
+        }
+        if (typeof dateVal === "string") {
+          if (dateVal.includes("T")) return dateVal.split("T")[0];
+          if (/^\d{4}-\d{2}-\d{2}/.test(dateVal)) return dateVal.substring(0, 10);
+          const p = new Date(dateVal);
+          return isNaN(p.getTime()) ? String(dateVal) : p.toISOString().split("T")[0];
+        }
+        return new Date(dateVal).toISOString().split("T")[0];
       };
 
       // ── 1. VENTAS Y COGS EN EL PERÍODO (Filtrado por rango, sucursal, método de pago, marca, precio) ──
@@ -246,6 +261,23 @@ export const statsRouter = router({
         (s: number, r: any) => s + (Number(r.partsCost) || 0) + (Number(r.laborCost) || 0), 0
       );
 
+      const repairsDetail = filteredRepairs.map((r: any) => {
+        const unit = (allUnits as any[]).find((u: any) => u.id === r.unitId);
+        return {
+          id: r.id,
+          otNumber: r.otNumber || `OT-#${r.id}`,
+          rmaNumber: r.rmaNumber || r.unitRmaNumber || unit?.rmaNumber || "—",
+          unitCode: unit?.code || "—",
+          brand: unit?.brand || "—",
+          model: unit?.model || "—",
+          laborCost: Number(r.laborCost) || 0,
+          partsCost: Number(r.partsCost) || 0,
+          totalCost: (Number(r.laborCost) || 0) + (Number(r.partsCost) || 0),
+          status: r.status,
+          date: r.endDate || r.startDate || r.createdAt,
+        };
+      });
+
       // ── 3. COSTOS DE GARANTÍA EN EL PERÍODO ────────────────────────────
       const warrantyExpenses = (allExpenses as any[]).filter(
         (e: any) => ["warranty_repair_cost", "warranty_replacement_cost", "warranty_refund"].includes(e.category) && inPeriod(e.createdAt || e.expenseDate)
@@ -263,7 +295,32 @@ export const statsRouter = router({
       });
       const totalOpExpenses = opExpenses.reduce((s: number, e: any) => s + (Number(e.amount) || 0), 0);
 
-      // ── 5. CÁLCULOS P&L FINALES ────────────────────────────────────────
+      const expensesDetail = opExpenses.map((e: any) => ({
+        id: e.id,
+        category: e.category,
+        description: e.description,
+        amount: Number(e.amount) || 0,
+        status: e.status,
+        paymentMethod: e.paymentMethod || "cash",
+        date: e.expenseDate || e.createdAt,
+      }));
+
+      // ── 5. TRANSACCIONES FINANCIERAS EN EL PERÍODO ─────────────────────
+      const transactionsDetail = (allTransactions as any[]).filter((t: any) => {
+        if (!inPeriod(t.createdAt || t.date)) return false;
+        if (branchId && (t.branchId || 1) !== branchId) return false;
+        return true;
+      }).map((t: any) => ({
+        id: t.id,
+        type: t.type,
+        category: t.category,
+        amount: Number(t.amount) || 0,
+        paymentMethod: t.paymentMethod,
+        description: t.description || t.notes || "—",
+        date: t.createdAt || t.date,
+      }));
+
+      // ── 6. CÁLCULOS P&L FINALES ────────────────────────────────────────
       const margenBruto = totalIngresos - totalCOGS;
       const margenBrutoPct = totalIngresos > 0 ? (margenBruto / totalIngresos) * 100 : 0;
       const utilidadOperativa = margenBruto - totalRepairCost - totalWarrantyCost;
@@ -271,12 +328,12 @@ export const statsRouter = router({
       const utilidadNetaPct = totalIngresos > 0 ? (utilidadNeta / totalIngresos) * 100 : 0;
       const avgTicket = unitsSoldInPeriod > 0 ? Math.round(totalIngresos / unitsSoldInPeriod) : 0;
 
-      // ── 6. EVOLUCIÓN TEMPORAL (TREND TIMELINE CHART) ───────────────────
+      // ── 7. EVOLUCIÓN TEMPORAL (TREND TIMELINE CHART) ───────────────────
       const timelineMap: Record<string, { date: string; label: string; ingresos: number; cogs: number; gastos: number; utilidadNeta: number }> = {};
       
       // Agrupar por día
       for (const sale of soldUnitsDetail) {
-        const d = (sale.saleDate as string).split("T")[0];
+        const d = safeDateStr(sale.saleDate);
         if (!timelineMap[d]) {
           timelineMap[d] = { date: d, label: d.substring(5), ingresos: 0, cogs: 0, gastos: 0, utilidadNeta: 0 };
         }
@@ -285,7 +342,7 @@ export const statsRouter = router({
         timelineMap[d].utilidadNeta += sale.grossMargin;
       }
       for (const exp of opExpenses) {
-        const d = (exp.expenseDate ? new Date(exp.expenseDate).toISOString() : exp.createdAt as string).split("T")[0];
+        const d = safeDateStr(exp.expenseDate || exp.createdAt);
         if (!timelineMap[d]) {
           timelineMap[d] = { date: d, label: d.substring(5), ingresos: 0, cogs: 0, gastos: 0, utilidadNeta: 0 };
         }
@@ -295,7 +352,7 @@ export const statsRouter = router({
 
       const timelineData = Object.values(timelineMap).sort((a, b) => a.date.localeCompare(b.date));
 
-      // ── 7. RANKING POR MARCA ──────────────────────────────────────────
+      // ── 8. RANKING POR MARCA ──────────────────────────────────────────
       const brandRanking = Object.values(brandStats)
         .map(b => ({
           ...b,
@@ -303,13 +360,13 @@ export const statsRouter = router({
         }))
         .sort((a, b) => b.margenBruto - a.margenBruto);
 
-      // ── 8. DESGLOSE DE GASTOS POR CATEGORÍA ────────────────────────────
+      // ── 9. DESGLOSE DE GASTOS POR CATEGORÍA ────────────────────────────
       const expensesByCategory: Record<string, number> = {};
       for (const e of opExpenses) {
         expensesByCategory[e.category] = (expensesByCategory[e.category] || 0) + e.amount;
       }
 
-      // ── 9. INVENTARIO ACTUAL DISPONIBLE ────────────────────────────────
+      // ── 10. INVENTARIO ACTUAL DISPONIBLE ────────────────────────────────
       const availableUnits = (allUnits as any[]).filter((u: any) => {
         if (u.status !== "available") return false;
         if (branchId && (u.branchId || 1) !== branchId) return false;
@@ -350,6 +407,9 @@ export const statsRouter = router({
         brandRanking,
         methodStats,
         soldUnitsDetail: soldUnitsDetail.sort((a, b) => b.grossMargin - a.grossMargin),
+        repairsDetail: repairsDetail.sort((a: any, b: any) => b.totalCost - a.totalCost),
+        expensesDetail: expensesDetail.sort((a: any, b: any) => b.amount - a.amount),
+        transactionsDetail: transactionsDetail.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()),
       };
     }),
 

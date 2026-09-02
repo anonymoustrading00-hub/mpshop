@@ -18,7 +18,7 @@ import {
   ShieldAlert, Receipt, BarChart3, ArrowDown, Boxes,
   CircleDollarSign, ShoppingCart, Percent, Calendar, Filter,
   RotateCcw, Sparkles, Laptop, Search, CreditCard, PieChart as PieIcon,
-  Layers, ArrowUpRight, ArrowDownRight,
+  Layers, ArrowUpRight, ArrowDownRight, RefreshCw, AlertTriangle,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -158,6 +158,9 @@ export default function Profitability() {
   const [brandFilter, setBrandFilter] = useState<string>("all");
   const [priceTypeFilter, setPriceTypeFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [repairsSearchQuery, setRepairsSearchQuery] = useState("");
+  const [expensesSearchQuery, setExpensesSearchQuery] = useState("");
+  const [txSearchQuery, setTxSearchQuery] = useState("");
 
   const queryFilters = {
     period,
@@ -169,7 +172,7 @@ export default function Profitability() {
     priceType: priceTypeFilter !== "all" ? priceTypeFilter : undefined,
   };
 
-  const { data, isLoading, refetch } = (trpc.stats as any).getProfitability.useQuery(queryFilters);
+  const { data, isLoading, error, refetch } = (trpc.stats as any).getProfitability.useQuery(queryFilters);
 
   const resetFilters = () => {
     setPeriod("month");
@@ -180,12 +183,18 @@ export default function Profitability() {
     setBrandFilter("all");
     setPriceTypeFilter("all");
     setSearchQuery("");
+    setRepairsSearchQuery("");
+    setExpensesSearchQuery("");
+    setTxSearchQuery("");
   };
 
   if (isLoading) {
     return (
       <div className="p-6 max-w-7xl mx-auto space-y-6">
-        <div className="h-10 w-80 bg-slate-200 animate-pulse rounded-xl" />
+        <div className="flex items-center gap-3">
+          <RefreshCw className="h-6 w-6 text-emerald-600 animate-spin" />
+          <h2 className="text-xl font-black text-slate-800">Calculando Estado de Resultados y Rentabilidad...</h2>
+        </div>
         <div className="h-24 bg-slate-100 animate-pulse rounded-2xl" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1,2,3,4].map(i => <div key={i} className="h-32 bg-slate-100 animate-pulse rounded-2xl" />)}
@@ -195,16 +204,32 @@ export default function Profitability() {
     );
   }
 
-  if (!data) return null;
+  if (error || !data) {
+    return (
+      <div className="p-8 max-w-2xl mx-auto my-12 text-center space-y-4 bg-white rounded-3xl border border-slate-200 shadow-sm">
+        <div className="p-4 bg-amber-50 text-amber-600 rounded-2xl w-fit mx-auto">
+          <AlertTriangle className="h-10 w-10" />
+        </div>
+        <h2 className="text-2xl font-black text-slate-900">No se pudo cargar la rentabilidad</h2>
+        <p className="text-slate-500 text-sm">
+          {error?.message || "Ocurrió un inconveniente al consultar las finanzas. Por favor intenta recargar los datos."}
+        </p>
+        <Button onClick={() => refetch()} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+          <RefreshCw className="h-4 w-4" /> Reintentar Carga
+        </Button>
+      </div>
+    );
+  }
 
   const {
     period: periodInfo,
-    totalIngresos, totalCOGS, margenBruto, margenBrutoPct,
-    totalRepairCost, totalWarrantyCost, utilidadOperativa,
-    totalOpExpenses, utilidadNeta, utilidadNetaPct,
-    unitsSoldInPeriod, avgTicket,
-    expensesByCategory, timelineData, brandRanking, methodStats, soldUnitsDetail,
-    inventoryValue, inventoryPotentialRevenue, inventoryPotentialMargin, availableUnitsCount,
+    totalIngresos = 0, totalCOGS = 0, margenBruto = 0, margenBrutoPct = 0,
+    totalRepairCost = 0, totalWarrantyCost = 0, utilidadOperativa = 0,
+    totalOpExpenses = 0, utilidadNeta = 0, utilidadNetaPct = 0,
+    unitsSoldInPeriod = 0, avgTicket = 0,
+    expensesByCategory = {}, timelineData = [], brandRanking = [], methodStats = {}, soldUnitsDetail = [],
+    repairsDetail = [], expensesDetail = [], transactionsDetail = [],
+    inventoryValue = 0, inventoryPotentialRevenue = 0, inventoryPotentialMargin = 0, availableUnitsCount = 0,
   } = data;
 
   // Waterfall data
@@ -240,6 +265,41 @@ export default function Profitability() {
       (u.model || "").toLowerCase().includes(q) ||
       (u.customerName || "").toLowerCase().includes(q) ||
       (u.saleCode || "").toLowerCase().includes(q)
+    );
+  });
+
+  // Filtrado de reparaciones de taller
+  const filteredRepairs = (repairsDetail as any[] || []).filter((r: any) => {
+    if (!repairsSearchQuery) return true;
+    const q = repairsSearchQuery.toLowerCase();
+    return (
+      (r.otNumber || "").toLowerCase().includes(q) ||
+      (r.rmaNumber || "").toLowerCase().includes(q) ||
+      (r.unitCode || "").toLowerCase().includes(q) ||
+      (r.brand || "").toLowerCase().includes(q) ||
+      (r.model || "").toLowerCase().includes(q)
+    );
+  });
+
+  // Filtrado de gastos
+  const filteredExpenses = (expensesDetail as any[] || []).filter((e: any) => {
+    if (!expensesSearchQuery) return true;
+    const q = expensesSearchQuery.toLowerCase();
+    const catLabel = CATEGORY_LABELS[e.category] || e.category;
+    return (
+      (e.description || "").toLowerCase().includes(q) ||
+      catLabel.toLowerCase().includes(q)
+    );
+  });
+
+  // Filtrado de transacciones
+  const filteredTransactions = (transactionsDetail as any[] || []).filter((t: any) => {
+    if (!txSearchQuery) return true;
+    const q = txSearchQuery.toLowerCase();
+    return (
+      (t.description || "").toLowerCase().includes(q) ||
+      (t.category || "").toLowerCase().includes(q) ||
+      (t.paymentMethod || "").toLowerCase().includes(q)
     );
   });
 
@@ -451,21 +511,29 @@ export default function Profitability() {
             <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
             Estado de Resultados (P&amp;L)
           </TabsTrigger>
+          <TabsTrigger value="units" className="rounded-lg font-bold text-xs py-2 px-3">
+            <Package className="h-3.5 w-3.5 mr-1.5" />
+            Equipos Vendidos ({unitsSoldInPeriod})
+          </TabsTrigger>
+          <TabsTrigger value="repairs" className="rounded-lg font-bold text-xs py-2 px-3">
+            <Wrench className="h-3.5 w-3.5 mr-1.5" />
+            Costos de Taller ({repairsDetail?.length || 0})
+          </TabsTrigger>
+          <TabsTrigger value="expenses_table" className="rounded-lg font-bold text-xs py-2 px-3">
+            <Receipt className="h-3.5 w-3.5 mr-1.5" />
+            Gastos Operativos ({expensesDetail?.length || 0})
+          </TabsTrigger>
+          <TabsTrigger value="finances" className="rounded-lg font-bold text-xs py-2 px-3">
+            <CircleDollarSign className="h-3.5 w-3.5 mr-1.5" />
+            Flujo de Caja ({transactionsDetail?.length || 0})
+          </TabsTrigger>
           <TabsTrigger value="timeline" className="rounded-lg font-bold text-xs py-2 px-3">
             <TrendingUp className="h-3.5 w-3.5 mr-1.5" />
-            Evolución en el Tiempo
+            Evolución Temporal
           </TabsTrigger>
           <TabsTrigger value="brands" className="rounded-lg font-bold text-xs py-2 px-3">
             <Laptop className="h-3.5 w-3.5 mr-1.5" />
-            Rentabilidad por Marca
-          </TabsTrigger>
-          <TabsTrigger value="expenses" className="rounded-lg font-bold text-xs py-2 px-3">
-            <Receipt className="h-3.5 w-3.5 mr-1.5" />
-            Gastos &amp; Métodos de Pago
-          </TabsTrigger>
-          <TabsTrigger value="units" className="rounded-lg font-bold text-xs py-2 px-3">
-            <Package className="h-3.5 w-3.5 mr-1.5" />
-            Detalle de Equipos Vendidos ({unitsSoldInPeriod})
+            Por Marcas
           </TabsTrigger>
         </TabsList>
 
@@ -519,18 +587,15 @@ export default function Profitability() {
                 <CardDescription>De ingresos brutos a utilidad neta final</CardDescription>
               </CardHeader>
               <CardContent className="p-4 sm:p-5">
-                <ResponsiveContainer width="100%" height={340}>
-                  <BarChart data={waterfallData} margin={{ top: 10, right: 10, left: 10, bottom: 50 }}>
+                <ResponsiveContainer width="100%" height={290}>
+                  <BarChart data={waterfallData} margin={{ top: 20, right: 10, left: 10, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11, fontWeight: 700 }} angle={-25} textAnchor="end" interval={0} />
-                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${Math.abs(v).toLocaleString()}`} />
-                    <Tooltip
-                      formatter={(val: number) => [`Bs. ${Math.abs(val).toLocaleString("es-BO", { minimumFractionDigits: 2 })}`, "Monto"]}
-                      labelStyle={{ fontWeight: 700 }}
-                    />
+                    <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 700 }} interval={0} angle={-15} textAnchor="end" />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} />
+                    <Tooltip formatter={(v: number) => [`Bs. ${Math.abs(Number(v)).toLocaleString("es-BO")}`, "Monto"]} />
                     <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                      {waterfallData.map((entry, i) => (
-                        <Cell key={i} fill={entry.fill} />
+                      {waterfallData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -540,199 +605,14 @@ export default function Profitability() {
           </div>
         </TabsContent>
 
-        {/* ── TAB 2: EVOLUCIÓN EN EL TIEMPO ── */}
-        <TabsContent value="timeline" className="space-y-6 mt-0">
-          <Card className="border border-slate-200/90 shadow-sm rounded-2xl bg-white">
-            <CardHeader className="pb-3 border-b border-slate-100">
-              <CardTitle className="text-base font-black text-slate-800 flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-emerald-600" />
-                Evolución Temporal: Ingresos vs Costos vs Utilidad
-              </CardTitle>
-              <CardDescription>Comportamiento diario/periódico en el rango seleccionado</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6">
-              {(!timelineData || timelineData.length === 0) ? (
-                <div className="py-16 text-center text-slate-400">
-                  <Calendar className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                  <p className="font-semibold text-sm">No hay transacciones registradas en este período</p>
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={360}>
-                  <AreaChart data={timelineData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
-                    <defs>
-                      <linearGradient id="colorIngresos" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
-                      </linearGradient>
-                      <linearGradient id="colorUtilidad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 700 }} />
-                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `Bs. ${v.toLocaleString()}`} />
-                    <Tooltip formatter={(v: number) => [`Bs. ${Number(v).toLocaleString("es-BO")}`, ""]} />
-                    <Legend />
-                    <Area type="monotone" dataKey="ingresos" name="Ingresos" stroke="#10b981" fillOpacity={1} fill="url(#colorIngresos)" strokeWidth={2} />
-                    <Area type="monotone" dataKey="cogs" name="Costo Compra (COGS)" stroke="#6366f1" fillOpacity={0.1} fill="#6366f1" strokeWidth={2} />
-                    <Area type="monotone" dataKey="utilidadNeta" name="Utilidad Neta" stroke="#3b82f6" fillOpacity={1} fill="url(#colorUtilidad)" strokeWidth={2.5} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ── TAB 3: RENTABILIDAD POR MARCA ── */}
-        <TabsContent value="brands" className="space-y-6 mt-0">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Gráfico de barras por marca */}
-            <Card className="lg:col-span-7 border border-slate-200/90 shadow-sm rounded-2xl bg-white">
-              <CardHeader className="pb-3 border-b border-slate-100">
-                <CardTitle className="text-base font-black text-slate-800 flex items-center gap-2">
-                  <Laptop className="h-4 w-4 text-blue-600" />
-                  Margen Bruto Obtenido por Marca
-                </CardTitle>
-                <CardDescription>Marcas que más ganancia neta aportaron al negocio</CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-5">
-                {(!brandRanking || brandRanking.length === 0) ? (
-                  <div className="py-12 text-center text-slate-400">Sin ventas de marcas en el período</div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={320}>
-                    <BarChart data={brandRanking} layout="vertical" margin={{ left: 10, right: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                      <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => `Bs. ${v.toLocaleString()}`} />
-                      <YAxis type="category" dataKey="brand" tick={{ fontSize: 11, fontWeight: 700 }} width={70} />
-                      <Tooltip formatter={(v: number) => [`Bs. ${Number(v).toLocaleString("es-BO")}`, "Margen"]} />
-                      <Bar dataKey="margenBruto" fill="#3b82f6" radius={[0, 6, 6, 0]}>
-                        {brandRanking.map((_entry: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Tabla Ranking de marcas */}
-            <Card className="lg:col-span-5 border border-slate-200/90 shadow-sm rounded-2xl bg-white">
-              <CardHeader className="pb-3 border-b border-slate-100">
-                <CardTitle className="text-base font-black text-slate-800">Ranking Detallado</CardTitle>
-                <CardDescription>Volumen, inversión y % de retorno</CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-5 space-y-3">
-                {(brandRanking || []).map((b: any, idx: number) => (
-                  <div key={b.brand} className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="h-5 w-5 rounded-full bg-slate-900 text-white font-black text-[10px] flex items-center justify-center">
-                          {idx + 1}
-                        </span>
-                        <p className="font-black text-slate-800 text-sm">{b.brand}</p>
-                        <Badge variant="secondary" className="text-[10px] font-bold">
-                          {b.count} {b.count === 1 ? "unidad" : "unidades"}
-                        </Badge>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        Ingresos: {fmt(b.ingresos)} | Costo: {fmt(b.cogs)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-black text-emerald-700 text-sm">+{fmt(b.margenBruto)}</p>
-                      <p className="text-[11px] font-bold text-slate-400">+{b.margenBrutoPct}% ROI</p>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* ── TAB 4: GASTOS & MÉTODOS DE PAGO ── */}
-        <TabsContent value="expenses" className="space-y-6 mt-0">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Gastos operativos */}
-            <Card className="lg:col-span-7 border border-slate-200/90 shadow-sm rounded-2xl bg-white">
-              <CardHeader className="pb-3 border-b border-slate-100">
-                <CardTitle className="text-base font-black text-slate-800 flex items-center gap-2">
-                  <Receipt className="h-4 w-4 text-violet-600" />
-                  Gastos Operativos del Período
-                </CardTitle>
-                <CardDescription>Desglose por categoría: {periodInfo?.label}</CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-5">
-                {opExpData.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400">Sin gastos operativos registrados</div>
-                ) : (
-                  <>
-                    <ResponsiveContainer width="100%" height={240}>
-                      <BarChart data={opExpData} layout="vertical" margin={{ left: 10, right: 16 }}>
-                        <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => `${v.toLocaleString()}`} />
-                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fontWeight: 700 }} width={120} />
-                        <Tooltip formatter={(v: number) => [`Bs. ${Number(v).toLocaleString("es-BO")}`, ""]} />
-                        <Bar dataKey="value" radius={[0, 6, 6, 0]} fill="#8b5cf6" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                    <div className="mt-4 border-t pt-3 flex justify-between items-center text-sm font-black">
-                      <span className="text-slate-700">TOTAL GASTOS OPERATIVOS:</span>
-                      <span className="text-violet-700 text-base">{fmt(totalOpExpenses)}</span>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Métodos de Pago */}
-            <Card className="lg:col-span-5 border border-slate-200/90 shadow-sm rounded-2xl bg-white">
-              <CardHeader className="pb-3 border-b border-slate-100">
-                <CardTitle className="text-base font-black text-slate-800 flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-emerald-600" />
-                  Distribución de Cobros por Método
-                </CardTitle>
-                <CardDescription>¿Cómo pagaron los clientes en este período?</CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-5">
-                {methodPieData.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400">Sin cobros en el período</div>
-                ) : (
-                  <>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <PieChart>
-                        <Pie data={methodPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={35} paddingAngle={4}>
-                          {methodPieData.map((entry, i) => (
-                            <Cell key={i} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(v: number) => [`Bs. ${Number(v).toLocaleString("es-BO")}`, ""]} />
-                        <Legend iconType="circle" iconSize={8} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="space-y-2 mt-3 pt-3 border-t">
-                      {methodPieData.map(m => (
-                        <div key={m.name} className="flex justify-between items-center text-xs">
-                          <span className="font-semibold text-slate-600">{m.name}</span>
-                          <span className="font-black text-slate-800">{fmt(m.value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* ── TAB 5: DETALLE DE EQUIPOS VENDIDOS ── */}
+        {/* ── TAB 2: DETALLE DE EQUIPOS VENDIDOS ── */}
         <TabsContent value="units" className="space-y-4 mt-0">
           <Card className="border border-slate-200/90 shadow-sm rounded-2xl bg-white overflow-hidden">
             <CardHeader className="p-4 sm:p-5 border-b border-slate-100">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <CardTitle className="text-base font-black text-slate-800">
-                    Equipos Vendidos en el Período
+                    Equipos Vendidos en el Período ({filteredSoldUnits.length})
                   </CardTitle>
                   <CardDescription>
                     Costo de compra, precio de venta, gastos de taller y ganancia neta por equipo
@@ -808,6 +688,358 @@ export default function Profitability() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── TAB 3: COSTOS DE TALLER Y REPARACIONES ── */}
+        <TabsContent value="repairs" className="space-y-4 mt-0">
+          <Card className="border border-slate-200/90 shadow-sm rounded-2xl bg-white overflow-hidden">
+            <CardHeader className="p-4 sm:p-5 border-b border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base font-black text-slate-800 flex items-center gap-2">
+                    <Wrench className="h-4 w-4 text-amber-600" />
+                    Órdenes de Trabajo y Costos de Taller ({filteredRepairs.length})
+                  </CardTitle>
+                  <CardDescription>
+                    Repuestos y mano de obra aplicados a los equipos en el período
+                  </CardDescription>
+                </div>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Buscar OT, RMA, equipo..."
+                    value={repairsSearchQuery}
+                    onChange={(e) => setRepairsSearchQuery(e.target.value)}
+                    className="pl-9 h-9 text-xs"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {filteredRepairs.length === 0 ? (
+                <div className="py-16 text-center text-slate-400">
+                  <Wrench className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                  <p className="font-semibold text-sm">No hay reparaciones registradas en este período</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                        <th className="py-3 px-4">OT / RMA</th>
+                        <th className="py-3 px-4">Equipo / Modelo</th>
+                        <th className="py-3 px-4 text-right">Mano de Obra</th>
+                        <th className="py-3 px-4 text-right">Repuestos</th>
+                        <th className="py-3 px-4 text-right">Costo Total</th>
+                        <th className="py-3 px-4 text-center">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredRepairs.map((r: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3 px-4">
+                            <Badge variant="outline" className="font-mono text-[10px] border-blue-300 text-blue-700 bg-blue-50">
+                              {r.otNumber}
+                            </Badge>
+                            {r.rmaNumber && r.rmaNumber !== "—" && (
+                              <p className="text-[10px] text-slate-400 font-mono mt-0.5">RMA: {r.rmaNumber}</p>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <p className="font-bold text-slate-800">{r.brand} {r.model}</p>
+                            <p className="text-[11px] text-slate-400 font-mono">{r.unitCode}</p>
+                          </td>
+                          <td className="py-3 px-4 text-right font-medium text-slate-600">
+                            {fmt(r.laborCost)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-medium text-slate-600">
+                            {fmt(r.partsCost)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-black text-amber-700 text-sm">
+                            {fmt(r.totalCost)}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <Badge variant="outline" className={`text-[10px] font-bold ${
+                              r.status === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
+                            }`}>
+                              {r.status === "completed" ? "Completada" : "En proceso"}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── TAB 4: GASTOS OPERATIVOS ── */}
+        <TabsContent value="expenses_table" className="space-y-4 mt-0">
+          <Card className="border border-slate-200/90 shadow-sm rounded-2xl bg-white overflow-hidden">
+            <CardHeader className="p-4 sm:p-5 border-b border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base font-black text-slate-800 flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-violet-600" />
+                    Gastos Operativos del Período ({filteredExpenses.length})
+                  </CardTitle>
+                  <CardDescription>
+                    Alquiler, sueldos, servicios básicos, marketing y otros egresos
+                  </CardDescription>
+                </div>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Buscar gasto o categoría..."
+                    value={expensesSearchQuery}
+                    onChange={(e) => setExpensesSearchQuery(e.target.value)}
+                    className="pl-9 h-9 text-xs"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {filteredExpenses.length === 0 ? (
+                <div className="py-16 text-center text-slate-400">
+                  <Receipt className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                  <p className="font-semibold text-sm">Sin gastos registrados en el período</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                        <th className="py-3 px-4">Categoría</th>
+                        <th className="py-3 px-4">Descripción</th>
+                        <th className="py-3 px-4">Método Pago</th>
+                        <th className="py-3 px-4 text-right">Monto</th>
+                        <th className="py-3 px-4 text-center">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredExpenses.map((e: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3 px-4">
+                            <Badge variant="outline" className="bg-slate-50 font-bold text-slate-700 border-slate-200">
+                              {CATEGORY_LABELS[e.category] || e.category}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4 font-medium text-slate-800">
+                            {e.description || "Gasto operativo"}
+                          </td>
+                          <td className="py-3 px-4 text-slate-500 uppercase font-mono text-[10px]">
+                            {e.paymentMethod || "Efectivo"}
+                          </td>
+                          <td className="py-3 px-4 text-right font-black text-violet-700 text-sm">
+                            {fmt(e.amount)}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-bold text-[10px]">
+                              Pagado
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── TAB 5: FLUJO DE CAJA & TRANSACCIONES ── */}
+        <TabsContent value="finances" className="space-y-4 mt-0">
+          <Card className="border border-slate-200/90 shadow-sm rounded-2xl bg-white overflow-hidden">
+            <CardHeader className="p-4 sm:p-5 border-b border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base font-black text-slate-800 flex items-center gap-2">
+                    <CircleDollarSign className="h-4 w-4 text-emerald-600" />
+                    Movimientos Financieros y Caja ({filteredTransactions.length})
+                  </CardTitle>
+                  <CardDescription>
+                    Historial de entradas y salidas de dinero registradas en finanzas
+                  </CardDescription>
+                </div>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Buscar transacción..."
+                    value={txSearchQuery}
+                    onChange={(e) => setTxSearchQuery(e.target.value)}
+                    className="pl-9 h-9 text-xs"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {filteredTransactions.length === 0 ? (
+                <div className="py-16 text-center text-slate-400">
+                  <CircleDollarSign className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                  <p className="font-semibold text-sm">Sin transacciones registradas</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                        <th className="py-3 px-4">Tipo</th>
+                        <th className="py-3 px-4">Categoría</th>
+                        <th className="py-3 px-4">Descripción</th>
+                        <th className="py-3 px-4">Método</th>
+                        <th className="py-3 px-4 text-right">Monto</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredTransactions.map((t: any, idx: number) => {
+                        const isIncome = t.type === "income";
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-3 px-4">
+                              <Badge variant="outline" className={`font-bold text-[10px] ${
+                                isIncome ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"
+                              }`}>
+                                {isIncome ? "Ingreso (+)" : "Egreso (−)"}
+                              </Badge>
+                            </td>
+                            <td className="py-3 px-4 font-semibold text-slate-700">
+                              {t.category}
+                            </td>
+                            <td className="py-3 px-4 text-slate-600">
+                              {t.description}
+                            </td>
+                            <td className="py-3 px-4 uppercase font-mono text-[10px] text-slate-400">
+                              {t.paymentMethod || "Efectivo"}
+                            </td>
+                            <td className={`py-3 px-4 text-right font-black text-sm ${
+                              isIncome ? "text-emerald-700" : "text-red-600"
+                            }`}>
+                              {isIncome ? "+" : "−"}{fmt(t.amount)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── TAB 6: EVOLUCIÓN EN EL TIEMPO ── */}
+        <TabsContent value="timeline" className="space-y-6 mt-0">
+          <Card className="border border-slate-200/90 shadow-sm rounded-2xl bg-white">
+            <CardHeader className="pb-3 border-b border-slate-100">
+              <CardTitle className="text-base font-black text-slate-800">
+                Evolución Diaria de Ventas, Costos y Utilidad
+              </CardTitle>
+              <CardDescription>
+                Comportamiento financiero a lo largo de los días en {periodInfo?.label}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-5">
+              {timelineData.length === 0 ? (
+                <div className="py-16 text-center text-slate-400">
+                  <Calendar className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                  <p className="font-semibold text-sm">Sin movimientos registrados para graficar en este período</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={320}>
+                  <AreaChart data={timelineData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorIngresos" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorUtilidad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} />
+                    <Tooltip formatter={(v: number) => [`Bs. ${Number(v).toLocaleString("es-BO")}`, ""]} />
+                    <Legend />
+                    <Area type="monotone" dataKey="ingresos" name="Ingresos" stroke="#10b981" fillOpacity={1} fill="url(#colorIngresos)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="utilidadNeta" name="Utilidad Neta" stroke="#3b82f6" fillOpacity={1} fill="url(#colorUtilidad)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── TAB 7: RENTABILIDAD POR MARCA ── */}
+        <TabsContent value="brands" className="space-y-6 mt-0">
+          <Card className="border border-slate-200/90 shadow-sm rounded-2xl bg-white overflow-hidden">
+            <CardHeader className="p-4 sm:p-5 border-b border-slate-100">
+              <CardTitle className="text-base font-black text-slate-800">
+                Ranking de Rentabilidad por Marca
+              </CardTitle>
+              <CardDescription>
+                ¿Cuáles marcas generan más volumen y mejores márgenes brutos?
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {brandRanking.length === 0 ? (
+                <div className="py-16 text-center text-slate-400">
+                  <Laptop className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                  <p className="font-semibold text-sm">Sin ventas en este período</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                        <th className="py-3 px-4">Marca</th>
+                        <th className="py-3 px-4 text-center">Unidades</th>
+                        <th className="py-3 px-4 text-right">Ingresos Brutos</th>
+                        <th className="py-3 px-4 text-right">Costo Total</th>
+                        <th className="py-3 px-4 text-right">Margen Bruto</th>
+                        <th className="py-3 px-4 text-right">% Rentabilidad</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {brandRanking.map((b: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3 px-4 font-black text-slate-800 flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-[10px] text-slate-500 font-mono">
+                              #{idx + 1}
+                            </span>
+                            {b.brand}
+                          </td>
+                          <td className="py-3 px-4 text-center font-bold text-slate-700">
+                            {b.count}
+                          </td>
+                          <td className="py-3 px-4 text-right font-medium text-slate-600">
+                            {fmt(b.ingresos)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-medium text-slate-600">
+                            {fmt(b.cogs)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-black text-emerald-700 text-sm">
+                            +{fmt(b.margenBruto)}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <Badge variant="outline" className={`font-bold text-[10px] ${
+                              b.margenBrutoPct >= 25 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-blue-50 text-blue-700 border-blue-200"
+                            }`}>
+                              +{b.margenBrutoPct}%
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* ─── RESUMEN FINAL DE INVENTARIO DISPONIBLE EN STOCK ────────────────────── */}
@@ -824,7 +1056,7 @@ export default function Profitability() {
               </div>
             </div>
             <Badge className="bg-white/10 text-white border-white/20 px-3 py-1 font-bold text-xs self-start md:self-auto">
-              {availableUnitsCount} Laptops Disponibles
+              {availableUnitsCount} Equipos Disponibles
             </Badge>
           </div>
 
