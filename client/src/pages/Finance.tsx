@@ -469,73 +469,7 @@ export default function Finance() {
       <BoxHistoryModal paymentMethod="qr" title="Caja QR" colorClass="blue" open={qrHistoryOpen} onOpenChange={setQrHistoryOpen} branchId={activeBranchId} />
       <BoxHistoryModal paymentMethod="transfer" title="Cuenta Bancaria" colorClass="purple" open={transferHistoryOpen} onOpenChange={setTransferHistoryOpen} branchId={activeBranchId} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] gap-6">
-        <Card className="border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[2.5rem] bg-white">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3 text-slate-800 font-black">
-              <div className="p-2 bg-slate-100 rounded-xl">
-                <WalletCards className="h-5 w-5" />
-              </div>
-              Resumen de Aperturas
-            </CardTitle>
-            <CardDescription>Control de fondo inicial y responsable hoy.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 p-5 rounded-[1.5rem] bg-slate-50/80 border border-slate-100/50">
-              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Aperturas de hoy</p>
-                <p className="text-3xl font-black text-slate-900">{todaysOpenings.length}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fondo inicial</p>
-                <p className="text-xl font-black text-slate-900">{formatCurrency(todaysOpenedAmount)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[2.5rem] bg-white">
-          <CardHeader>
-            <CardTitle className="font-black text-slate-800">Aperturas Recientes</CardTitle>
-            <CardDescription>Ultimas aperturas registradas en caja.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingOpenings ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => <div key={i} className="h-16 bg-slate-50 animate-pulse rounded-2xl" />)}
-              </div>
-            ) : ((cashOpenings as any[]) || []).length === 0 ? (
-              <div className="py-12 text-center text-sm text-muted-foreground bg-slate-50/50 rounded-[2rem] border-dashed border-2">
-                Todavia no hay aperturas de caja registradas.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {((cashOpenings as any[]) || []).slice(0, 3).map((opening: any) => (
-                  <div key={opening.id} className="flex flex-col gap-4 rounded-[1.5rem] bg-slate-50/80 border border-slate-100/50 p-4 sm:flex-row sm:items-center sm:justify-between transition-all hover:bg-slate-100/50">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-white shadow-sm flex items-center justify-center">
-                        <User className="h-5 w-5 text-slate-400" />
-                      </div>
-                      <div>
-                        <p className="font-black text-slate-800 text-sm">{opening.responsibleUserName || `Usuario #${opening.responsibleUserId}`}</p>
-                        <p className="text-[10px] text-slate-500 font-medium">
-                          Fecha: {opening.openingDate} · {opening.status === "open" ? "Abierta ahora" : "Ya cerrada"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right flex items-center sm:flex-col gap-2 sm:gap-0">
-                      <p className="font-black text-slate-900 text-base">{formatCurrency(opening.openingAmount)}</p>
-                      <Badge variant={opening.status === "open" ? "outline" : "secondary"} className={`text-[9px] uppercase tracking-widest font-black px-2 py-0 ${opening.status === 'open' ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : ''}`}>
-                        {opening.status === "open" ? "Abierta" : "Cerrada"}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
 
       <Tabs defaultValue="transactions" className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-8 bg-slate-100/50 p-1.5 rounded-[1.5rem] h-14">
