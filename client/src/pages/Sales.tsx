@@ -774,6 +774,7 @@ export default function Sales() {
       const saleNumber = (data as any)?.saleNumber || nextSaleData?.saleNumber || "";
       setLastSaleNumber(saleNumber);
       setShowSuccess(true);
+      resetForm();
       await Promise.all([
         utils.sales.list.invalidate(),
         utils.units.list.invalidate(),
@@ -783,7 +784,6 @@ export default function Sales() {
       setTimeout(() => {
         setShowSuccess(false);
         setIsCreateOpen(false);
-        resetForm();
       }, 1800);
     },
     onError: (error) => {
@@ -1850,8 +1850,19 @@ export default function Sales() {
                       value={productSearch}
                       onChange={(event) => setProductSearch(event.target.value)}
                       onKeyDown={(event) => {
-                        if (event.key === "Enter" && groupedProducts.length > 0) {
-                          addGroupToCart(groupedProducts[0]);
+                        if (event.key === "Enter" && productSearch.trim().length >= 2) {
+                          const query = productSearch.trim().toLowerCase();
+                          const exactMatch = groupedProducts.find((g) => {
+                            const u = g.representative;
+                            return (
+                              u.code?.toLowerCase() === query ||
+                              u.serialNumber?.toLowerCase() === query ||
+                              `${u.brand} ${u.model}`.toLowerCase() === query
+                            );
+                          });
+                          if (exactMatch) {
+                            addGroupToCart(exactMatch);
+                          }
                         }
                       }}
                       placeholder="Buscar producto por código, marca, modelo... (Ctrl+B)"
