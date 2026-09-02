@@ -182,25 +182,26 @@ export const statsRouter = router({
         
         if (items.length > 0) {
           for (const item of items) {
-            const unit = (allUnits as any[]).find((u: any) => u.id === item.unitId);
+            const targetUnitId = item.unitId || item.productId;
+            const unit = (allUnits as any[]).find((u: any) => u.id === targetUnitId);
             const brand = (unit?.brand || "Desconocida").trim();
             
             // Filtro por marca si aplica
             if (brandFilter && brand.toLowerCase() !== brandFilter) continue;
             // Filtro por tipo de precio si aplica
-            if (priceTypeFilter && item.priceType !== priceTypeFilter) continue;
+            if (priceTypeFilter && item.pricingType !== priceTypeFilter && item.priceType !== priceTypeFilter) continue;
 
-            const salePrice = Number(item.finalUnitPrice || item.unitPrice || unit?.salePrice || sale.total || 0);
+            const salePrice = Number(item.subtotal || item.finalUnitPrice || item.unitPrice || unit?.salePrice || sale.total || 0);
             const purchaseCost = Number(unit?.purchasePrice || item.purchasePrice || 0);
 
             // Costo de taller asociado a esta unidad si lo hubo
             const repairCost = (allDbRepairs as any[])
-              .filter((r: any) => r.unitId === item.unitId && r.status === "completed")
+              .filter((r: any) => r.unitId === targetUnitId && r.status === "completed")
               .reduce((s: number, r: any) => s + (Number(r.laborCost) || 0) + (Number(r.partsCost) || 0), 0);
 
             totalIngresos += salePrice;
             totalCOGS += purchaseCost;
-            unitsSoldInPeriod += 1;
+            unitsSoldInPeriod += (item.quantity || 1);
 
             const margin = salePrice - purchaseCost - repairCost;
             const marginPct = purchaseCost > 0 ? (margin / purchaseCost) * 100 : 0;
@@ -209,7 +210,7 @@ export const statsRouter = router({
             if (!brandStats[brand]) {
               brandStats[brand] = { brand, count: 0, ingresos: 0, cogs: 0, margenBruto: 0 };
             }
-            brandStats[brand].count += 1;
+            brandStats[brand].count += (item.quantity || 1);
             brandStats[brand].ingresos += salePrice;
             brandStats[brand].cogs += purchaseCost;
             brandStats[brand].margenBruto += (salePrice - purchaseCost);
@@ -222,12 +223,12 @@ export const statsRouter = router({
 
             soldUnitsDetail.push({
               saleId: sale.id,
-              saleCode: sale.code,
-              unitId: unit?.id || item.unitId,
+              saleCode: sale.saleNumber || sale.code || `VENTA-#${sale.id}`,
+              unitId: unit?.id || targetUnitId,
               code: unit?.code || "—",
               brand,
               model: unit?.model || "—",
-              customerName: sale.customerName || "Cliente Mostrador",
+              customerName: sale.customerDisplayName || sale.customerName || "Cliente Mostrador",
               paymentMethod: sale.paymentMethod || "cash",
               salePrice,
               purchasePrice: purchaseCost,
@@ -245,6 +246,23 @@ export const statsRouter = router({
             unitsSoldInPeriod += 1;
             const m = (sale.paymentMethod as "cash" | "qr" | "transfer") || "cash";
             if (m in methodStats) methodStats[m] += salePrice;
+
+            soldUnitsDetail.push({
+              saleId: sale.id,
+              saleCode: sale.saleNumber || sale.code || `VENTA-#${sale.id}`,
+              unitId: null,
+              code: "—",
+              brand: "Venta General",
+              model: "—",
+              customerName: sale.customerDisplayName || sale.customerName || "Cliente Mostrador",
+              paymentMethod: sale.paymentMethod || "cash",
+              salePrice,
+              purchasePrice: 0,
+              repairCost: 0,
+              grossMargin: salePrice,
+              grossMarginPct: 100,
+              saleDate: sale.createdAt,
+            });
           }
         }
       }
