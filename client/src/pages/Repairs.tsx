@@ -239,7 +239,7 @@ function RepairDetailsDialog({
                         </div>
                         {(r.laborCost || r.partsCost) && (
                           <p className="mt-1 text-muted-foreground">
-                            M.O.: {formatCurrency((r.laborCost || 0) / 100)} · Repuestos: {formatCurrency((r.partsCost || 0) / 100)}
+                            M.O.: {formatCurrency(r.laborCost || 0)} · Repuestos: {formatCurrency(r.partsCost || 0)}
                           </p>
                         )}
                         {r.endDate && (
@@ -776,7 +776,7 @@ export default function Repairs() {
             <tbody className="divide-y divide-slate-100">
               {repairsData.items.map((ot: any) => {
                 const otLabel = ot.otNumber || `OT-#${ot.id}`;
-                const totalCost = ((ot.laborCost || 0) + (ot.partsCost || 0)) / 100;
+                const totalCost = (ot.laborCost || 0) + (ot.partsCost || 0);
                 return (
                   <tr key={ot.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="px-4 py-3">
@@ -816,8 +816,8 @@ export default function Repairs() {
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {totalCost > 0 ? (
                         <div className="text-xs">
-                          <p className="text-slate-500">M.O.: {formatCurrency(ot.laborCost / 100)}</p>
-                          <p className="text-slate-500">Rep.: {formatCurrency(ot.partsCost / 100)}</p>
+                          <p className="text-slate-500">M.O.: {formatCurrency(ot.laborCost || 0)}</p>
+                          <p className="text-slate-500">Rep.: {formatCurrency(ot.partsCost || 0)}</p>
                           <p className="font-bold text-slate-800">{formatCurrency(totalCost)}</p>
                         </div>
                       ) : (
@@ -995,8 +995,8 @@ export default function Repairs() {
                             {/* Costos (solo si > 0) */}
                             {((ot.laborCost || 0) + (ot.partsCost || 0)) > 0 && (
                               <div className="flex justify-between text-[10px] text-muted-foreground border-t pt-1.5 mt-1">
-                                <span>M.O.: {formatCurrency(ot.laborCost / 100)}</span>
-                                <span>Repuestos: {formatCurrency(ot.partsCost / 100)}</span>
+                                <span>M.O.: {formatCurrency(ot.laborCost || 0)}</span>
+                                <span>Repuestos: {formatCurrency(ot.partsCost || 0)}</span>
                               </div>
                             )}
 

@@ -242,7 +242,7 @@ export function WorkOrderModal({
           <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; text-align:right;">
             <div style="font-size:10px; color:#64748b;">Costo Estimado / Reparación</div>
             <div style="font-size:14px; font-weight:900; color:#0f172a;">
-              ${workOrder.totalCost > 0 ? formatCurrency(workOrder.totalCost / 100) : "Por Diagnosticar"}
+              ${workOrder.totalCost > 0 ? formatCurrency(workOrder.totalCost) : "Por Diagnosticar"}
             </div>
           </div>
         </div>
@@ -655,7 +655,7 @@ Te avisaremos apenas tengamos el diagnóstico listo. Puedes consultar el estado 
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-right">
                   <p className="text-[10px] text-slate-500">Presupuesto / Costo Estimado</p>
                   <p className="text-base font-black text-slate-900">
-                    {workOrder.totalCost > 0 ? formatCurrency(workOrder.totalCost / 100) : "Por Diagnosticar"}
+                    {workOrder.totalCost > 0 ? formatCurrency(workOrder.totalCost) : "Por Diagnosticar"}
                   </p>
                 </div>
               </div>

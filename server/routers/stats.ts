@@ -7,12 +7,14 @@ import {
   getOperationalExpenses,
   getAllSales,
   getSaleItemsBySaleId,
+  getDb,
   MOCK_REPAIRS,
   MOCK_WARRANTIES,
   MOCK_RETURNS,
   MOCK_UNITS,
   MOCK_SALE_ITEMS,
 } from "../db";
+import { repairs, saleItems } from "../../drizzle/schema";
 import { TRPCError } from "@trpc/server";
 
 export const statsRouter = router({
@@ -126,11 +128,14 @@ export const statsRouter = router({
       const { startDate, endDate, label: periodLabel } = computeDateRange(period, from, to);
 
       // ── Datos ─────────────────────────────────────────────────────────
-      const [allTransactions, allExpenses, allUnits, allSales] = await Promise.all([
+      const db = await getDb();
+      const [allTransactions, allExpenses, allUnits, allSales, allDbRepairs, allDbSaleItems] = await Promise.all([
         getFinancialTransactions(undefined, branchId),
         getOperationalExpenses(branchId),
         getAllUnits(),
         getAllSales(branchId),
+        db ? db.select().from(repairs) : MOCK_REPAIRS,
+        db ? db.select().from(saleItems) : MOCK_SALE_ITEMS,
       ]);
 
       // ── Helper rango de fechas ─────────────────────────────────────────
@@ -158,7 +163,7 @@ export const statsRouter = router({
 
       for (const sale of filteredSales) {
         // Buscar items de la venta
-        const items = (MOCK_SALE_ITEMS as any[]).filter((si: any) => si.saleId === sale.id);
+        const items = (allDbSaleItems as any[]).filter((si: any) => si.saleId === sale.id);
         
         if (items.length > 0) {
           for (const item of items) {
@@ -174,7 +179,7 @@ export const statsRouter = router({
             const purchaseCost = Number(unit?.purchasePrice || item.purchasePrice || 0);
 
             // Costo de taller asociado a esta unidad si lo hubo
-            const repairCost = (MOCK_REPAIRS as any[])
+            const repairCost = (allDbRepairs as any[])
               .filter((r: any) => r.unitId === item.unitId && r.status === "completed")
               .reduce((s: number, r: any) => s + (Number(r.laborCost) || 0) + (Number(r.partsCost) || 0), 0);
 
@@ -230,8 +235,10 @@ export const statsRouter = router({
       }
 
       // ── 2. COSTOS DE TALLER EN EL PERÍODO ──────────────────────────────
-      const filteredRepairs = (MOCK_REPAIRS as any[]).filter((r: any) => {
-        if (!inPeriod(r.entryDate || r.createdAt)) return false;
+      const filteredRepairs = (allDbRepairs as any[]).filter((r: any) => {
+        if (r.status === "cancelled") return false;
+        const repDate = r.endDate || r.startDate || r.createdAt || r.entryDate;
+        if (!inPeriod(repDate)) return false;
         if (branchId && (r.branchId || 1) !== branchId) return false;
         return true;
       });
