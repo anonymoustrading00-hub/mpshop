@@ -485,35 +485,46 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
                 </CardHeader>
                 <CardContent className={isMobile ? "grid gap-4" : "grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]"}>
                   <div className="space-y-2">
-                    <Label>Buscar Cliente</Label>
+                    <Label>Cliente</Label>
                     <div className="relative">
                       <UserRound className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input 
                         autoFocus
                         value={customerSearch} 
-                        onChange={e => { setCustomerSearch(e.target.value); setSelectedCustomerId(null); }} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setCustomerSearch(val);
+                          setSelectedCustomerId(null);
+                          // Si no hay cliente registrado, lo que escriban aquí = nombre libre
+                          setAnonymousCustomerName(val.trim());
+                        }} 
                         className="pl-9 focus-visible:ring-indigo-500" 
-                        placeholder="Buscar cliente registrado..." 
+                        placeholder="Nombre del cliente (o buscar uno registrado)..." 
                       />
                     </div>
-                    {filteredCustomers.length > 0 && !selectedCustomerId && (
+                    {/* Dropdown: only show registered matches if text is non-empty */}
+                    {filteredCustomers.length > 0 && !selectedCustomerId && customerSearch.trim() && (
                       <div className="border rounded-xl bg-white shadow-sm overflow-hidden">
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400 px-3 pt-2 pb-1 font-bold">Clientes registrados</p>
                         {filteredCustomers.map((c: any) => (
-                          <button key={c.id} className="block w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 border-b last:border-0" onClick={() => { setSelectedCustomerId(c.id); setCustomerSearch(c.name); }}>
+                          <button key={c.id} className="block w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 border-b last:border-0" onClick={() => { setSelectedCustomerId(c.id); setCustomerSearch(c.name); setAnonymousCustomerName(""); }}>
                             <span className="font-medium">{c.name}</span>
                           </button>
                         ))}
                       </div>
                     )}
-                    {!selectedCustomerId ? (
-                      <Input value={anonymousCustomerName} onChange={e => setAnonymousCustomerName(e.target.value)} placeholder="O escribe nombre libre / anónimo" className="focus-visible:ring-indigo-500" />
-                    ) : (
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-indigo-50">Cliente seleccionado</Badge>
-                        <Button type="button" size="sm" variant="ghost" onClick={() => { setSelectedCustomerId(null); setCustomerSearch(""); }}>
+                    {selectedCustomerId && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-indigo-50">✓ Cliente registrado seleccionado</Badge>
+                        <Button type="button" size="sm" variant="ghost" className="h-6 text-xs text-slate-500 hover:text-red-500" onClick={() => { setSelectedCustomerId(null); setCustomerSearch(""); setAnonymousCustomerName(""); }}>
                           Cambiar
                         </Button>
                       </div>
+                    )}
+                    {!selectedCustomerId && customerSearch.trim() && (
+                      <p className="text-[11px] text-slate-500">
+                        💡 Se guardará como <strong className="text-slate-700">"{customerSearch.trim()}"</strong>. Si es un cliente registrado, selecciónalo arriba.
+                      </p>
                     )}
                   </div>
                   
