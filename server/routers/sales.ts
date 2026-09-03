@@ -113,7 +113,7 @@ export const salesRouter = router({
         adminOverrideReason: z.string().optional(),
         items: z.array(
           z.object({
-            unitId: z.number(),
+            unitId: z.number().int().positive("El ID de unidad debe ser un número positivo"),
             pricingType: z.enum(["unit", "wholesale", "discount"]).default("unit"),
             quantity: z.number().default(1),
             basePrice: z.number(),

@@ -3615,6 +3615,10 @@ export async function cancelSaleRecord(saleId: number, cancelledByUserId: number
     // Eliminar registros de garantía generados por esta venta anulada
     await tx.delete(schema.warranties).where(eq(schema.warranties.saleId, saleId));
 
+    // Eliminar items de esta venta anulada para evitar items huerfanos
+    // que aparecen como "Articulo #X" si el saleId es reutilizado
+    await tx.delete(saleItems).where(eq(saleItems.saleId, saleId));
+
     // Cancelar cuenta por cobrar si existía
     await tx.update(schema.accountsReceivable).set({ status: "cancelled" }).where(eq(schema.accountsReceivable.saleId, saleId));
 
@@ -3703,25 +3707,31 @@ export async function getSaleItemsBySaleId(saleId: number) {
     });
   }
   const items = await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
-  return await Promise.all(items.map(async (item: any) => {
+  const resolved = await Promise.all(items.map(async (item: any) => {
     let name = item.productName;
     let code = item.productCode || "";
+    let foundUnit = false;
     const uId = item.unitId ?? item.productId;
     if (uId) {
       const unit = await db.select({ brand: units.brand, model: units.model, code: units.code }).from(units).where(eq(units.id, uId)).limit(1);
       const u = unit[0];
       if (u) {
+        foundUnit = true;
         name = `${u.brand || ""} ${u.model || ""}`.trim() || u.code || `Unidad #${uId}`;
         code = u.code || "";
       }
     }
+    // Si no se encontro la unidad en el catalogo, marcar como huerfano
     return {
       ...item,
-      productName: name || `Artículo #${item.id}`,
+      productName: name || `Articulo #${item.id}`,
       productCode: code,
       unitType: "PZA",
+      _orphan: !foundUnit && !!(uId),
     };
   }));
+  // Filtrar items huerfanos (unitId no existe en units) para no mostrar articulos fantasma
+  return resolved.filter((item: any) => !item._orphan);
 }
 
 export async function getOnOrderQuantities() {

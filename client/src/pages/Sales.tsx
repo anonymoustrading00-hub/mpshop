@@ -1228,14 +1228,16 @@ export default function Sales() {
       discountValue: globalDiscountValue,
       notes,
       customerType: selectedCustomerType,
-      items: computedCart.items.map((item) => ({
-        unitId: item.productId,
-        pricingType: item.pricingType,
-        quantity: item.quantity,
-        basePrice: item.basePrice,
-        discountType: item.discountType,
-        discountValue: item.discountValue,
-      })),
+      items: computedCart.items
+        .filter((item) => item.productId && item.productId > 0)
+        .map((item) => ({
+          unitId: item.productId,
+          pricingType: item.pricingType,
+          quantity: item.quantity,
+          basePrice: item.basePrice,
+          discountType: item.discountType,
+          discountValue: item.discountValue,
+        })),
     });
   };
 
@@ -1342,7 +1344,7 @@ export default function Sales() {
                  </div>
                </div>
                <div className="relative z-10 flex flex-col sm:flex-row gap-3">
-                 <Button onClick={() => setIsCreateOpen(true)} className="h-14 px-8 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg gap-3 shadow-xl shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95">
+                 <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="h-14 px-8 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg gap-3 shadow-xl shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95">
                    <Plus className="h-6 w-6" />
                    Nueva Venta
                  </Button>
