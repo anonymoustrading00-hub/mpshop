@@ -70,6 +70,7 @@ export default function Warranties() {
     let claimed = 0;
 
     allItems.forEach((w: any) => {
+      if (w.status === "cancelled") return;
       if (w.status === "claimed") {
         claimed++;
       } else if (w.isExpired) {
@@ -82,12 +83,14 @@ export default function Warranties() {
       }
     });
 
-    return { total: allItems.length, active, expiringSoon, expired, claimed };
+    const activeList = allItems.filter((w: any) => w.status !== "cancelled");
+    return { total: activeList.length, active, expiringSoon, expired, claimed };
   }, [allItems]);
 
   // Filtered items
   const filteredItems = useMemo(() => {
     return allItems.filter((w: any) => {
+      if (w.status === "cancelled") return false;
       // Filter by status tab
       if (statusFilter === "active" && (w.status !== "active" || w.isExpired)) return false;
       if (statusFilter === "expiring_soon" && (w.status !== "active" || w.isExpired || w.daysLeft > 5)) return false;

@@ -800,6 +800,7 @@ export default function Sales() {
         utils.sales.getDetails.invalidate(),
         utils.units.list.invalidate(),
         utils.finance.getTransactions.invalidate(),
+        utils.warranties.list.invalidate(),
       ]);
     },
     onError: (error) => {

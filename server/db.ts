@@ -3582,6 +3582,13 @@ export async function cancelSaleRecord(saleId: number, cancelledByUserId: number
       });
     }
 
+    // Limpiar garantías asociadas a esta venta en mock
+    for (let i = MOCK_WARRANTIES.length - 1; i >= 0; i--) {
+      if (MOCK_WARRANTIES[i].saleId === saleId) {
+        MOCK_WARRANTIES.splice(i, 1);
+      }
+    }
+
     return { success: true };
   }
 
@@ -3604,6 +3611,12 @@ export async function cancelSaleRecord(saleId: number, cancelledByUserId: number
         notes: `Anulación de venta ${sale.saleNumber}`,
       });
     }
+
+    // Eliminar registros de garantía generados por esta venta anulada
+    await tx.delete(schema.warranties).where(eq(schema.warranties.saleId, saleId));
+
+    // Cancelar cuenta por cobrar si existía
+    await tx.update(schema.accountsReceivable).set({ status: "cancelled" }).where(eq(schema.accountsReceivable.saleId, saleId));
 
     if (sale.paymentStatus === "completed") {
       await tx.insert(financialTransactions).values({

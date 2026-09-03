@@ -3,7 +3,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb, MOCK_WARRANTIES, MOCK_UNITS, MOCK_SALES, MOCK_CUSTOMERS, MOCK_RETURNS, MOCK_REPAIRS, syncMocksToDisk } from "../db";
 import { warranties, units, sales, customers, returns, repairs } from "../../drizzle/schema";
-import { eq, desc, and, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, sql, inArray, ne, or, isNull } from "drizzle-orm";
 
 function toDate(v: any): Date | null {
   if (v === null || v === undefined) return null;
@@ -33,13 +33,16 @@ function buildWarrantyView(w: any, unit: any, sale: any, customer: any, returnRm
   const warrantyExpired = endDate.getTime() <= now.getTime();
 
   // Reglas de estado (en orden de prioridad):
+  // 0) Si la venta asociada fue anulada -> "cancelled"
   // 1) Si hay repair activa en la unidad -> "paused" (la garantía se pausó por el taller)
   // 2) Si está pausada por un repair que ya cerró pero no se reanudó -> "paused"
   // 3) Si la garantía venció Y tuvo al menos un return -> "claimed" (definitivo, se usó y venció)
   // 4) Si la garantía venció (sin return) -> "expired"
   // 5) Si está activa y vigente -> "active" — incluso si tuvo returns previos.
   //    El cliente puede registrar nuevas devoluciones mientras la garantía esté vigente.
-  if (isPausedByRepair) {
+  if (sale?.status === "cancelled" || w.status === "cancelled") {
+    resolvedStatus = "cancelled";
+  } else if (isPausedByRepair) {
     resolvedStatus = "paused";
   } else if (pausedAt && remainingDaysAtPause !== null) {
     resolvedStatus = "paused";
@@ -149,6 +152,16 @@ export const warrantiesRouter = router({
           });
         }
 
+        // Excluir garantías de ventas anuladas o canceladas
+        filtered = filtered.filter((w: any) => {
+          if (w.status === "cancelled") return false;
+          if (w.saleId) {
+            const sale = MOCK_SALES.find((s: any) => s.id === w.saleId);
+            if (sale && sale.status === "cancelled") return false;
+          }
+          return true;
+        });
+
         let items = filtered.map((w: any) => {
           const unit = MOCK_UNITS.find((u: any) => u.id === w.unitId);
           const sale = MOCK_SALES.find((s: any) => s.id === w.saleId);
@@ -156,7 +169,7 @@ export const warrantiesRouter = router({
           const returnRma = MOCK_RETURNS.find((r: any) => r.unitId === w.unitId || r.warrantyId === w.id);
           const activeRepair = MOCK_REPAIRS.find((r: any) => r.unitId === w.unitId && r.status === "in_progress");
           return buildWarrantyView(w, unit, sale, customer, returnRma, activeRepair);
-        });
+        }).filter((w: any) => w.status !== "cancelled");
 
         if (input?.status) {
           items = items.filter((w: any) => w.status === input.status);
@@ -182,6 +195,8 @@ export const warrantiesRouter = router({
       if (input?.saleId) conditions.push(eq(warranties.saleId, input.saleId));
       if (input?.orderId) conditions.push(eq(warranties.orderId, input.orderId));
       if (input?.branchId) conditions.push(eq(units.branchId, input.branchId));
+      // Excluir garantías de ventas anuladas
+      conditions.push(or(isNull(sales.status), ne(sales.status, "cancelled")));
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -220,7 +235,7 @@ export const warrantiesRouter = router({
         const returnRma = allReturns.find((ret: any) => ret.unitId === r.warranty.unitId || ret.warrantyId === r.warranty.id);
         const activeRepair = allRepairs.find((rep: any) => rep.unitId === r.warranty.unitId);
         return buildWarrantyView(r.warranty, r.unit, r.sale, r.customer, returnRma, activeRepair);
-      });
+      }).filter((w: any) => w.status !== "cancelled");
 
       if (input?.status) {
         items = items.filter((w: any) => w.status === input.status);
