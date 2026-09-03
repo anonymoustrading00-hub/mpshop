@@ -473,6 +473,28 @@ async function startServer() {
     }
   });
 
+  // Debug endpoint to check specific sale and its saleItems (diagnose ghost items)
+  app.get("/api/debug-sale/:saleId", async (req, res) => {
+    if (!process.env.DATABASE_URL) {
+      return res.status(400).json({ error: "Solo funciona con DATABASE_URL" });
+    }
+    try {
+      const saleId = parseInt(req.params.saleId);
+      const mysql = await import("mysql2/promise");
+      const connection = await mysql.default.createConnection(process.env.DATABASE_URL!);
+
+      const [sale] = await connection.query("SELECT * FROM sales WHERE id = ?", [saleId]);
+      const [items] = await connection.query("SELECT si.*, u.brand, u.model, u.code, u.salePrice, u.status as unitStatus FROM saleItems si LEFT JOIN units u ON si.unitId = u.id WHERE si.saleId = ?", [saleId]);
+      const [allSaleItems] = await connection.query("SELECT * FROM saleItems ORDER BY id DESC LIMIT 20");
+
+      await connection.end();
+
+      res.json({ sale, items, lastSaleItems: allSaleItems });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ──────────────────────────────────────────────────────────────────────────
   // RESET DE BASE DE DATOS (solo en modo DATABASE_URL / producción)
   // Borra TODOS los datos operativos y conserva únicamente el usuario admin.
