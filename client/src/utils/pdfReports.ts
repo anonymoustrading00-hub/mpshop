@@ -230,228 +230,465 @@ export const generateSalesPDF = (sales: any[], filters: any, companyConfig?: any
   return doc;
 };
 
-// 3. REPORTE DE INVENTARIO (UNIDADES) - MEJORADO
+// 3. REPORTE DE INVENTARIO Y VALUACIÓN (UNIDADES, TALLER Y ROTACIÓN) - MEJORADO
 export const generateInventoryPDF = (data: any, companyConfig?: any) => {
   const units = data?.units || [];
   const stats = data?.stats || {};
   
-  const doc = createPDF("Reporte de Inventario - Unidades", companyConfig);
+  const doc = createPDF("Reporte Ejecutivo de Inventario y Valuación", companyConfig);
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
 
-  let y = 45;
+  let y = 43;
 
   // ═══════════════════════════════════════════════════════════
-  // SECCIÓN 1: RESUMEN EJECUTIVO
+  // SECCIÓN 1: RESUMEN EJECUTIVO Y VALUACIÓN DE STOCK
   // ═══════════════════════════════════════════════════════════
-  doc.setFillColor(240, 245, 250);
-  doc.rect(15, y - 5, 180, 50, "F");
-  
-  doc.setFontSize(12);
+  doc.setFillColor(241, 245, 249); // slate-100
+  doc.roundedRect(14, y - 4, pageWidth - 28, 56, 3, 3, "F");
+  doc.setDrawColor(203, 213, 225); // slate-300
+  doc.roundedRect(14, y - 4, pageWidth - 28, 56, 3, 3, "D");
+
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 58, 138); // blue-900
+  doc.text("1. RESUMEN EJECUTIVO Y VALUACION GLOBAL", 18, y + 2);
+  doc.setTextColor(51, 65, 85); // slate-700
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+
+  const availableCost = stats.availableCostCents ?? stats.totalCost ?? 0;
+  const availableSaleValue = stats.availableSaleValueCents ?? stats.totalSaleValue ?? 0;
+  const potentialProfit = stats.availablePotentialProfitCents ?? stats.potentialProfit ?? Math.max(0, availableSaleValue - availableCost);
+  const marginPct = stats.availableMarginPct ?? (availableCost > 0 ? Math.round((potentialProfit / availableCost) * 1000) / 10 : 0);
+
+  const col1X = 18;
+  const col2X = 76;
+  const col3X = 138;
+
+  const r1Y = y + 10;
+  const r2Y = y + 18;
+  const r3Y = y + 26;
+  const r4Y = y + 34;
+  const r5Y = y + 42;
+
+  // Columna 1: Stock Disponible
+  doc.setFont("helvetica", "bold");
+  doc.text("STOCK DISPONIBLE:", col1X, r1Y);
+  doc.setFont("helvetica", "normal");
+  doc.text(`${stats.availableCount ?? stats.total ?? 0} unidades disponibles`, col1X, r2Y);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Inversion en Stock (Costo):", col1X, r3Y);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(220, 38, 38); // red-600
+  doc.text(formatBs(availableCost), col1X, r4Y);
+  doc.setTextColor(51, 65, 85);
+
+  doc.setFont("helvetica", "normal");
+  doc.text(`Valor de Venta (PVP): ${formatBs(availableSaleValue)}`, col1X, r5Y);
+
+  // Columna 2: Ganancia Potencial y Margen
+  doc.setFont("helvetica", "bold");
+  doc.text("GANANCIA POTENCIAL:", col2X, r1Y);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(16, 185, 129); // emerald-600
+  doc.text(formatBs(potentialProfit), col2X, r2Y);
+  doc.setTextColor(51, 65, 85);
+
+  doc.setFont("helvetica", "normal");
+  doc.text(`Margen Comercial: ${marginPct}%`, col2X, r3Y);
+  doc.text(`Total en Catalogo: ${stats.total || 0} unidades`, col2X, r4Y);
+  doc.text(`Historico Vendidos: ${stats.soldCount || (stats.byStatus?.sold ?? 0)} unid.`, col2X, r5Y);
+
+  // Columna 3: Taller y Rotación
+  const workshopUnitsCount = stats.workshopCount ?? stats.inRepair ?? 0;
+  const workshopTiedCapital = stats.workshopTotalTiedCapitalCents ?? stats.workshopUnitsCostCents ?? 0;
+
+  doc.setFont("helvetica", "bold");
+  doc.text("CAPITAL EN TALLER:", col3X, r1Y);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(217, 119, 6); // amber-600
+  doc.text(`${workshopUnitsCount} unidades en servicio`, col3X, r2Y);
+  doc.text(formatBs(workshopTiedCapital), col3X, r3Y);
+  doc.setTextColor(51, 65, 85);
+
+  doc.setFont("helvetica", "normal");
+  doc.text(`Rotacion Promedio: ${stats.avgDaysInStock || 0} dias`, col3X, r4Y);
+  doc.text(`En Garantia Activa: ${stats.inWarrantyCount ?? stats.inWarranty ?? 0} unid.`, col3X, r5Y);
+
+  y += 60;
+
+  // ═══════════════════════════════════════════════════════════
+  // SECCIÓN 2: DISTRIBUCIÓN Y VALUACIÓN POR ESTADO
+  // ═══════════════════════════════════════════════════════════
+  doc.setFontSize(10.5);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(30, 58, 138);
-  doc.text("📊 RESUMEN EJECUTIVO", 20, y + 2);
+  doc.text("2. DISTRIBUCION Y VALUACION POR ESTADO DE INVENTARIO", 14, y);
   doc.setTextColor(40, 40, 40);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  y += 4;
 
-  const row1Y = y + 10;
-  const row2Y = y + 18;
-  const row3Y = y + 26;
-  const row4Y = y + 34;
+  const statusRows: any[] = [];
+  if (Array.isArray(stats.byStatus)) {
+    stats.byStatus.forEach((st: any) => {
+      statusRows.push([
+        st.label || st.statusKey,
+        st.count.toString(),
+        `${st.pctOfTotal || 0}%`,
+        formatBs(st.costCents || 0),
+        formatBs(st.saleValueCents || 0),
+      ]);
+    });
+  } else {
+    const statusLabels: Record<string, string> = {
+      available: "Disponible para Venta",
+      in_repair: "En Taller (Reparacion)",
+      in_diagnosis: "En Diagnostico",
+      sold: "Vendido",
+      reserved: "Reservado",
+      returned: "Devuelto / Garantia",
+      scrapped: "Baja / Desecho",
+    };
+    Object.entries(stats.byStatus || {}).forEach(([st, cnt]) => {
+      statusRows.push([
+        statusLabels[st] || st,
+        (cnt as number).toString(),
+        `${(((cnt as number) / (stats.total || 1)) * 100).toFixed(1)}%`,
+        "—",
+        "—",
+      ]);
+    });
+  }
 
-  // Fila 1: Total y Valoración
-  doc.setFont("helvetica", "bold");
-  doc.text(`Total Unidades:`, 20, row1Y);
-  doc.setFont("helvetica", "normal");
-  doc.text(`${stats.total || 0}`, 55, row1Y);
-
-  doc.setFont("helvetica", "bold");
-  doc.text(`Inversión Total:`, 100, row1Y);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(220, 38, 38);
-  doc.text(`${formatBs(stats.totalCost / 100)}`, 135, row1Y);
-  doc.setTextColor(40, 40, 40);
-
-  // Fila 2: Valor de venta y Ganancia proyectada
-  doc.setFont("helvetica", "bold");
-  doc.text(`Valor en Venta:`, 20, row2Y);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(22, 163, 74);
-  doc.text(`${formatBs(stats.totalSaleValue / 100)}`, 55, row2Y);
-  doc.setTextColor(40, 40, 40);
-
-  doc.setFont("helvetica", "bold");
-  doc.text(`Ganancia Potencial:`, 100, row2Y);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(16, 185, 129);
-  doc.text(`${formatBs(stats.potentialProfit / 100)} (${stats.totalCost > 0 ? Math.round((stats.potentialProfit / stats.totalCost) * 100) : 0}%)`, 135, row2Y);
-  doc.setTextColor(40, 40, 40);
-
-  // Fila 3: Rotación y Taller
-  doc.setFont("helvetica", "bold");
-  doc.text(`Días Prom. Stock:`, 20, row3Y);
-  doc.setFont("helvetica", "normal");
-  doc.text(`${stats.avgDaysInStock || 0} días`, 55, row3Y);
-
-  doc.setFont("helvetica", "bold");
-  doc.text(`En Taller:`, 100, row3Y);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(234, 179, 8);
-  doc.text(`${stats.inRepair || 0} unidades`, 135, row3Y);
-  doc.setTextColor(40, 40, 40);
-
-  // Fila 4: Garantías activas
-  doc.setFont("helvetica", "bold");
-  doc.text(`En Garantía:`, 20, row4Y);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(59, 130, 246);
-  doc.text(`${stats.inWarranty || 0} unidades`, 55, row4Y);
-  doc.setTextColor(40, 40, 40);
-
-  y += 58;
+  if (statusRows.length > 0) {
+    (autoTable as any)(doc, {
+      ...getTableOptions(y),
+      head: [["Estado del Inventario", "Cantidad", "% Total", "Inversion al Costo", "Valor Venta Estimado"]],
+      body: statusRows,
+      theme: "grid",
+      headStyles: { fillColor: [30, 58, 138], fontSize: 8.5, halign: "left" },
+      styles: { fontSize: 8, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 55 },
+        1: { cellWidth: 24, halign: "center" },
+        2: { cellWidth: 24, halign: "center" },
+        3: { cellWidth: 40, halign: "right" },
+        4: { cellWidth: 40, halign: "right" },
+      },
+    });
+    y = (doc as any).lastAutoTable.finalY + 10;
+  }
 
   // ═══════════════════════════════════════════════════════════
-  // SECCIÓN 2: DISTRIBUCIÓN POR ESTADO
+  // SECCIÓN 3: DETALLE DE EQUIPOS EN TALLER / SERVICIO TÉCNICO
   // ═══════════════════════════════════════════════════════════
+  const workshopItems = stats.workshopDetail || [];
+  const checkHeight = y + (workshopItems.length > 0 ? 45 : 25);
+  if (checkHeight > pageHeight - 25) {
+    doc.addPage();
+    y = 20;
+  }
+
+  doc.setFontSize(10.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 58, 138);
+  doc.text("3. INVENTARIO EN TALLER Y SERVICIO TECNICO", 14, y);
+  doc.setTextColor(40, 40, 40);
+  y += 4;
+
+  if (workshopItems.length > 0) {
+    const workshopTableRows = workshopItems.map((item: any) => [
+      item.code || "—",
+      `${item.brand} ${item.model}`.trim() || "—",
+      item.status === "in_repair" ? "En Reparacion" : "En Diagnostico",
+      item.otNumber || "—",
+      `${item.daysInWorkshop || 0} d`,
+      formatBs(item.purchasePrice || 0),
+      formatBs(item.repairCost || 0),
+      formatBs(item.totalTiedCapital || 0),
+    ]);
+
+    (autoTable as any)(doc, {
+      ...getTableOptions(y),
+      head: [["Codigo", "Equipo / Modelo", "Estado Taller", "OT / Ref.", "Dias", "P. Compra", "Gastos Taller", "Total Inmovilizado"]],
+      body: workshopTableRows,
+      theme: "grid",
+      headStyles: { fillColor: [217, 119, 6], fontSize: 8, halign: "left" },
+      styles: { fontSize: 7.5, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 22 },
+        1: { cellWidth: 42 },
+        2: { cellWidth: 26 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 14, halign: "center" },
+        5: { cellWidth: 20, halign: "right" },
+        6: { cellWidth: 20, halign: "right" },
+        7: { cellWidth: 20, halign: "right" },
+      },
+    });
+    y = (doc as any).lastAutoTable.finalY + 10;
+  } else {
+    doc.setFillColor(254, 243, 199); // amber-100
+    doc.rect(14, y, pageWidth - 28, 12, "F");
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(146, 64, 14);
+    doc.text("Actualmente no hay unidades en taller ni en diagnostico. Todo el stock operativo esta al dia.", 18, y + 7.5);
+    doc.setTextColor(40, 40, 40);
+    y += 18;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // SECCIÓN 4: VALUACIÓN POR CATEGORÍA / TIPO DE EQUIPO
+  // ═══════════════════════════════════════════════════════════
+  if (y + 50 > pageHeight - 25) {
+    doc.addPage();
+    y = 20;
+  }
+
+  doc.setFontSize(10.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 58, 138);
+  doc.text("4. VALUACION POR CATEGORIA / TIPO DE EQUIPO", 14, y);
+  doc.setTextColor(40, 40, 40);
+  y += 4;
+
+  const typeRows: any[] = [];
+  if (Array.isArray(stats.byType)) {
+    stats.byType.forEach((tp: any) => {
+      typeRows.push([
+        tp.label || tp.typeKey,
+        tp.totalCount.toString(),
+        tp.availableCount.toString(),
+        tp.workshopCount.toString(),
+        formatBs(tp.costCents || 0),
+        formatBs(tp.saleValueCents || 0),
+        formatBs(tp.potentialProfitCents || 0),
+        `${tp.marginPct || 0}%`,
+      ]);
+    });
+  } else {
+    const typeLabels: Record<string, string> = {
+      laptop: "Laptops",
+      tablet: "Tablets",
+      phone: "Celulares",
+      monitor: "Monitores",
+      charger: "Cargadores",
+      accessory: "Accesorios",
+      other: "Otros",
+    };
+    Object.entries(stats.byType || {}).forEach(([tp, cnt]) => {
+      typeRows.push([typeLabels[tp] || tp, (cnt as number).toString(), "—", "—", "—", "—", "—", "—"]);
+    });
+  }
+
+  if (typeRows.length > 0) {
+    (autoTable as any)(doc, {
+      ...getTableOptions(y),
+      head: [["Categoria", "Total", "Disp.", "Taller", "Inversion Costo", "Valor Venta", "Ganancia Pot.", "% Margen"]],
+      body: typeRows,
+      theme: "grid",
+      headStyles: { fillColor: [30, 58, 138], fontSize: 8 },
+      styles: { fontSize: 7.5, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 42 },
+        1: { cellWidth: 14, halign: "center" },
+        2: { cellWidth: 14, halign: "center" },
+        3: { cellWidth: 14, halign: "center" },
+        4: { cellWidth: 26, halign: "right" },
+        5: { cellWidth: 26, halign: "right" },
+        6: { cellWidth: 26, halign: "right" },
+        7: { cellWidth: 20, halign: "center" },
+      },
+    });
+    y = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // SECCIÓN 5: VALUACIÓN POR MARCA Y ANTIGÜEDAD (AGING)
+  // ═══════════════════════════════════════════════════════════
+  if (y + 50 > pageHeight - 25) {
+    doc.addPage();
+    y = 20;
+  }
+
+  // Marcas
+  if (Array.isArray(stats.byBrand) && stats.byBrand.length > 0) {
+    doc.setFontSize(10.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 58, 138);
+    doc.text("5. DISTRIBUCION Y VALUACION POR MARCA (STOCK DISPONIBLE)", 14, y);
+    doc.setTextColor(40, 40, 40);
+    y += 4;
+
+    const brandRows = stats.byBrand.slice(0, 15).map((b: any) => [
+      b.brand || "Sin marca",
+      b.availableCount.toString(),
+      formatBs(b.costCents || 0),
+      formatBs(b.saleValueCents || 0),
+      formatBs(b.potentialProfitCents || 0),
+      `${b.marginPct || 0}%`,
+    ]);
+
+    (autoTable as any)(doc, {
+      ...getTableOptions(y),
+      head: [["Marca", "Unidades Disponibles", "Inversion Costo", "Valor Venta Estimado", "Ganancia Proyectada", "% Margen"]],
+      body: brandRows,
+      theme: "grid",
+      headStyles: { fillColor: [15, 23, 42], fontSize: 8 },
+      styles: { fontSize: 7.5, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 46 },
+        1: { cellWidth: 26, halign: "center" },
+        2: { cellWidth: 28, halign: "right" },
+        3: { cellWidth: 28, halign: "right" },
+        4: { cellWidth: 28, halign: "right" },
+        5: { cellWidth: 26, halign: "center" },
+      },
+    });
+    y = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Antigüedad (Aging)
+  if (stats.agingBuckets) {
+    if (y + 40 > pageHeight - 25) {
+      doc.addPage();
+      y = 20;
+    }
+
+    doc.setFontSize(10.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 58, 138);
+    doc.text("6. ANALISIS DE ANTIGUEDAD Y ROTACION DE STOCK (AGING)", 14, y);
+    doc.setTextColor(40, 40, 40);
+    y += 4;
+
+    const agingRows = Object.values(stats.agingBuckets).map((bucket: any) => [
+      bucket.label,
+      bucket.count.toString(),
+      formatBs(bucket.costCents || 0),
+      formatBs(bucket.saleValueCents || 0),
+      availableCost > 0
+        ? `${((bucket.costCents / availableCost) * 100).toFixed(1)}%`
+        : "0%",
+    ]);
+
+    (autoTable as any)(doc, {
+      ...getTableOptions(y),
+      head: [["Rango de Permanencia", "Cantidad", "Inversion al Costo", "Valor Venta Estimado", "% del Capital"]],
+      body: agingRows,
+      theme: "grid",
+      headStyles: { fillColor: [79, 70, 229], fontSize: 8 },
+      styles: { fontSize: 7.5, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 62 },
+        1: { cellWidth: 22, halign: "center" },
+        2: { cellWidth: 34, halign: "right" },
+        3: { cellWidth: 34, halign: "right" },
+        4: { cellWidth: 30, halign: "center" },
+      },
+    });
+    y = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // SECCIÓN 7: DETALLE DE EQUIPOS EN STOCK (PÁGINA NUEVA)
+  // ═══════════════════════════════════════════════════════════
+  doc.addPage();
+  y = 20;
+
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(30, 58, 138);
-  doc.text("📦 DISTRIBUCIÓN POR ESTADO", 20, y);
+  doc.text("7. INVENTARIO DETALLADO DE EQUIPOS DISPONIBLES", 14, y);
   doc.setTextColor(40, 40, 40);
-  y += 7;
+  y += 4;
 
-  const statusLabels: Record<string, string> = {
-    available: "Disponible para Venta",
+  const STATUS_TEXT: Record<string, string> = {
+    available: "Disponible",
     in_repair: "En Taller",
-    in_diagnosis: "En Diagnóstico",
+    in_diagnosis: "Diagnostico",
     sold: "Vendido",
     reserved: "Reservado",
-    returned: "Devuelto",
-    scrapped: "Desechado",
+    returned: "Garantia",
+    scrapped: "Baja",
   };
 
-  const statusData = Object.entries(stats.byStatus || {}).map(([status, count]) => [
-    statusLabels[status] || status,
-    (count as number).toString(),
-    `${(((count as number) / stats.total) * 100).toFixed(1)}%`,
-  ]);
-
-  if (statusData.length > 0) {
-    (autoTable as any)(doc, {
-      ...getTableOptions(y),
-      head: [["Estado", "Cantidad", "% del Total"]],
-      body: statusData,
-      theme: "grid",
-      headStyles: { fillColor: [30, 58, 138], fontSize: 9 },
-      styles: { fontSize: 9 },
-      columnStyles: {
-        1: { halign: "center" },
-        2: { halign: "center" },
-      },
-    });
-    y = (doc as any).lastAutoTable.finalY + 10;
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // SECCIÓN 3: DISTRIBUCIÓN POR TIPO DE EQUIPO
-  // ═══════════════════════════════════════════════════════════
-  doc.setFontSize(11);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(30, 58, 138);
-  doc.text("💻 DISTRIBUCIÓN POR TIPO DE EQUIPO", 20, y);
-  doc.setTextColor(40, 40, 40);
-  y += 7;
-
-  const typeLabels: Record<string, string> = {
-    laptop: "Laptops",
-    tablet: "Tablets",
-    phone: "Celulares",
-    monitor: "Monitores",
-    charger: "Cargadores",
-    accessory: "Accesorios/Repuestos",
-    other: "Otros",
+  const TYPE_SHORT: Record<string, string> = {
+    laptop: "Laptop",
+    tablet: "Tablet",
+    phone: "Celular",
+    monitor: "Monitor",
+    charger: "Cargador",
+    accessory: "Accesorio",
+    other: "Otro",
   };
 
-  const typeData = Object.entries(stats.byType || {}).map(([type, count]) => [
-    typeLabels[type] || type,
-    (count as number).toString(),
-    `${(((count as number) / stats.total) * 100).toFixed(1)}%`,
-  ]);
-
-  if (typeData.length > 0) {
-    (autoTable as any)(doc, {
-      ...getTableOptions(y),
-      head: [["Tipo", "Cantidad", "% del Total"]],
-      body: typeData,
-      theme: "grid",
-      headStyles: { fillColor: [30, 58, 138], fontSize: 9 },
-      styles: { fontSize: 9 },
-      columnStyles: {
-        1: { halign: "center" },
-        2: { halign: "center" },
-      },
-    });
-    y = (doc as any).lastAutoTable.finalY + 10;
-  }
-
-  // Nueva página para detalle
-  doc.addPage();
-  y = 30;
-
-  // ═══════════════════════════════════════════════════════════
-  // SECCIÓN 4: DETALLE DE UNIDADES
-  // ═══════════════════════════════════════════════════════════
-  doc.setFontSize(11);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(30, 58, 138);
-  doc.text("📋 DETALLE DE UNIDADES", 20, y);
-  doc.setTextColor(40, 40, 40);
-  y += 7;
-
-  const tableData = units.slice(0, 200).map((unit: any) => {
-    const statusEmoji = 
-      unit.status === "available" ? "✅" :
-      unit.status === "in_repair" ? "🔧" :
-      unit.status === "in_diagnosis" ? "🔍" :
-      unit.status === "sold" ? "💰" :
-      unit.status === "reserved" ? "📌" :
-      unit.status === "scrapped" ? "🗑️" : "❓";
+  const tableData = units.slice(0, 300).map((u: any) => {
+    const pCost = Number(u.purchasePrice || 0);
+    const sPrice = Number(u.salePrice || 0);
+    const margin = sPrice - pCost;
+    const marginPct = pCost > 0 ? Math.round((margin / pCost) * 100) : 0;
+    const purchaseDate = u.purchaseDate ? new Date(u.purchaseDate) : new Date(u.createdAt);
+    const days = Math.max(0, Math.floor((Date.now() - purchaseDate.getTime()) / 86400000));
 
     return [
-      unit.code || "N/A",
-      `${unit.brand || ""} ${unit.model || ""}`.trim() || "N/A",
-      typeLabels[unit.type] || unit.type,
-      `${statusEmoji} ${statusLabels[unit.status] || unit.status}`,
-      formatBs((unit.purchasePrice || 0) / 100),
-      formatBs((unit.salePrice || 0) / 100),
-      unit.purchaseDate ? format(new Date(unit.purchaseDate), "dd/MM/yyyy", { locale: es }) : "N/A",
+      u.code || `UNI-${u.id}`,
+      `${u.brand || ""} ${u.model || ""}`.trim() || "—",
+      TYPE_SHORT[u.type] || u.type || "—",
+      STATUS_TEXT[u.status] || u.status || "—",
+      `${days} d`,
+      formatBs(pCost),
+      formatBs(sPrice),
+      `${formatBs(margin)} (${marginPct}%)`,
     ];
   });
 
   (autoTable as any)(doc, {
     ...getTableOptions(y),
-    head: [["Código", "Marca/Modelo", "Tipo", "Estado", "Costo", "Precio Venta", "F. Compra"]],
+    head: [["Codigo", "Marca / Modelo", "Tipo", "Estado", "Dias", "P. Compra", "P. Venta", "Margen Est."]],
     body: tableData,
     theme: "striped",
-    headStyles: { fillColor: [30, 58, 138], fontSize: 8 },
-    styles: { fontSize: 7 },
+    headStyles: { fillColor: [30, 58, 138], fontSize: 7.5 },
+    styles: { fontSize: 7, cellPadding: 1.8 },
     columnStyles: {
       0: { cellWidth: 20 },
-      1: { cellWidth: 45 },
-      2: { cellWidth: 22 },
-      3: { cellWidth: 32 },
-      4: { cellWidth: 20, halign: "right" },
-      5: { cellWidth: 20, halign: "right" },
-      6: { cellWidth: 22, halign: "center" },
+      1: { cellWidth: 46 },
+      2: { cellWidth: 18 },
+      3: { cellWidth: 22 },
+      4: { cellWidth: 12, halign: "center" },
+      5: { cellWidth: 22, halign: "right" },
+      6: { cellWidth: 22, halign: "right" },
+      7: { cellWidth: 22, halign: "right" },
     },
   });
 
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
-
-  // Nota de corte si hay más de 200 unidades
-  if (units.length > 200) {
-    doc.setFontSize(8);
+  const finalY = (doc as any).lastAutoTable.finalY + 8;
+  if (units.length > 300) {
+    doc.setFontSize(7.5);
     doc.setTextColor(100, 100, 100);
-    doc.text(`Nota: Se muestran las primeras 200 unidades de ${units.length} totales.`, 20, finalY);
+    doc.text(`Nota: Se muestran los primeros 300 registros de un total de ${units.length} equipos.`, 14, finalY);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PIE DE PÁGINA PROFESIONAL EN TODAS LAS PÁGINAS
+  // ═══════════════════════════════════════════════════════════
+  const totalPages = (doc.internal as any).getNumberOfPages();
+  const printDateStr = format(new Date(), "dd/MM/yyyy HH:mm", { locale: es });
+  const companyTitle = companyConfig?.name || "MP SHOP";
+
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(226, 232, 240); // slate-200
+    doc.setLineWidth(0.3);
+    doc.line(14, pageHeight - 12, pageWidth - 14, pageHeight - 12);
+
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.text(`${companyTitle} · Reporte Oficial de Inventario y Valuacion`, 14, pageHeight - 7);
+    doc.text(`Emitido: ${printDateStr} | Pagina ${i} de ${totalPages}`, pageWidth - 14, pageHeight - 7, { align: "right" });
   }
 
   return doc;

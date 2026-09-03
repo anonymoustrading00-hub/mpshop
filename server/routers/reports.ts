@@ -259,64 +259,270 @@ export const reportsRouter = router({
     };
   }),
 
-  // Reporte mejorado de inventario (unidades)
+  // Reporte integral de inventario (unidades, taller, valuación, marcas y rotación)
   inventoryReport: protectedProcedure.query(async () => {
     const db = await getDb();
+    let allUnits: any[] = [];
+    let allRepairs: any[] = [];
+
     if (!db) {
-      return {
-        units: [],
-        stats: {
-          total: 0,
-          byStatus: {},
-          byType: {},
-          totalCost: 0,
-          totalSaleValue: 0,
-          potentialProfit: 0,
-          avgDaysInStock: 0,
-          inRepair: 0,
-          inWarranty: 0,
-        },
-      };
+      allUnits = (MOCK_UNITS as any[]) || [];
+      allRepairs = (MOCK_REPAIRS as any[]) || [];
+    } else {
+      [allUnits, allRepairs] = await Promise.all([
+        db.select().from(units),
+        db.select().from(repairs),
+      ]);
     }
 
-    const allUnits = await db.select().from(units);
+    const todayMs = Date.now();
 
-    // Calcular estadísticas
-    const stats = {
-      total: allUnits.length,
-      byStatus: allUnits.reduce((acc: Record<string, number>, u: any) => {
-        const status = u.status || "unknown";
-        acc[status] = (acc[status] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
-      byType: allUnits.reduce((acc: Record<string, number>, u: any) => {
-        const type = u.type || "other";
-        acc[type] = (acc[type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
-      totalCost: allUnits.reduce((sum: number, u: any) => sum + (u.purchasePrice || 0), 0),
-      totalSaleValue: allUnits.filter((u: any) => u.status === "available").reduce((sum: number, u: any) => sum + (u.salePrice || 0), 0),
-      potentialProfit: 0,
-      avgDaysInStock: 0,
-      inRepair: allUnits.filter((u: any) => u.status === "in_repair").length,
-      inWarranty: allUnits.filter((u: any) => u.warrantyStatus === "active").length,
+    // Mapeo de costos de taller por unidad
+    const repairCostMap = new Map<number, { laborCost: number; partsCost: number; totalRepairCost: number; activeOT?: string; activeStatus?: string; startDate?: Date }>();
+    allRepairs.forEach((r: any) => {
+      const uId = r.unitId;
+      if (!uId) return;
+      const prev = repairCostMap.get(uId) || { laborCost: 0, partsCost: 0, totalRepairCost: 0 };
+      const labor = Number(r.laborCost || 0);
+      const parts = Number(r.partsCost || 0);
+      const total = labor + parts;
+      prev.laborCost += labor;
+      prev.partsCost += parts;
+      prev.totalRepairCost += total;
+      if (r.status === "in_progress") {
+        prev.activeOT = r.otNumber || `OT-#${r.id}`;
+        prev.activeStatus = r.status;
+        prev.startDate = r.startDate ? new Date(r.startDate) : new Date(r.createdAt);
+      }
+      repairCostMap.set(uId, prev);
+    });
+
+    // Unidades disponibles para la venta
+    const availableUnits = allUnits.filter((u: any) => u.status === "available");
+    const availableCostCents = availableUnits.reduce((sum: number, u: any) => sum + (Number(u.purchasePrice) || 0), 0);
+    const availableSaleValueCents = availableUnits.reduce((sum: number, u: any) => sum + (Number(u.salePrice) || 0), 0);
+    const availablePotentialProfitCents = Math.max(0, availableSaleValueCents - availableCostCents);
+    const availableMarginPct = availableCostCents > 0 ? (availablePotentialProfitCents / availableCostCents) * 100 : 0;
+
+    // Unidades en taller (reparación o diagnóstico)
+    const workshopUnits = allUnits.filter((u: any) => ["in_repair", "in_diagnosis"].includes(u.status));
+    const workshopUnitsCostCents = workshopUnits.reduce((sum: number, u: any) => sum + (Number(u.purchasePrice) || 0), 0);
+
+    let workshopLaborCostCents = 0;
+    let workshopPartsCostCents = 0;
+
+    const workshopDetail = workshopUnits.map((u: any) => {
+      const rep = repairCostMap.get(u.id);
+      const labor = rep?.laborCost || 0;
+      const parts = rep?.partsCost || 0;
+      const repairCost = labor + parts;
+      workshopLaborCostCents += labor;
+      workshopPartsCostCents += parts;
+      const purchasePrice = Number(u.purchasePrice || 0);
+      const totalTiedCapital = purchasePrice + repairCost;
+      const startDate = rep?.startDate || (u.updatedAt ? new Date(u.updatedAt) : new Date(u.createdAt));
+      const daysInWorkshop = Math.max(0, Math.floor((todayMs - startDate.getTime()) / 86400000));
+
+      return {
+        id: u.id,
+        code: u.code || `UNI-${u.id}`,
+        brand: u.brand || "—",
+        model: u.model || "—",
+        type: u.type || "other",
+        status: u.status,
+        otNumber: rep?.activeOT || "—",
+        purchasePrice,
+        repairCost,
+        totalTiedCapital,
+        daysInWorkshop,
+      };
+    });
+
+    const workshopTotalTiedCapitalCents = workshopUnitsCostCents + workshopLaborCostCents + workshopPartsCostCents;
+
+    // Unidades vendidas
+    const soldUnits = allUnits.filter((u: any) => u.status === "sold");
+    const soldCostCents = soldUnits.reduce((sum: number, u: any) => sum + (Number(u.purchasePrice) || 0), 0);
+    const soldRevenueCents = soldUnits.reduce((sum: number, u: any) => sum + (Number(u.salePrice) || 0), 0);
+
+    // Unidades en garantía activa
+    const inWarrantyUnits = allUnits.filter((u: any) => u.warrantyStatus === "active" || (u.warrantyMonths && u.warrantyMonths > 0 && u.status !== "scrapped"));
+
+    // Desglose por Estado
+    const STATUS_LABELS: Record<string, string> = {
+      available: "Disponible para Venta",
+      in_repair: "En Taller (Reparación)",
+      in_diagnosis: "En Diagnóstico",
+      sold: "Vendido",
+      reserved: "Reservado",
+      returned: "Devuelto / En Garantía",
+      scrapped: "Baja / Desecho",
     };
 
-    // Calcular ganancia potencial
-    stats.potentialProfit = stats.totalSaleValue - allUnits
-      .filter((u: any) => u.status === "available")
-      .reduce((sum: number, u: any) => sum + (u.purchasePrice || 0), 0);
+    const byStatusMap = new Map<string, { count: number; costCents: number; saleValueCents: number }>();
+    allUnits.forEach((u: any) => {
+      const st = u.status || "unknown";
+      const curr = byStatusMap.get(st) || { count: 0, costCents: 0, saleValueCents: 0 };
+      curr.count += 1;
+      curr.costCents += Number(u.purchasePrice || 0);
+      curr.saleValueCents += Number(u.salePrice || 0);
+      byStatusMap.set(st, curr);
+    });
 
-    // Calcular días promedio en stock (para unidades no vendidas)
+    const byStatus = Array.from(byStatusMap.entries()).map(([statusKey, val]) => ({
+      statusKey,
+      label: STATUS_LABELS[statusKey] || statusKey,
+      count: val.count,
+      pctOfTotal: allUnits.length > 0 ? Math.round((val.count / allUnits.length) * 1000) / 10 : 0,
+      costCents: val.costCents,
+      saleValueCents: val.saleValueCents,
+    }));
+
+    // Desglose por Tipo de Equipo (Categoría)
+    const TYPE_LABELS: Record<string, string> = {
+      laptop: "Laptops / Portátiles",
+      tablet: "Tablets",
+      phone: "Celulares / Teléfonos",
+      monitor: "Monitores / Pantallas",
+      charger: "Cargadores y Fuentes",
+      accessory: "Accesorios y Periféricos",
+      other: "Otros Equipos",
+    };
+
+    const byTypeMap = new Map<string, { totalCount: number; availableCount: number; workshopCount: number; costCents: number; saleValueCents: number }>();
+    allUnits.forEach((u: any) => {
+      const t = u.type || "other";
+      const curr = byTypeMap.get(t) || { totalCount: 0, availableCount: 0, workshopCount: 0, costCents: 0, saleValueCents: 0 };
+      curr.totalCount += 1;
+      if (u.status === "available") {
+        curr.availableCount += 1;
+        curr.costCents += Number(u.purchasePrice || 0);
+        curr.saleValueCents += Number(u.salePrice || 0);
+      } else if (["in_repair", "in_diagnosis"].includes(u.status)) {
+        curr.workshopCount += 1;
+      }
+      byTypeMap.set(t, curr);
+    });
+
+    const byType = Array.from(byTypeMap.entries()).map(([typeKey, val]) => {
+      const potentialProfit = Math.max(0, val.saleValueCents - val.costCents);
+      const marginPct = val.costCents > 0 ? Math.round((potentialProfit / val.costCents) * 1000) / 10 : 0;
+      return {
+        typeKey,
+        label: TYPE_LABELS[typeKey] || typeKey,
+        totalCount: val.totalCount,
+        availableCount: val.availableCount,
+        workshopCount: val.workshopCount,
+        costCents: val.costCents,
+        saleValueCents: val.saleValueCents,
+        potentialProfitCents: potentialProfit,
+        marginPct,
+      };
+    }).sort((a, b) => b.costCents - a.costCents);
+
+    // Desglose por Marca (para stock disponible)
+    const brandMap = new Map<string, { availableCount: number; costCents: number; saleValueCents: number }>();
+    availableUnits.forEach((u: any) => {
+      const b = (u.brand || "Sin marca").trim();
+      const curr = brandMap.get(b) || { availableCount: 0, costCents: 0, saleValueCents: 0 };
+      curr.availableCount += 1;
+      curr.costCents += Number(u.purchasePrice || 0);
+      curr.saleValueCents += Number(u.salePrice || 0);
+      brandMap.set(b, curr);
+    });
+
+    const byBrand = Array.from(brandMap.entries()).map(([brand, val]) => {
+      const profit = Math.max(0, val.saleValueCents - val.costCents);
+      const marginPct = val.costCents > 0 ? Math.round((profit / val.costCents) * 1000) / 10 : 0;
+      return {
+        brand,
+        availableCount: val.availableCount,
+        costCents: val.costCents,
+        saleValueCents: val.saleValueCents,
+        potentialProfitCents: profit,
+        marginPct,
+      };
+    }).sort((a, b) => b.costCents - a.costCents);
+
+    // Análisis de Antigüedad (Aging de inventario no vendido)
     const unsoldUnits = allUnits.filter((u: any) => u.status !== "sold");
-    if (unsoldUnits.length > 0) {
-      const totalDays = unsoldUnits.reduce((sum: number, u: any) => {
-        const purchaseDate = u.purchaseDate ? new Date(u.purchaseDate) : new Date(u.createdAt);
-        const daysDiff = Math.floor((Date.now() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24));
-        return sum + daysDiff;
-      }, 0);
-      stats.avgDaysInStock = Math.round(totalDays / unsoldUnits.length);
-    }
+    let totalDaysSum = 0;
+    const agingBuckets = {
+      fresh: { label: "0 - 30 días (Rotación Rápida)", count: 0, costCents: 0, saleValueCents: 0 },
+      normal: { label: "31 - 60 días (Stock Normal)", count: 0, costCents: 0, saleValueCents: 0 },
+      attention: { label: "61 - 90 días (Atención / Observación)", count: 0, costCents: 0, saleValueCents: 0 },
+      aging: { label: "+90 días (Inmovilizado / Envejecido)", count: 0, costCents: 0, saleValueCents: 0 },
+    };
+
+    unsoldUnits.forEach((u: any) => {
+      const purchaseDate = u.purchaseDate ? new Date(u.purchaseDate) : new Date(u.createdAt);
+      const days = Math.max(0, Math.floor((todayMs - purchaseDate.getTime()) / 86400000));
+      totalDaysSum += days;
+
+      const pCost = Number(u.purchasePrice || 0);
+      const sVal = Number(u.salePrice || 0);
+
+      if (days <= 30) {
+        agingBuckets.fresh.count++;
+        agingBuckets.fresh.costCents += pCost;
+        agingBuckets.fresh.saleValueCents += sVal;
+      } else if (days <= 60) {
+        agingBuckets.normal.count++;
+        agingBuckets.normal.costCents += pCost;
+        agingBuckets.normal.saleValueCents += sVal;
+      } else if (days <= 90) {
+        agingBuckets.attention.count++;
+        agingBuckets.attention.costCents += pCost;
+        agingBuckets.attention.saleValueCents += sVal;
+      } else {
+        agingBuckets.aging.count++;
+        agingBuckets.aging.costCents += pCost;
+        agingBuckets.aging.saleValueCents += sVal;
+      }
+    });
+
+    const avgDaysInStock = unsoldUnits.length > 0 ? Math.round(totalDaysSum / unsoldUnits.length) : 0;
+
+    const stats = {
+      total: allUnits.length,
+      availableCount: availableUnits.length,
+      availableCostCents,
+      availableSaleValueCents,
+      availablePotentialProfitCents,
+      availableMarginPct: Math.round(availableMarginPct * 10) / 10,
+      
+      // Taller
+      workshopCount: workshopUnits.length,
+      inRepairCount: allUnits.filter((u: any) => u.status === "in_repair").length,
+      inDiagnosisCount: allUnits.filter((u: any) => u.status === "in_diagnosis").length,
+      workshopUnitsCostCents,
+      workshopLaborCostCents,
+      workshopPartsCostCents,
+      workshopTotalTiedCapitalCents,
+      workshopDetail,
+
+      // Ventas y Garantías
+      soldCount: soldUnits.length,
+      soldCostCents,
+      soldRevenueCents,
+      inWarrantyCount: inWarrantyUnits.length,
+
+      // Antigüedad y Desgloses
+      avgDaysInStock,
+      agingBuckets,
+      byStatus,
+      byType,
+      byBrand,
+
+      // Retrocompatibilidad con campos previos
+      totalCost: availableCostCents,
+      totalSaleValue: availableSaleValueCents,
+      potentialProfit: availablePotentialProfitCents,
+      inRepair: workshopUnits.length,
+      inWarranty: inWarrantyUnits.length,
+      byStatusMap: Object.fromEntries(byStatusMap),
+      byTypeMap: Object.fromEntries(byTypeMap),
+    };
 
     return {
       units: allUnits,
