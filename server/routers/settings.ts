@@ -157,4 +157,52 @@ export const settingsRouter = router({
       await writeCompanyConfig(updated);
       return { success: true, config: updated };
     }),
+
+  // Reiniciar / Borrar todos los datos de prueba para empezar de cero
+  resetAllTestData: protectedProcedure.mutation(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Solo los administradores pueden reiniciar los datos del sistema." });
+    }
+
+    const databaseUrl = process.env.DATABASE_URL;
+    if (databaseUrl) {
+      const mysql = await import("mysql2/promise");
+      const conn = await mysql.createConnection(databaseUrl);
+      try {
+        await conn.query("SET FOREIGN_KEY_CHECKS = 0");
+        const tables = [
+          "saleItems", "sales", "orderItems", "orders", "repairs",
+          "warranties", "returns", "financialTransactions", "cashOpenings",
+          "cashClosures", "accountsReceivable", "accountsPayable",
+          "unitEvents", "units", "auditLogs", "generatedCodes",
+          "generatedCodeBatches", "quotationItems", "quotations",
+          "deliveryLoadItems", "deliveryLoads", "purchaseItems",
+          "purchases", "customers", "suppliers", "gpsTracking"
+        ];
+        for (const t of tables) {
+          try {
+            await conn.query(`TRUNCATE TABLE \`${t}\``);
+          } catch {
+            try {
+              await conn.query(`DELETE FROM \`${t}\``);
+            } catch {}
+          }
+        }
+        await conn.query("SET FOREIGN_KEY_CHECKS = 1");
+      } finally {
+        await conn.end();
+      }
+    } else {
+      const db = await import("../db");
+      if (Array.isArray(db.MOCK_UNITS)) (db.MOCK_UNITS as any[]).length = 0;
+      if (Array.isArray(db.MOCK_SALES)) (db.MOCK_SALES as any[]).length = 0;
+      if (Array.isArray(db.MOCK_SALE_ITEMS)) (db.MOCK_SALE_ITEMS as any[]).length = 0;
+      if (Array.isArray(db.MOCK_REPAIRS)) (db.MOCK_REPAIRS as any[]).length = 0;
+      if (Array.isArray(db.MOCK_ORDERS)) (db.MOCK_ORDERS as any[]).length = 0;
+      if (Array.isArray(db.MOCK_RETURNS)) (db.MOCK_RETURNS as any[]).length = 0;
+      if (Array.isArray(db.MOCK_FINANCIAL_TRANSACTIONS)) (db.MOCK_FINANCIAL_TRANSACTIONS as any[]).length = 0;
+    }
+
+    return { success: true, message: "Todos los datos de prueba han sido eliminados correctamente." };
+  }),
 });

@@ -10,6 +10,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "wouter";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Building2,
   MapPin,
   Phone,
@@ -22,6 +33,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ChevronLeft,
+  Trash2,
 } from "lucide-react";
 
 export default function Settings() {
@@ -50,6 +62,18 @@ export default function Settings() {
     },
     onError: (err: any) => {
       toast.error(err.message || "Error al guardar configuración");
+    },
+  });
+
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const resetMutation = trpc.settings.resetAllTestData.useMutation({
+    onSuccess: (res) => {
+      toast.success(res.message || "Todos los datos de prueba han sido borrados con éxito.");
+      setIsResetDialogOpen(false);
+      utils.invalidate();
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Error al reiniciar datos");
     },
   });
 
@@ -457,6 +481,62 @@ export default function Settings() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* ─── Zona de Peligro: Reiniciar Datos de Prueba ─── */}
+      <Card className="border-red-200 bg-red-50/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-700 text-lg">
+            <Trash2 className="h-5 w-5 text-red-600" />
+            Zona de Pruebas: Reiniciar Base de Datos
+          </CardTitle>
+          <CardDescription className="text-red-700/80">
+            ¿Deseas probar el software completamente desde cero? Este botón elimina de forma segura todas las unidades de inventario, ventas, órdenes de taller, pedidos, garantías y movimientos de prueba.
+            <strong className="block mt-1 text-slate-800">Tus usuarios administradores, sucursales y datos de empresa se mantienen 100% seguros e intactos.</strong>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                className="gap-2 bg-red-600 hover:bg-red-700 text-white font-bold shadow-sm"
+              >
+                <Trash2 className="h-4 w-4" />
+                Borrar Todo y Empezar de Cero
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-red-600 flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5" />
+                  ¿Estás seguro de borrar todos los datos de prueba?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-slate-600 space-y-2">
+                  <p>
+                    Esta acción vaciará completamente las tablas de <strong>unidades, ventas, pedidos, taller, comprobantes, garantías y gastos</strong> para que puedas registrar tus propios equipos y probar el software en limpio.
+                  </p>
+                  <p className="font-semibold text-slate-800">
+                    Los usuarios del sistema y la configuración de tu empresa NO se eliminarán.
+                  </p>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={resetMutation.isPending}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(e) => {
+                    e.preventDefault();
+                    resetMutation.mutate();
+                  }}
+                  disabled={resetMutation.isPending}
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold"
+                >
+                  {resetMutation.isPending ? "Borrando datos..." : "Sí, Borrar Todo"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardContent>
+      </Card>
 
       {/* Save Footer */}
       <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
