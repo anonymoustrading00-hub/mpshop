@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,10 @@ import {
   CheckCircle2,
   BadgeCent,
   ArrowRightLeft,
+  QrCode,
+  Barcode,
+  Cpu,
+  HardDrive,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { WorkOrderModal } from "@/components/WorkOrderModal";
@@ -388,6 +392,48 @@ function CompleteRepairDialog({
   const replacementPriceCents = selectedReplacementUnit?.salePrice || 0;
   const priceDiffCents = selectedReplacementUnit ? replacementPriceCents - originalPriceCents : 0;
 
+  // Buscador con autocompletar para cambio de equipo (busca por nombre, modelo, QR, barras, procesador, RAM, etc.)
+  const [unitSearchQuery, setUnitSearchQuery] = useState("");
+
+  const getUnitSearchText = (u: any) => {
+    const specs = typeof u.specs === "object" && u.specs !== null ? u.specs : {};
+    const specsStr = Object.entries(specs)
+      .map(([k, v]) => `${k} ${v}`)
+      .join(" ");
+    return `${u.code || ""} ${u.brand || ""} ${u.model || ""} ${u.serialNumber || ""} ${u.barcode || ""} ${u.rmaNumber || ""} ${specsStr}`.toLowerCase();
+  };
+
+  const filteredAvailableUnits = useMemo(() => {
+    if (!unitSearchQuery.trim()) return availableUnits;
+    const terms = unitSearchQuery.trim().toLowerCase().split(/\s+/);
+    return availableUnits.filter((u: any) => {
+      const text = getUnitSearchText(u);
+      return terms.every((t) => text.includes(t));
+    });
+  }, [availableUnits, unitSearchQuery]);
+
+  const handleBarcodeOrSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (filteredAvailableUnits.length === 1) {
+        setReplacementUnitId(filteredAvailableUnits[0].id);
+        setUnitSearchQuery("");
+      } else if (filteredAvailableUnits.length > 1) {
+        const query = unitSearchQuery.trim().toLowerCase();
+        const exact = filteredAvailableUnits.find(
+          (u: any) =>
+            u.code?.toLowerCase() === query ||
+            u.serialNumber?.toLowerCase() === query ||
+            u.barcode?.toLowerCase() === query
+        );
+        if (exact) {
+          setReplacementUnitId(exact.id);
+          setUnitSearchQuery("");
+        }
+      }
+    }
+  };
+
   // Resetear al abrir (preseleccionar return_to_inventory por defecto)
   useEffect(() => {
     if (open) {
@@ -402,6 +448,7 @@ function CompleteRepairDialog({
       setRefundPaymentMethod("cash");
       setReplacementUnitId(null);
       setDifferencePaymentMethod("cash");
+      setUnitSearchQuery("");
     }
   }, [open, repair]);
 
@@ -727,41 +774,195 @@ function CompleteRepairDialog({
                           </div>
                         )}
 
-                        {/* Sub-formulario: Cambio de equipo */}
+                        {/* Sub-formulario: Cambio de equipo con BUSCADOR Y AUTOCOMPLETAR */}
                         {customerResolution === "exchange" && (
                           <div className="p-3.5 bg-indigo-50/90 border border-indigo-300 rounded-xl space-y-3">
                             <div>
-                              <Label className="text-xs font-bold text-indigo-950 mb-1 block">
-                                Seleccionar equipo sustituto del inventario disponible:
-                              </Label>
-                              {availableUnits.length === 0 ? (
-                                <p className="text-xs text-amber-700 bg-white p-2 rounded border border-amber-200">
-                                  No hay otras unidades en estado disponible actualmente en el inventario.
-                                </p>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <Label className="text-xs font-bold text-indigo-950 block">
+                                  Buscar equipo sustituto del inventario disponible:
+                                </Label>
+                                <span className="text-[11px] text-indigo-700 font-medium flex items-center gap-1">
+                                  <QrCode className="h-3.5 w-3.5 text-indigo-600" />
+                                  Compatible con lector de QR / Barras
+                                </span>
+                              </div>
+
+                              {/* Si ya hay un equipo seleccionado */}
+                              {selectedReplacementUnit ? (
+                                <div className="p-3 bg-white rounded-xl border-2 border-indigo-500 shadow-sm space-y-2">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-start gap-2.5">
+                                      <div className="h-9 w-9 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0 mt-0.5">
+                                        <Laptop className="h-5 w-5 text-indigo-700" />
+                                      </div>
+                                      <div>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="px-1.5 py-0.5 rounded bg-indigo-600 text-white font-mono text-[11px] font-bold">
+                                            #{selectedReplacementUnit.code}
+                                          </span>
+                                          <span className="font-bold text-sm text-slate-900">
+                                            {selectedReplacementUnit.brand} {selectedReplacementUnit.model}
+                                          </span>
+                                        </div>
+                                        <div className="text-xs text-slate-600 mt-1 flex flex-wrap items-center gap-2">
+                                          {selectedReplacementUnit.specs?.processor && (
+                                            <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
+                                              <Cpu className="h-3 w-3 text-slate-500" /> {selectedReplacementUnit.specs.processor}
+                                            </span>
+                                          )}
+                                          {selectedReplacementUnit.specs?.ram && (
+                                            <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">
+                                              {selectedReplacementUnit.specs.ram}
+                                            </span>
+                                          )}
+                                          {selectedReplacementUnit.specs?.storage && (
+                                            <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
+                                              <HardDrive className="h-3 w-3 text-slate-500" /> {selectedReplacementUnit.specs.storage}
+                                            </span>
+                                          )}
+                                          {selectedReplacementUnit.serialNumber && (
+                                            <span className="font-mono text-slate-500 text-[11px]">
+                                              S/N: {selectedReplacementUnit.serialNumber}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      <div className="text-sm font-black text-indigo-950">
+                                        {formatCurrency(selectedReplacementUnit.salePrice)}
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          setReplacementUnitId(null);
+                                          setUnitSearchQuery("");
+                                        }}
+                                        className="h-7 text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50 mt-1.5"
+                                      >
+                                        Cambiar equipo
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
                               ) : (
-                                <Select
-                                  value={replacementUnitId ? String(replacementUnitId) : ""}
-                                  onValueChange={(v) => setReplacementUnitId(Number(v))}
-                                >
-                                  <SelectTrigger className="h-9 text-xs bg-white border-indigo-300">
-                                    <SelectValue placeholder="Selecciona el equipo a entregar al cliente..." />
-                                  </SelectTrigger>
-                                  <SelectContent className="max-h-60">
-                                    {availableUnits.map((u: any) => (
-                                      <SelectItem key={u.id} value={String(u.id)}>
-                                        {u.code} — {u.brand} {u.model} ({formatCurrency(u.salePrice)})
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                /* Buscador interactivo con autocompletar */
+                                <div className="space-y-2">
+                                  <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-500 pointer-events-none" />
+                                    <Input
+                                      type="text"
+                                      value={unitSearchQuery}
+                                      onChange={(e) => setUnitSearchQuery(e.target.value)}
+                                      onKeyDown={handleBarcodeOrSearchKeyDown}
+                                      placeholder="Escribe o escanea: marca, modelo, código QR, serial, barras, RAM, procesador..."
+                                      className="pl-9 pr-9 h-10 text-xs bg-white border-indigo-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg shadow-sm"
+                                      autoFocus
+                                    />
+                                    {unitSearchQuery ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setUnitSearchQuery("")}
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100"
+                                      >
+                                        <X className="h-3.5 w-3.5" />
+                                      </button>
+                                    ) : (
+                                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                        <Barcode className="h-4 w-4 text-slate-400" />
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Lista de resultados de autocompletado */}
+                                  <div className="max-h-56 overflow-y-auto rounded-lg border border-indigo-200 bg-white shadow-sm divide-y divide-slate-100">
+                                    {availableUnits.length === 0 ? (
+                                      <div className="p-4 text-center text-xs text-amber-700 bg-amber-50/50">
+                                        No hay equipos en estado disponible actualmente en el inventario.
+                                      </div>
+                                    ) : filteredAvailableUnits.length === 0 ? (
+                                      <div className="p-4 text-center text-xs text-slate-500">
+                                        No se encontraron equipos disponibles con "<strong>{unitSearchQuery}</strong>".
+                                      </div>
+                                    ) : (
+                                      filteredAvailableUnits.map((u: any) => {
+                                        const diff = (u.salePrice || 0) - originalPriceCents;
+                                        return (
+                                          <div
+                                            key={u.id}
+                                            onClick={() => {
+                                              setReplacementUnitId(u.id);
+                                              setUnitSearchQuery("");
+                                            }}
+                                            className="p-2.5 hover:bg-indigo-50/80 cursor-pointer transition-colors flex items-center justify-between gap-3 group"
+                                          >
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                              <div className="h-8 w-8 rounded-lg bg-slate-100 group-hover:bg-indigo-100 flex items-center justify-center shrink-0 text-slate-600 group-hover:text-indigo-700 transition-colors">
+                                                <Laptop className="h-4 w-4" />
+                                              </div>
+                                              <div className="min-w-0">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                  <span className="px-1.5 py-0.5 rounded bg-slate-100 group-hover:bg-indigo-200 text-slate-800 group-hover:text-indigo-950 font-mono text-[11px] font-bold">
+                                                    #{u.code}
+                                                  </span>
+                                                  <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-900">
+                                                    {u.brand} {u.model}
+                                                  </span>
+                                                </div>
+                                                <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                                  {u.specs?.processor && <span>{u.specs.processor}</span>}
+                                                  {u.specs?.ram && <span>• {u.specs.ram}</span>}
+                                                  {u.specs?.storage && <span>• {u.specs.storage}</span>}
+                                                  {u.serialNumber && (
+                                                    <span className="font-mono text-slate-400">
+                                                      • S/N: {u.serialNumber}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="text-right shrink-0">
+                                              <div className="text-xs font-black text-slate-900 group-hover:text-indigo-900">
+                                                {formatCurrency(u.salePrice)}
+                                              </div>
+                                              <div className="text-[10px] mt-0.5">
+                                                {diff > 0 ? (
+                                                  <span className="text-emerald-700 font-semibold bg-emerald-50 px-1 py-0.5 rounded">
+                                                    +Bs. {(diff / 100).toFixed(2)}
+                                                  </span>
+                                                ) : diff < 0 ? (
+                                                  <span className="text-red-600 font-semibold bg-red-50 px-1 py-0.5 rounded">
+                                                    -Bs. {(Math.abs(diff) / 100).toFixed(2)}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-slate-500">Mismo precio</span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+                                  {filteredAvailableUnits.length > 0 && (
+                                    <div className="flex items-center justify-between text-[10px] text-indigo-700 px-1">
+                                      <span>{filteredAvailableUnits.length} equipo(s) disponible(s)</span>
+                                      <span>💡 Haz clic en uno o presiona <strong>Enter</strong> para seleccionar</span>
+                                    </div>
+                                  )}
+                                </div>
                               )}
                             </div>
 
                             {selectedReplacementUnit && (
                               <div className="p-3 bg-white rounded-lg border border-indigo-200 text-xs space-y-2">
                                 <div className="grid grid-cols-2 gap-2 text-slate-600 pb-2 border-b">
-                                  <div>Equipo original: <span className="font-semibold text-slate-800">{formatCurrency(originalPriceCents)}</span></div>
-                                  <div>Equipo nuevo ({selectedReplacementUnit.code}): <span className="font-semibold text-slate-800">{formatCurrency(selectedReplacementUnit.salePrice)}</span></div>
+                                  <div>Equipo original devuelto: <span className="font-semibold text-slate-800">{formatCurrency(originalPriceCents)}</span></div>
+                                  <div>Equipo sustituto ({selectedReplacementUnit.code}): <span className="font-semibold text-slate-800">{formatCurrency(selectedReplacementUnit.salePrice)}</span></div>
                                 </div>
 
                                 <div className="flex items-center justify-between font-bold text-xs pt-1">
