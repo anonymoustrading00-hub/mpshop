@@ -145,8 +145,12 @@ export function CommercialCatalogModal({
         : `<div style="text-align:center;color:#94a3b8;"><div style="font-size:38px;">💻</div><div style="font-size:11px;font-weight:700;margin-top:4px;">Sin Fotografía</div></div>`;
 
       const priceHTML = `
-        <div style="font-size:10.5px;color:#475569;font-weight:800;letter-spacing:0.4px;margin-bottom:2px;">PRECIO VENTA UNIT (BS)</div>
-        <div style="font-size:25px;font-weight:900;color:${acc};background:${pg};padding:4px 14px;border-radius:10px;border:1.5px solid ${pb};line-height:1.1;">${price}</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;">
+          <div style="font-size:10px;color:#475569;font-weight:800;letter-spacing:0.5px;margin-bottom:3px;text-transform:uppercase;">PRECIO VENTA UNIT (BS)</div>
+          <div style="display:inline-flex;align-items:center;justify-content:center;background:${pg};padding:6px 16px;border-radius:10px;border:1.5px solid ${pb};box-sizing:border-box;">
+            <span style="font-size:22px;font-weight:900;color:${acc};line-height:1.2;white-space:nowrap;">${price}</span>
+          </div>
+        </div>
       `;
 
       return `
@@ -172,16 +176,16 @@ export function CommercialCatalogModal({
               ${specsRows}
             </div>` : ""}
             ${unit.damageNotes ? `
-            <div style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #d97706;border-radius:6px;padding:4px 8px;margin:3px 0;display:flex;align-items:flex-start;gap:6px;box-sizing:border-box;">
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #d97706;border-radius:6px;padding:5px 10px;margin:3px 0;display:flex;align-items:center;gap:6px;box-sizing:border-box;">
               <span style="font-size:11.5px;font-weight:900;color:#92400e;flex-shrink:0;white-space:nowrap;">📝 Detalle adicional:</span>
-              <span style="font-size:11.5px;font-weight:700;color:#78350f;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${unit.damageNotes}</span>
+              <span style="font-size:11.5px;font-weight:700;color:#78350f;line-height:1.4;word-break:break-word;flex:1;">${unit.damageNotes}</span>
             </div>` : ""}
             <div style="display:flex;align-items:center;justify-content:space-between;border-top:1.5px solid #f1f5f9;padding-top:7px;margin-top:3px;">
               <div style="display:flex;flex-direction:column;gap:3px;">
                 <span style="font-size:11px;font-weight:800;background:#dcfce7;color:#166534;padding:3px 10px;border-radius:20px;border:1px solid #86efac;display:inline-block;">✓ STOCK DISPONIBLE</span>
                 <div style="font-size:11.5px;color:#334155;font-weight:700;">📲 ${company.whatsapp}</div>
               </div>
-              <div style="text-align:right;">${priceHTML}</div>
+              <div>${priceHTML}</div>
             </div>
           </div>
         </div>`;
@@ -557,9 +561,9 @@ function CatalogPageContent({ pageItems, pageIndex, totalPages, company }: { pag
                   </div>
                 )}
                 {unit.damageNotes && (
-                  <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderLeft: "4px solid #d97706", borderRadius: "6px", padding: "4px 8px", margin: "3px 0", display: "flex", alignItems: "flex-start", gap: "6px", boxSizing: "border-box" }}>
+                  <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderLeft: "4px solid #d97706", borderRadius: "6px", padding: "5px 10px", margin: "3px 0", display: "flex", alignItems: "center", gap: "6px", boxSizing: "border-box" }}>
                     <span style={{ fontSize: "11.5px", fontWeight: 900, color: "#92400e", flexShrink: 0, whiteSpace: "nowrap" }}>📝 Detalle adicional:</span>
-                    <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#78350f", lineHeight: "1.3", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{unit.damageNotes}</span>
+                    <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#78350f", lineHeight: 1.4, wordBreak: "break-word", flex: 1 }}>{unit.damageNotes}</span>
                   </div>
                 )}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1.5px solid #f1f5f9", paddingTop: "7px", marginTop: "3px" }}>
@@ -567,9 +571,11 @@ function CatalogPageContent({ pageItems, pageIndex, totalPages, company }: { pag
                     <span style={{ fontSize: "11px", fontWeight: 800, background: "#dcfce7", color: "#166534", padding: "3px 10px", borderRadius: "20px", border: "1px solid #86efac", display: "inline-block" }}>✓ STOCK DISPONIBLE</span>
                     <div style={{ fontSize: "11.5px", color: "#334155", fontWeight: 700 }}>📲 {company.whatsapp}</div>
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: "10.5px", color: "#475569", fontWeight: 800, letterSpacing: "0.4px", marginBottom: "2px" }}>PRECIO VENTA UNIT (BS)</div>
-                    <div style={{ fontSize: "25px", fontWeight: 900, color: accentColor, background: priceGradient, padding: "4px 14px", borderRadius: "10px", border: `1.5px solid ${priceBorder}`, lineHeight: 1.1 }}>{price}</div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                    <div style={{ fontSize: "10px", color: "#475569", fontWeight: 800, letterSpacing: "0.5px", marginBottom: "3px", textTransform: "uppercase" }}>PRECIO VENTA UNIT (BS)</div>
+                    <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: priceGradient, padding: "6px 16px", borderRadius: "10px", border: `1.5px solid ${priceBorder}`, boxSizing: "border-box" }}>
+                      <span style={{ fontSize: "22px", fontWeight: 900, color: accentColor, lineHeight: 1.2, whiteSpace: "nowrap" }}>{price}</span>
+                    </div>
                   </div>
                 </div>
               </div>
