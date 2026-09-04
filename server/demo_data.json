@@ -13,7 +13,7 @@
       "branchId": 1,
       "createdAt": "2024-01-01T00:00:00.000Z",
       "updatedAt": "2024-01-01T00:00:00.000Z",
-      "lastSignedIn": "2026-09-04T03:54:55.406Z"
+      "lastSignedIn": "2026-09-04T04:56:21.162Z"
     }
   ],
   "MOCK_PRODUCTS": [],
@@ -280,6 +280,24 @@
       "id": 2,
       "createdAt": "2026-09-04T03:48:08.192Z",
       "updatedAt": "2026-09-04T03:48:08.192Z"
+    },
+    {
+      "branchId": 2,
+      "description": "COGS - Apple MacBook Pro 14 M3 Pro (7845) · Venta VTA-002",
+      "category": "cogs",
+      "costType": "direct_cost",
+      "referenceType": "sale",
+      "referenceId": 2,
+      "isAutomatic": 1,
+      "amount": 200000,
+      "paymentMethod": "cash",
+      "expenseDate": "2026-09-04T04:55:59.984Z",
+      "status": "paid",
+      "notes": "Costo de adquisición registrado al momento de venta VTA-002",
+      "userId": 999,
+      "id": 3,
+      "createdAt": "2026-09-04T04:55:59.984Z",
+      "updatedAt": "2026-09-04T04:55:59.984Z"
     }
   ],
   "MOCK_FINANCIAL_TRANSACTIONS": [
@@ -342,6 +360,18 @@
       "notes": "Costo Reparación - Dell Vostro 3425 Laptop (RMA-2026-000001)",
       "id": 5,
       "createdAt": "2026-09-04T03:48:08.192Z"
+    },
+    {
+      "type": "income",
+      "category": "sale_local",
+      "amount": 230000,
+      "paymentMethod": "cash",
+      "branchId": 1,
+      "userId": 999,
+      "referenceId": 2,
+      "notes": "Venta VTA-002",
+      "id": 6,
+      "createdAt": "2026-09-04T04:56:00.016Z"
     }
   ],
   "MOCK_CASH_CLOSURES": [],
@@ -402,6 +432,29 @@
       "cancelledAt": null,
       "cancelledBy": null,
       "createdAt": "2026-09-04T03:43:56.351Z"
+    },
+    {
+      "id": 2,
+      "branchId": 2,
+      "saleNumber": "VTA-002",
+      "customerId": null,
+      "customerName": "Anónimo",
+      "saleChannel": "local",
+      "status": "completed",
+      "orderId": null,
+      "soldBy": 999,
+      "subtotal": 230000,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 230000,
+      "paymentMethod": "cash",
+      "paymentStatus": "completed",
+      "notes": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "cancelledBy": null,
+      "createdAt": "2026-09-04T04:55:59.983Z"
     }
   ],
   "MOCK_SALE_ITEMS": [
@@ -418,6 +471,20 @@
       "finalUnitPrice": 150000,
       "subtotal": 150000,
       "createdAt": "2026-09-04T03:43:56.351Z"
+    },
+    {
+      "id": 2,
+      "saleId": 2,
+      "unitId": 22,
+      "pricingType": "unit",
+      "quantity": 1,
+      "basePrice": 230000,
+      "discountType": "none",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "finalUnitPrice": 230000,
+      "subtotal": 230000,
+      "createdAt": "2026-09-04T04:55:59.983Z"
     }
   ],
   "MOCK_QUOTATIONS": [],
@@ -1024,7 +1091,7 @@
       "damageChecklist": "{\"keyboard\":false,\"screen\":false,\"hinges\":false,\"trackpad\":false,\"cosmetic\":false,\"other\":false}",
       "damageNotes": null,
       "functionalTestPassed": 1,
-      "status": "available",
+      "status": "in_repair",
       "purchaseId": 3,
       "purchasePrice": 200000,
       "salePrice": 230000,
@@ -1035,7 +1102,7 @@
       "photos": null,
       "tiktokUrl": null,
       "createdAt": "2026-09-04T03:46:17.062Z",
-      "updatedAt": "2026-09-04T03:46:30.717Z"
+      "updatedAt": "2026-09-04T04:56:21.163Z"
     }
   ],
   "MOCK_UNIT_EVENTS": [
@@ -1318,6 +1385,36 @@
       "userId": 999,
       "notes": "Reparación finalizada (RMA-2026-000001). Unidad: available | Retornado a inventario de venta",
       "createdAt": "2026-09-04T03:48:08.192Z"
+    },
+    {
+      "id": 29,
+      "unitId": 22,
+      "eventType": "sold",
+      "fromStatus": "available",
+      "toStatus": "sold",
+      "userId": 999,
+      "notes": "Venta #VTA-002",
+      "createdAt": "2026-09-04T04:55:59.983Z"
+    },
+    {
+      "id": 1788497781164,
+      "unitId": 22,
+      "eventType": "return_rma",
+      "fromStatus": "sold",
+      "toStatus": "in_repair",
+      "userId": 999,
+      "notes": "DevoluciÃ³n (RMA #1788497781163) - Motivo: DEDE â†’ Reingresado a taller",
+      "createdAt": "2026-09-04T04:56:21.163Z"
+    },
+    {
+      "id": 1788497781167,
+      "unitId": 22,
+      "eventType": "repair_start",
+      "fromStatus": "sold",
+      "toStatus": "in_repair",
+      "userId": 999,
+      "notes": "Ingreso a taller - RMA-2026-000002 (post-RMA)",
+      "createdAt": "2026-09-04T04:56:21.164Z"
     }
   ],
   "MOCK_REPAIRS": [
@@ -1335,6 +1432,21 @@
       "resolutionType": "return_to_inventory",
       "notes": "RMA #1788493665783. PROBLEMAS EN PUERTO DE CARGA",
       "createdAt": "2026-09-04T03:47:45.784Z"
+    },
+    {
+      "id": 1788497781165,
+      "rmaNumber": "RMA-2026-000002",
+      "unitId": 22,
+      "technicianId": 999,
+      "startDate": "2026-09-04T04:56:21.164Z",
+      "endDate": null,
+      "partsUsed": "[]",
+      "laborCost": 0,
+      "partsCost": 0,
+      "status": "in_progress",
+      "resolutionType": null,
+      "notes": "RMA #1788497781163. DEDE",
+      "createdAt": "2026-09-04T04:56:21.164Z"
     }
   ],
   "MOCK_WARRANTIES": [
@@ -1349,6 +1461,19 @@
       "status": "active",
       "createdAt": "2026-09-04T03:43:56.351Z",
       "pausedAt": "2026-09-04T03:47:45.784Z",
+      "remainingDaysAtPause": 29
+    },
+    {
+      "id": 2,
+      "saleId": 2,
+      "orderId": null,
+      "unitId": 22,
+      "days": 30,
+      "startDate": "2026-09-04T04:55:59.983Z",
+      "endDate": "2026-10-04T04:55:59.983Z",
+      "status": "active",
+      "createdAt": "2026-09-04T04:55:59.983Z",
+      "pausedAt": "2026-09-04T04:56:21.164Z",
       "remainingDaysAtPause": 29
     }
   ],
@@ -1365,6 +1490,19 @@
       "refundAmount": null,
       "refundPaymentMethod": null,
       "createdAt": "2026-09-04T03:47:45.783Z"
+    },
+    {
+      "id": 1788497781163,
+      "warrantyId": 2,
+      "saleId": null,
+      "unitId": 22,
+      "returnDate": "2026-09-04T04:56:21.163Z",
+      "reason": "DEDE",
+      "resolution": null,
+      "reenteredRepair": 1,
+      "refundAmount": null,
+      "refundPaymentMethod": null,
+      "createdAt": "2026-09-04T04:56:21.163Z"
     }
   ],
   "MOCK_GENERATED_CODES": [],
