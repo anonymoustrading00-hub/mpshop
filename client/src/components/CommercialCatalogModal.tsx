@@ -300,7 +300,7 @@ export function CommercialCatalogModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[95vh] p-0 overflow-hidden flex flex-col bg-slate-900 border-slate-700 text-white">
+        <DialogContent className="max-w-4xl max-h-[95vh] p-0 overflow-hidden flex flex-col bg-slate-900 border-slate-700 text-white" showCloseButton={false}>
           <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 p-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl shadow-lg shadow-blue-900/40">
