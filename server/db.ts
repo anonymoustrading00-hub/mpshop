@@ -181,12 +181,33 @@ export const MOCK_PURCHASES: any[] = [];
 export const MOCK_PURCHASE_ITEMS: any[] = [];
 export const MOCK_ACCOUNTS_PAYABLE: any[] = [];
 export const MOCK_DELIVERY_EXPENSES: any[] = [];
-export const MOCK_OPERATIONAL_EXPENSES: any[] = [];
+export const MOCK_OPERATIONAL_EXPENSES: any[] = [
+  { id: 1, category: "rent", amount: 50000, expenseDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), createdAt: new Date() },
+  { id: 2, category: "labor", amount: 30000, expenseDate: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), createdAt: new Date() },
+  { id: 3, category: "transport", amount: 15000, expenseDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), createdAt: new Date() },
+  { id: 4, category: "repairs", amount: 8000, expenseDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), createdAt: new Date() },
+  { id: 5, category: "marketing", amount: 12000, expenseDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), createdAt: new Date() },
+  { id: 6, category: "services", amount: 5000, expenseDate: new Date(Date.now()), createdAt: new Date() },
+];
 export const MOCK_FINANCIAL_TRANSACTIONS: any[] = [];
 export const MOCK_CASH_CLOSURES: any[] = [];
 export const MOCK_CASH_OPENINGS: any[] = [];
-export const MOCK_SALES: any[] = [];
-export const MOCK_SALE_ITEMS: any[] = [];
+export const MOCK_SALES: any[] = [
+  { id: 1, saleNumber: "V-001", total: 150000, status: "completed", createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000) },
+  { id: 2, saleNumber: "V-002", total: 200000, status: "completed", createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+  { id: 3, saleNumber: "V-003", total: 180000, status: "completed", createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000) },
+  { id: 4, saleNumber: "V-004", total: 220000, status: "completed", createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) },
+  { id: 5, saleNumber: "V-005", total: 170000, status: "completed", createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) },
+  { id: 6, saleNumber: "V-006", total: 190000, status: "completed", createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
+];
+export const MOCK_SALE_ITEMS: any[] = [
+  { id: 1, saleId: 1, unitId: 1, quantity: 1, finalUnitPrice: 150000, discountAmount: 0 },
+  { id: 2, saleId: 2, unitId: 2, quantity: 1, finalUnitPrice: 200000, discountAmount: 0 },
+  { id: 3, saleId: 3, unitId: 3, quantity: 1, finalUnitPrice: 180000, discountAmount: 0 },
+  { id: 4, saleId: 4, unitId: 4, quantity: 1, finalUnitPrice: 220000, discountAmount: 0 },
+  { id: 5, saleId: 5, unitId: 5, quantity: 1, finalUnitPrice: 170000, discountAmount: 0 },
+  { id: 6, saleId: 6, unitId: 6, quantity: 1, finalUnitPrice: 190000, discountAmount: 0 },
+];
 export const MOCK_QUOTATIONS: any[] = [];
 export const MOCK_QUOTATION_ITEMS: any[] = [];
 export const MOCK_DELIVERY_EXTRA_LOAD: any[] = [];
@@ -199,9 +220,22 @@ export const MOCK_INVENTORY_TRANSFER_ITEMS: any[] = [];
 export const MOCK_ACCOUNTS_RECEIVABLE: any[] = [];
 export const MOCK_CREDIT_PAYMENTS: any[] = [];
 export const MOCK_BRANCHES: any[] = [];
-export const MOCK_UNITS: any[] = [];
+export const MOCK_UNITS: any[] = [
+  { id: 1, code: "UNI-00001", type: "laptop", brand: "Dell", model: "Inspiron 15", condition: 7, status: "sold", purchasePrice: 120000, salePrice: 150000, createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000), updatedAt: new Date() },
+  { id: 2, code: "UNI-00002", type: "laptop", brand: "HP", model: "Pavilion 14", condition: 8, status: "sold", purchasePrice: 150000, salePrice: 200000, createdAt: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000), updatedAt: new Date() },
+  { id: 3, code: "UNI-00003", type: "celular", brand: "Samsung", model: "A12", condition: 6, status: "sold", purchasePrice: 130000, salePrice: 180000, createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000), updatedAt: new Date() },
+  { id: 4, code: "UNI-00004", type: "tablet", brand: "iPad", model: "Air", condition: 10, status: "sold", purchasePrice: 180000, salePrice: 220000, createdAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000), updatedAt: new Date() },
+  { id: 5, code: "UNI-00005", type: "laptop", brand: "Lenovo", model: "ThinkPad", condition: 7, status: "sold", purchasePrice: 140000, salePrice: 170000, createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), updatedAt: new Date() },
+  { id: 6, code: "UNI-00006", type: "charger", brand: "Generic", model: "USB-C", condition: 10, status: "sold", purchasePrice: 40000, salePrice: 190000, createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000), updatedAt: new Date() },
+  { id: 7, code: "UNI-00007", type: "laptop", brand: "ASUS", model: "VivoBook", condition: 5, status: "available", purchasePrice: 100000, salePrice: 0, createdAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000), updatedAt: new Date() },
+  { id: 8, code: "UNI-00008", type: "celular", brand: "Xiaomi", model: "Redmi Note", condition: 6, status: "in_repair", purchasePrice: 80000, salePrice: 0, createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), updatedAt: new Date() },
+];
 export const MOCK_UNIT_EVENTS: any[] = [];
-export const MOCK_REPAIRS: any[] = [];
+export const MOCK_REPAIRS: any[] = [
+  { id: 1, unitId: 2, startDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), endDate: new Date(Date.now() - 13 * 24 * 60 * 60 * 1000), status: "completed", laborCost: 20000, partsCost: 30000 },
+  { id: 2, unitId: 3, startDate: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000), endDate: new Date(Date.now() - 11 * 24 * 60 * 60 * 1000), status: "completed", laborCost: 15000, partsCost: 35000 },
+  { id: 3, unitId: 8, startDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), endDate: null, status: "in_progress", laborCost: 0, partsCost: 25000 },
+];
 export const MOCK_WARRANTIES: any[] = [];
 export const MOCK_RETURNS: any[] = [];
 export const MOCK_GENERATED_CODES: any[] = [];
