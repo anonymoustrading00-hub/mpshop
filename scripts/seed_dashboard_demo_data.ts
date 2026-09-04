@@ -11,12 +11,23 @@ async function seedDashboardDemoData() {
   const connection = await mysql.createConnection(databaseUrl);
 
   try {
+    console.log("[Seed] Checking dashboard demo data...");
+
+    // 0. Verificar si los datos demo ya existen para evitar duplicados y errores
+    const [existingUnits]: any = await connection.query(
+      `SELECT COUNT(*) as cnt FROM units WHERE code = 'UNI-00001'`,
+    );
+    if (existingUnits[0]?.cnt > 0) {
+      console.log("[Seed] Dashboard demo data already seeded, skipping.");
+      return;
+    }
+
     console.log("[Seed] Seeding dashboard demo data...");
 
-    // 1. Agregar unidades (equipos)
+    // 1. Agregar unidades (equipos) - escapar palabras reservadas de MySQL como `condition`, `type`, `status`
     await connection.query(
       `INSERT INTO units 
-        (code, type, brand, model, condition, status, purchasePrice, salePrice, createdAt, updatedAt, branchId)
+        (code, \`type\`, brand, model, \`condition\`, \`status\`, purchasePrice, salePrice, createdAt, updatedAt, branchId)
        VALUES 
         (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 1),
         (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 1),
@@ -38,71 +49,90 @@ async function seedDashboardDemoData() {
       ],
     );
 
-    // 2. Agregar ventas (sales)
-    await connection.query(
-      `INSERT INTO sales 
-        (saleNumber, total, status, branchId, createdAt, updatedAt)
-       VALUES 
-        (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 15 DAY), NOW()),
-        (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 14 DAY), NOW()),
-        (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 10 DAY), NOW()),
-        (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 8 DAY), NOW()),
-        (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 5 DAY), NOW()),
-        (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 3 DAY), NOW())`,
-      [
-        "V-001", 150000, "completed",
-        "V-002", 200000, "completed",
-        "V-003", 180000, "completed",
-        "V-004", 220000, "completed",
-        "V-005", 170000, "completed",
-        "V-006", 190000, "completed",
-      ],
+    // Obtener IDs reales generados para las unidades
+    const [insertedUnits]: any = await connection.query(
+      `SELECT id, code FROM units WHERE code IN ('UNI-00001', 'UNI-00002', 'UNI-00003', 'UNI-00004', 'UNI-00005', 'UNI-00006', 'UNI-00007', 'UNI-00008')`,
     );
-
-    // 3. Obtener IDs de sales y agregar sale items
-    const [sales]: any = await connection.query(
-      `SELECT id, saleNumber FROM sales WHERE saleNumber IN ('V-001', 'V-002', 'V-003', 'V-004', 'V-005', 'V-006') ORDER BY saleNumber`,
-    );
-
-    const saleMap: Record<string, number> = {};
-    sales.forEach((s: any) => {
-      saleMap[s.saleNumber] = s.id;
+    const unitMap: Record<string, number> = {};
+    insertedUnits.forEach((u: any) => {
+      unitMap[u.code] = u.id;
     });
 
-    await connection.query(
-      `INSERT INTO saleItems 
-        (saleId, unitId, quantity, finalUnitPrice, discountAmount)
-       VALUES 
-        (?, ?, 1, ?, 0),
-        (?, ?, 1, ?, 0),
-        (?, ?, 1, ?, 0),
-        (?, ?, 1, ?, 0),
-        (?, ?, 1, ?, 0),
-        (?, ?, 1, ?, 0)`,
-      [
-        saleMap["V-001"], 1, 150000,
-        saleMap["V-002"], 2, 200000,
-        saleMap["V-003"], 3, 180000,
-        saleMap["V-004"], 4, 220000,
-        saleMap["V-005"], 5, 170000,
-        saleMap["V-006"], 6, 190000,
-      ],
+    // 2. Agregar ventas (sales) si no existen
+    const [existingSales]: any = await connection.query(
+      `SELECT COUNT(*) as cnt FROM sales WHERE saleNumber = 'V-001'`,
     );
 
-    // 4. Agregar reparaciones
-    await connection.query(
-      `INSERT INTO repairs 
-        (unitId, startDate, endDate, status, laborCost, partsCost, createdAt, updatedAt)
-       VALUES 
-        (?, DATE_SUB(NOW(), INTERVAL 14 DAY), DATE_SUB(NOW(), INTERVAL 13 DAY), 'completed', ?, ?, NOW(), NOW()),
-        (?, DATE_SUB(NOW(), INTERVAL 12 DAY), DATE_SUB(NOW(), INTERVAL 11 DAY), 'completed', ?, ?, NOW(), NOW()),
-        (?, DATE_SUB(NOW(), INTERVAL 5 DAY), NULL, 'in_progress', ?, ?, NOW(), NOW())`,
-      [
-        2, 20000, 30000,
-        3, 15000, 35000,
-        8, 0, 25000,
-      ],
-    );
+    if (existingSales[0]?.cnt === 0) {
+      await connection.query(
+        `INSERT INTO sales 
+          (saleNumber, total, \`status\`, branchId, createdAt, updatedAt)
+         VALUES 
+          (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 15 DAY), NOW()),
+          (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 14 DAY), NOW()),
+          (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 10 DAY), NOW()),
+          (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 8 DAY), NOW()),
+          (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 5 DAY), NOW()),
+          (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 3 DAY), NOW())`,
+        [
+          "V-001", 150000, "completed",
+          "V-002", 200000, "completed",
+          "V-003", 180000, "completed",
+          "V-004", 220000, "completed",
+          "V-005", 170000, "completed",
+          "V-006", 190000, "completed",
+        ],
+      );
+
+      // 3. Obtener IDs de sales y agregar sale items
+      const [sales]: any = await connection.query(
+        `SELECT id, saleNumber FROM sales WHERE saleNumber IN ('V-001', 'V-002', 'V-003', 'V-004', 'V-005', 'V-006') ORDER BY saleNumber`,
+      );
+
+      const saleMap: Record<string, number> = {};
+      sales.forEach((s: any) => {
+        saleMap[s.saleNumber] = s.id;
+      });
+
+      if (Object.keys(saleMap).length > 0) {
+        await connection.query(
+          `INSERT INTO saleItems 
+            (saleId, unitId, quantity, finalUnitPrice, discountAmount)
+           VALUES 
+            (?, ?, 1, ?, 0),
+            (?, ?, 1, ?, 0),
+            (?, ?, 1, ?, 0),
+            (?, ?, 1, ?, 0),
+            (?, ?, 1, ?, 0),
+            (?, ?, 1, ?, 0)`,
+          [
+            saleMap["V-001"], unitMap["UNI-00001"] || 1, 150000,
+            saleMap["V-002"], unitMap["UNI-00002"] || 2, 200000,
+            saleMap["V-003"], unitMap["UNI-00003"] || 3, 180000,
+            saleMap["V-004"], unitMap["UNI-00004"] || 4, 220000,
+            saleMap["V-005"], unitMap["UNI-00005"] || 5, 170000,
+            saleMap["V-006"], unitMap["UNI-00006"] || 6, 190000,
+          ],
+        );
+      }
+    }
+
+    // 4. Agregar reparaciones demo
+    if (unitMap["UNI-00002"] && unitMap["UNI-00003"]) {
+      await connection.query(
+        `INSERT INTO repairs 
+          (unitId, startDate, endDate, \`status\`, laborCost, partsCost, createdAt, updatedAt)
+         VALUES 
+          (?, DATE_SUB(NOW(), INTERVAL 14 DAY), DATE_SUB(NOW(), INTERVAL 13 DAY), 'completed', ?, ?, NOW(), NOW()),
+          (?, DATE_SUB(NOW(), INTERVAL 12 DAY), DATE_SUB(NOW(), INTERVAL 11 DAY), 'completed', ?, ?, NOW(), NOW()),
+          (?, DATE_SUB(NOW(), INTERVAL 5 DAY), NULL, 'in_progress', ?, ?, NOW(), NOW())`,
+        [
+          unitMap["UNI-00002"], 20000, 30000,
+          unitMap["UNI-00003"], 15000, 35000,
+          unitMap["UNI-00008"] || unitMap["UNI-00003"], 0, 25000,
+        ],
+      );
+    }
 
     // 5. Agregar gastos operativos
     const expenses = [
@@ -117,7 +147,7 @@ async function seedDashboardDemoData() {
     for (const exp of expenses) {
       await connection.query(
         `INSERT INTO financialTransactions 
-          (type, category, description, amount, paymentMethod, branchId, createdAt, updatedAt)
+          (\`type\`, category, description, amount, paymentMethod, branchId, createdAt, updatedAt)
          VALUES (?, ?, ?, ?, 'cash', 1, DATE_SUB(NOW(), INTERVAL ? DAY), NOW())`,
         ["expense", exp.category, `Gasto: ${exp.category}`, exp.amount, exp.offset],
       );

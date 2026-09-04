@@ -945,7 +945,7 @@ export async function ensureTables() {
         model varchar(100) NOT NULL,
         serialNumber varchar(100),
         specs text,
-        condition int,
+        \`condition\` int,
         batteryHealth enum('100','90','80','70','60','50','40','plugged_only','n_a') NOT NULL DEFAULT 'n_a',
         damageChecklist text,
         damageNotes text,
