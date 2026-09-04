@@ -1150,6 +1150,11 @@ export async function ensureTables() {
       ALTER TABLE units ADD COLUMN rmaNumber varchar(30) NULL AFTER code
     `);
 
+    // units: notas de daño / detalle adicional del equipo
+    await runSQL("units.damageNotes column", `
+      ALTER TABLE units ADD COLUMN damageNotes text NULL AFTER damageChecklist
+    `);
+
     // repairs: número de Orden de Trabajo por entrada
     await runSQL("repairs.otNumber column", `
       ALTER TABLE repairs ADD COLUMN otNumber varchar(30) NULL AFTER rmaNumber
