@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { trpc } from "@/lib/trpc";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -122,6 +124,12 @@ function ProtectedRoute({
 function Router() {
   const [location] = useLocation();
   const { user, loading } = useAuth();
+  const { data: companyConfig } = trpc.settings.getCompanyConfig.useQuery();
+
+  useEffect(() => {
+    document.title = companyConfig?.name || "MP SHOP TIENDA ONLINE";
+  }, [companyConfig?.name]);
+
   const showTopHeader = true;
 
   if (loading) {

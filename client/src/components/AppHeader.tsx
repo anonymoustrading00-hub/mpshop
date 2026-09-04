@@ -149,7 +149,7 @@ export default function AppHeader() {
           <div className="group flex shrink-0 cursor-pointer items-center gap-3">
             <img
               src={companyConfig?.logo || "/logo.png"}
-              alt={companyConfig?.name || "Vitalia"}
+              alt={companyConfig?.name || "MP Shop"}
               className="h-10 w-auto max-w-[120px] object-contain transition-transform duration-300 group-hover:scale-105"
             />
             <div className="flex flex-col min-w-0">
@@ -158,7 +158,7 @@ export default function AppHeader() {
               </span>
               <div className="flex items-center gap-2">
                 <span className="text-lg font-extrabold text-slate-900 tracking-tight leading-none">
-                  {companyConfig?.name || "Vitalia"}
+                  {companyConfig?.name || "MP SHOP TIENDA ONLINE"}
                 </span>
                 <span className="bg-slate-100 text-[10px] px-1.5 py-0.5 rounded-md text-slate-600 font-mono border border-slate-200 leading-none">
                   v1.5.0
@@ -280,7 +280,7 @@ export default function AppHeader() {
           <div className="flex items-center gap-2.5">
             <img src={companyConfig?.logo || "/logo.png"} alt={companyConfig?.name || "Logo"} className="h-9 w-auto object-contain" />
             <div className="flex flex-col">
-              <span className="text-[14px] font-extrabold text-slate-900 leading-tight tracking-tight">{companyConfig?.name || "Vitalia"}</span>
+              <span className="text-[14px] font-extrabold text-slate-900 leading-tight tracking-tight">{companyConfig?.name || "MP SHOP TIENDA ONLINE"}</span>
               <span className="text-[9px] font-bold uppercase tracking-widest text-primary/60 leading-none">
                 Op. diaria
               </span>
