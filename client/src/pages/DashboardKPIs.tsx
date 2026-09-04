@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import {
   TrendingUp, TrendingDown, Clock, Package, Wallet,
-  CreditCard, RotateCcw, AlertTriangle, QrCode, Landmark,
+  CreditCard, RotateCcw, AlertTriangle,
   RefreshCw, BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -78,21 +78,6 @@ function KpiCard({ label, value, sub, icon: Icon, accent, trend, linkTo }: KpiPr
   return card;
 }
 
-// ─── Balance mini-card ────────────────────────────────────────────
-
-function BalanceCard({ label, amount, color, icon: Icon }: { label: string; amount: number; color: string; icon: React.ElementType }) {
-  return (
-    <div className={`flex items-center justify-between px-4 py-3 rounded-2xl border ${color}`}>
-      <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 shrink-0" />
-        <span className="text-xs font-bold">{label}</span>
-      </div>
-      <span className={`text-sm font-black tabular-nums ${amount >= 0 ? "" : "text-red-600"}`}>
-        {formatCurrency(amount)}
-      </span>
-    </div>
-  );
-}
 
 // ─── Main page ────────────────────────────────────────────────────
 
@@ -196,28 +181,6 @@ export default function DashboardKPIs() {
               accent={data.cxcPendingCents === 0 ? "emerald" : "amber"}
               linkTo="/accounts-receivable"
             />
-          </div>
-
-          {/* Desglose de cajas */}
-          <div className="bg-white rounded-[2rem] border-none shadow-[0_8px_30px_rgb(0,0,0,0.05)] p-5 space-y-3">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-slate-100 rounded-xl">
-                <BarChart3 className="h-4 w-4 text-slate-600" />
-              </div>
-              <span className="font-black text-slate-800 text-sm uppercase tracking-wide">Desglose de Cajas</span>
-            </div>
-            <BalanceCard label="Caja Efectivo" amount={data.balances.cash}    color="border-emerald-100 bg-emerald-50/50 text-emerald-700" icon={Wallet} />
-            <BalanceCard label="Caja QR"        amount={data.balances.qr}      color="border-blue-100 bg-blue-50/50 text-blue-700"          icon={QrCode} />
-            <BalanceCard label="Cuenta Bancaria" amount={data.balances.transfer} color="border-violet-100 bg-violet-50/50 text-violet-700"   icon={Landmark} />
-            <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-900 text-white">
-              <div className="flex items-center gap-2">
-                <Wallet className="h-4 w-4" />
-                <span className="text-xs font-black uppercase tracking-wider">Total</span>
-              </div>
-              <span className={`text-sm font-black tabular-nums ${data.balances.total >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                {formatCurrency(data.balances.total)}
-              </span>
-            </div>
           </div>
 
           {/* Links de acción */}
