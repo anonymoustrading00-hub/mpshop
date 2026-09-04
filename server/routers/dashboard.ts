@@ -167,4 +167,312 @@ export const dashboardRouter = router({
       returnsThisMonth: returnsN,
     };
   }),
+
+  /**
+   * getBusinessDashboard — Dashboard completo de rentabilidad por flujo de negocio
+   * 
+   * Flujos detectados:
+   * 1. usado_directo: compra usado → venta sin reparar
+   * 2. reparado: compra usado → reparación → venta
+   * 3. inventario_nuevo: compra nuevo → venta (accesorios, etc.)
+   */
+  getBusinessDashboard: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    const monthStart = startOfMonth();
+    const today = now();
+    const sixtyDaysAgo = new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+    if (!db) {
+      // ═══ MODO DEMO (MOCK) ═══
+      const { MOCK_OPERATIONAL_EXPENSES, MOCK_PURCHASES } = await import("../db");
+
+      // 1. Clasificar equipos vendidos por flujo
+      const soldUnits = (MOCK_UNITS as any[]).filter((u: any) => u.status === "sold");
+      
+      const flowData: any = { usado_directo: [], reparado: [], inventario_nuevo: [] };
+      
+      for (const unit of soldUnits) {
+        const wasRepaired = (MOCK_REPAIRS as any[]).some((r: any) => 
+          r.unitId === unit.id && r.status === "completed"
+        );
+        const isNew = unit.condition === 10 || unit.type === "charger" || unit.type === "accessory";
+        
+        const saleItem = (MOCK_SALE_ITEMS as any[]).find((si: any) => si.unitId === unit.id);
+        const salePrice = saleItem?.finalUnitPrice || unit.salePrice || 0;
+        
+        const repairCosts = (MOCK_REPAIRS as any[])
+          .filter((r: any) => r.unitId === unit.id && r.status === "completed")
+          .reduce((s: number, r: any) => s + (r.laborCost || 0) + (r.partsCost || 0), 0);
+        
+        const cogs = (unit.purchasePrice || 0) + repairCosts;
+        const margin = salePrice - cogs;
+        const marginPct = salePrice > 0 ? (margin / salePrice) * 100 : 0;
+        
+        const sale = (MOCK_SALES as any[]).find((s: any) => 
+          (MOCK_SALE_ITEMS as any[]).some((si: any) => si.saleId === s.id && si.unitId === unit.id)
+        );
+        const daysInInventory = sale && unit.createdAt 
+          ? Math.max(0, Math.round((new Date(sale.createdAt).getTime() - new Date(unit.createdAt).getTime()) / 86400000))
+          : 0;
+        
+        const item = {
+          unitId: unit.id,
+          code: unit.code,
+          type: unit.type,
+          brand: unit.brand,
+          model: unit.model,
+          purchasePrice: unit.purchasePrice || 0,
+          repairCost: repairCosts,
+          salePrice,
+          margin,
+          marginPct,
+          daysInInventory,
+        };
+        
+        if (isNew) flowData.inventario_nuevo.push(item);
+        else if (wasRepaired) flowData.reparado.push(item);
+        else flowData.usado_directo.push(item);
+      }
+
+      // 2. KPIs principales
+      const totalRevenue = soldUnits.reduce((s: number, u: any) => {
+        const si = (MOCK_SALE_ITEMS as any[]).find((item: any) => item.unitId === u.id);
+        return s + (si?.finalUnitPrice || u.salePrice || 0);
+      }, 0);
+
+      const totalCOGS = soldUnits.reduce((s: number, u: any) => {
+        const repairCosts = (MOCK_REPAIRS as any[])
+          .filter((r: any) => r.unitId === u.id && r.status === "completed")
+          .reduce((sum: number, r: any) => sum + (r.laborCost || 0) + (r.partsCost || 0), 0);
+        return s + (u.purchasePrice || 0) + repairCosts;
+      }, 0);
+
+      const grossProfit = totalRevenue - totalCOGS;
+
+      const operationalExpenses = (MOCK_OPERATIONAL_EXPENSES as any[])
+        .filter((e: any) => new Date(e.expenseDate || e.createdAt) >= monthStart)
+        .reduce((s: number, e: any) => s + (e.amount || 0), 0);
+
+      const netProfit = grossProfit - operationalExpenses;
+      const netMarginPct = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+      const inventoryValue = (MOCK_UNITS as any[])
+        .filter((u: any) => ["available", "in_repair", "in_diagnosis"].includes(u.status))
+        .reduce((s: number, u: any) => s + (u.purchasePrice || 0), 0);
+
+      // 3. Rentabilidad por flujo
+      const flowSummary = Object.keys(flowData).map((flow: string) => {
+        const items = flowData[flow];
+        const count = items.length;
+        const revenue = items.reduce((s: number, i: any) => s + i.salePrice, 0);
+        const cogs = items.reduce((s: number, i: any) => s + i.purchasePrice + i.repairCost, 0);
+        const profit = revenue - cogs;
+        const marginPct = revenue > 0 ? (profit / revenue) * 100 : 0;
+        return { flow, count, revenue, cogs, profit, marginPct };
+      });
+
+      // 4. Flujo de equipos (embudo)
+      const purchased = (MOCK_UNITS as any[]).length;
+      const inRepair = (MOCK_UNITS as any[]).filter((u: any) => u.status === "in_repair").length;
+      const available = (MOCK_UNITS as any[]).filter((u: any) => u.status === "available").length;
+      const sold = soldUnits.length;
+
+      // 5. Gastos operativos por categoría
+      const expensesByCategory = (MOCK_OPERATIONAL_EXPENSES as any[])
+        .filter((e: any) => new Date(e.expenseDate || e.createdAt) >= monthStart)
+        .reduce((acc: any, e: any) => {
+          const cat = e.category || "other";
+          acc[cat] = (acc[cat] || 0) + (e.amount || 0);
+          return acc;
+        }, {});
+
+      // 6. Estado de reparaciones
+      const repairsInProgress = (MOCK_REPAIRS as any[]).filter((r: any) => r.status === "in_progress").length;
+      const repairsCompleted = (MOCK_REPAIRS as any[]).filter((r: any) => 
+        r.status === "completed" && new Date(r.endDate || r.updatedAt) >= monthStart
+      ).length;
+      
+      const avgRepairDays = (MOCK_REPAIRS as any[])
+        .filter((r: any) => r.status === "completed" && r.endDate && r.startDate)
+        .reduce((acc: any, r: any) => {
+          const days = Math.round((new Date(r.endDate).getTime() - new Date(r.startDate).getTime()) / 86400000);
+          acc.sum += days;
+          acc.count++;
+          return acc;
+        }, { sum: 0, count: 0 });
+
+      const avgRepairDaysValue = avgRepairDays.count > 0 ? Math.round(avgRepairDays.sum / avgRepairDays.count) : 0;
+
+      // Reparaciones en pérdida (costo reparación > incremento valor venta)
+      const lossRepairs = (MOCK_REPAIRS as any[])
+        .filter((r: any) => {
+          if (r.status !== "completed") return false;
+          const unit = (MOCK_UNITS as any[]).find((u: any) => u.id === r.unitId);
+          if (!unit) return false;
+          const repairCost = (r.laborCost || 0) + (r.partsCost || 0);
+          const salePrice = unit.salePrice || 0;
+          const purchasePrice = unit.purchasePrice || 0;
+          return repairCost > (salePrice - purchasePrice);
+        }).length;
+
+      // 7. Rotación de inventario
+      const avgInventoryDays = soldUnits
+        .map((u: any) => {
+          const sale = (MOCK_SALES as any[]).find((s: any) => 
+            (MOCK_SALE_ITEMS as any[]).some((si: any) => si.saleId === s.id && si.unitId === u.id)
+          );
+          if (!sale || !u.createdAt) return 0;
+          return Math.round((new Date(sale.createdAt).getTime() - new Date(u.createdAt).getTime()) / 86400000);
+        })
+        .reduce((acc: any, days: number) => {
+          acc.sum += days;
+          acc.count++;
+          return acc;
+        }, { sum: 0, count: 0 });
+
+      const avgRotationDays = avgInventoryDays.count > 0 ? Math.round(avgInventoryDays.sum / avgInventoryDays.count) : 0;
+
+      const rotationByFlow = Object.keys(flowData).map((flow: string) => {
+        const items = flowData[flow];
+        const avg = items.length > 0 
+          ? items.reduce((s: number, i: any) => s + i.daysInInventory, 0) / items.length
+          : 0;
+        return { flow, avgDays: Math.round(avg) };
+      });
+
+      // 8. Top productos
+      const productStats = soldUnits.reduce((acc: any, u: any) => {
+        const key = `${u.brand || "Sin marca"} ${u.model || "Sin modelo"}`.trim();
+        if (!acc[key]) {
+          acc[key] = { name: key, sales: 0, revenue: 0, profit: 0 };
+        }
+        const si = (MOCK_SALE_ITEMS as any[]).find((item: any) => item.unitId === u.id);
+        const salePrice = si?.finalUnitPrice || u.salePrice || 0;
+        const repairCosts = (MOCK_REPAIRS as any[])
+          .filter((r: any) => r.unitId === u.id && r.status === "completed")
+          .reduce((s: number, r: any) => s + (r.laborCost || 0) + (r.partsCost || 0), 0);
+        const profit = salePrice - (u.purchasePrice || 0) - repairCosts;
+        
+        acc[key].sales++;
+        acc[key].revenue += salePrice;
+        acc[key].profit += profit;
+        return acc;
+      }, {});
+
+      const topProducts = Object.values(productStats)
+        .sort((a: any, b: any) => b.sales - a.sales)
+        .slice(0, 5);
+
+      const topProfitable = Object.values(productStats)
+        .sort((a: any, b: any) => b.profit - a.profit)
+        .slice(0, 5);
+
+      // 9. Alertas automáticas
+      const alerts: any[] = [];
+
+      // Equipos +60 días
+      const oldInventory = (MOCK_UNITS as any[]).filter((u: any) => {
+        if (!["available", "in_repair", "in_diagnosis"].includes(u.status)) return false;
+        return new Date(u.createdAt) <= sixtyDaysAgo;
+      });
+      if (oldInventory.length > 0) {
+        alerts.push({
+          type: "warning",
+          title: `${oldInventory.length} equipos con +60 días en inventario`,
+          description: "Revisar precios o promociones",
+        });
+      }
+
+      // Reparaciones en pérdida
+      if (lossRepairs > 0) {
+        alerts.push({
+          type: "error",
+          title: `${lossRepairs} reparaciones resultaron en pérdida`,
+          description: "Revisar criterios de aceptación",
+        });
+      }
+
+      // Margen neto positivo
+      if (netMarginPct > 15) {
+        alerts.push({
+          type: "success",
+          title: `Margen neto del ${netMarginPct.toFixed(1)}%`,
+          description: "Excelente rentabilidad este mes",
+        });
+      }
+
+      // 10. Ventas por período (últimas 8 semanas)
+      const weeklySales: any[] = [];
+      for (let i = 7; i >= 0; i--) {
+        const weekStart = new Date(today.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+        const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+        
+        const weekSales = (MOCK_SALES as any[]).filter((s: any) => {
+          const d = new Date(s.createdAt);
+          return d >= weekStart && d < weekEnd && s.status !== "cancelled";
+        });
+
+        const revenue = weekSales.reduce((s: number, sale: any) => s + (sale.total || 0), 0);
+        const cogs = weekSales.reduce((s: number, sale: any) => {
+          return s + (MOCK_SALE_ITEMS as any[])
+            .filter((si: any) => si.saleId === sale.id)
+            .reduce((ss: number, si: any) => {
+              const unit = (MOCK_UNITS as any[]).find((u: any) => u.id === si.unitId);
+              if (!unit) return ss;
+              const repairCosts = (MOCK_REPAIRS as any[])
+                .filter((r: any) => r.unitId === unit.id && r.status === "completed")
+                .reduce((rr: number, r: any) => rr + (r.laborCost || 0) + (r.partsCost || 0), 0);
+              return ss + (unit.purchasePrice || 0) + repairCosts;
+            }, 0);
+        }, 0);
+
+        weeklySales.push({
+          week: `Sem ${8 - i}`,
+          revenue,
+          profit: revenue - cogs,
+        });
+      }
+
+      return {
+        kpis: {
+          totalRevenue,
+          totalCOGS,
+          grossProfit,
+          operationalExpenses,
+          netProfit,
+          netMarginPct,
+          inventoryValue,
+          previousMonthComparison: 0, // TODO: calcular mes anterior
+        },
+        waterfall: [
+          { name: "Ingresos", value: totalRevenue },
+          { name: "(-) Costo Mercadería", value: -totalCOGS },
+          { name: "= Ganancia Bruta", value: grossProfit },
+          { name: "(-) Gastos Operativos", value: -operationalExpenses },
+          { name: "= Ganancia Neta", value: netProfit },
+        ],
+        flowSummary,
+        equipmentFlow: { purchased, inRepair, available, sold },
+        expensesByCategory,
+        repairStatus: {
+          inProgress: repairsInProgress,
+          completed: repairsCompleted,
+          avgDays: avgRepairDaysValue,
+          lossRepairs,
+        },
+        rotation: {
+          avgDays: avgRotationDays,
+          byFlow: rotationByFlow,
+        },
+        topProducts,
+        topProfitable,
+        alerts,
+        weeklySales,
+      };
+    }
+
+    // ═══ MODO REAL (DATABASE) ═══
+    // TODO: Implementar queries reales cuando se conecte MySQL
+    throw new Error("Database mode not implemented yet for getBusinessDashboard");
+  }),
 });
