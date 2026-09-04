@@ -675,7 +675,7 @@ function BoxHistoryModal({ paymentMethod, title, colorClass, open, onOpenChange,
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!fixed !inset-0 !translate-x-0 !translate-y-0 !w-full !max-w-none !h-full sm:!inset-auto sm:!top-[50%] sm:!left-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:!h-[95vh] sm:!max-w-4xl flex flex-col p-0 overflow-hidden rounded-none sm:rounded-[1.5rem] border-none sm:border bg-white">
+      <DialogContent className="!fixed !inset-0 !translate-x-0 !translate-y-0 !w-full !max-w-none !h-full sm:!inset-auto sm:!top-[50%] sm:!left-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:!h-[95vh] sm:!max-w-4xl flex flex-col p-0 overflow-hidden rounded-none sm:rounded-[1.5rem] border-none sm:border bg-white" showCloseButton={false}>
         <div className={`${colors.light} p-4 sm:p-6 border-b ${colors.border} shrink-0`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
