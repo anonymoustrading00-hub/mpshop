@@ -40,12 +40,12 @@ async function seedDashboardDemoData() {
       [
         "UNI-00001", "laptop", "Dell", "Inspiron 15", 7, "sold", 120000, 150000,
         "UNI-00002", "laptop", "HP", "Pavilion 14", 8, "sold", 150000, 200000,
-        "UNI-00003", "celular", "Samsung", "A12", 6, "sold", 130000, 180000,
+        "UNI-00003", "phone", "Samsung", "A12", 6, "sold", 130000, 180000,
         "UNI-00004", "tablet", "iPad", "Air", 10, "sold", 180000, 220000,
         "UNI-00005", "laptop", "Lenovo", "ThinkPad", 7, "sold", 140000, 170000,
         "UNI-00006", "charger", "Generic", "USB-C", 10, "sold", 40000, 190000,
         "UNI-00007", "laptop", "ASUS", "VivoBook", 5, "available", 100000, 0,
-        "UNI-00008", "celular", "Xiaomi", "Redmi Note", 6, "in_repair", 80000, 0,
+        "UNI-00008", "phone", "Xiaomi", "Redmi Note", 6, "in_repair", 80000, 0,
       ],
     );
 

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { Link } from "wouter";
 import { useBranch } from "@/contexts/BranchContext";
 import { UnitKardex } from "@/components/UnitKardex";
 import { CommercialCatalogModal } from "@/components/CommercialCatalogModal";
@@ -226,7 +227,9 @@ export default function Units() {
   // ── Paginación, vista y modo ──────────────────────────────────────────────
   const [page, setPage]           = useState(1);
   const [pageSize, setPageSize]   = useState<number>(24);
-  const [viewMode, setViewMode]   = useState<"grid" | "table" | "grouped">("table");
+  const [viewMode, setViewMode]   = useState<"grid" | "table" | "grouped">(() =>
+    typeof window !== "undefined" && window.innerWidth < 768 ? "grid" : "table"
+  );
   // Resetear página cuando cambian filtros
   const handleSearchChange = (v: string) => { setSearch(v); setPage(1); };
   const handleTypeChange   = (v: string) => { setTypeFilter(v); setPage(1); };
@@ -793,35 +796,35 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
             </p>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              onClick={() => { setDisplayCardsUnitId(null); setIsDisplayCardsOpen(true); }}
-              className="gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-sm"
-            >
-              <Sparkles className="h-4 w-4" /> Fichas de Exhibición (Vitrina)
-            </Button>
-            <a href="/purchases">
-              <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm">
-                <ShoppingCart className="h-4 w-4" /> Compras
-              </Button>
-            </a>
-            <a href="/register-unit">
-              <Button className="gap-2 bg-blue-600 hover:bg-blue-700 font-bold shadow-sm">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full touch-scroll sm:flex-wrap">
+            <Link href="/register-unit">
+              <Button className="gap-2 bg-blue-600 hover:bg-blue-700 font-bold shadow-sm whitespace-nowrap">
                 <Plus className="h-4 w-4" /> Registrar Unidad
               </Button>
-            </a>
-            <a href="/generate-codes">
-              <Button variant="outline" className="gap-2">
+            </Link>
+            <Button
+              onClick={() => { setDisplayCardsUnitId(null); setIsDisplayCardsOpen(true); }}
+              className="gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-sm whitespace-nowrap"
+            >
+              <Sparkles className="h-4 w-4" /> Fichas Vitrina
+            </Button>
+            <Link href="/purchases">
+              <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm whitespace-nowrap">
+                <ShoppingCart className="h-4 w-4" /> Compras
+              </Button>
+            </Link>
+            <Link href="/generate-codes">
+              <Button variant="outline" className="gap-2 whitespace-nowrap">
                 <QrCode className="h-4 w-4" /> Códigos QR
               </Button>
-            </a>
+            </Link>
           </div>
 
         </div>
 
         {/* Input de Escáner USB omnipresente */}
         <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <form onSubmit={handleScanSubmit} className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -829,12 +832,15 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                   ref={scanInputRef}
                   value={scanInput}
                   onChange={(e) => setScanInput(e.target.value)}
-                  placeholder="Escanear Código QR / Código de Barras físico o escribir 'LT-0001' + Enter..."
+                  placeholder="Escanear QR / Código físico o escribir código + Enter..."
                   className="pl-9 bg-background"
                   autoFocus
                 />
               </div>
-              <Button type="submit">Buscar Escáner</Button>
+              <Button type="submit" className="shrink-0 font-bold px-3 sm:px-4">
+                <span className="hidden sm:inline">Buscar Escáner</span>
+                <span className="sm:hidden">Buscar</span>
+              </Button>
             </form>
           </CardContent>
         </Card>
@@ -953,7 +959,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
           <>
             {/* ── MODO TABLA (Formato Oficial de Inventario y Stock) ── */}
             {viewMode === "table" && (
-              <div className="overflow-x-auto rounded-xl border border-slate-300 shadow-sm bg-white">
+              <div className="overflow-x-auto rounded-xl border border-slate-300 shadow-sm bg-white touch-scroll">
                 <table className="w-full text-xs border-collapse">
                   <thead className="bg-slate-100 border-b border-slate-300">
                     <tr className="text-[11px] font-bold text-slate-800 uppercase tracking-wider select-none">

@@ -1680,8 +1680,8 @@ export default function Sales() {
         <DialogContent
           className={
             isMobile
-              ? "max-h-[94vh] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-3xl border-slate-200 bg-white p-4 sm:max-w-[calc(100vw-1.5rem)] sm:p-5"
-              : "flex flex-col h-[88vh] max-h-[840px] w-[min(1380px,96vw)] sm:max-w-[min(1380px,96vw)] overflow-hidden rounded-3xl border-slate-200/90 bg-slate-100/70 shadow-2xl p-0"
+              ? "max-h-[96vh] w-[98vw] max-w-[calc(100vw-0.5rem)] overflow-y-auto rounded-3xl border-slate-200 bg-white p-3 sm:p-4"
+              : "flex flex-col h-[90vh] max-h-[880px] w-[min(1380px,96vw)] sm:max-w-[min(1380px,96vw)] overflow-hidden rounded-3xl border-slate-200/90 bg-slate-100/70 shadow-2xl p-0"
           }
         >
           {/* Success overlay */}
@@ -2143,7 +2143,7 @@ export default function Sales() {
                             setPaymentMethod(method);
                             if (method === "credit") setPaymentStatus("pending");
                           }}
-                          className={`h-9 rounded-xl border text-xs flex items-center justify-center gap-1 transition-all ${colors}`}
+                          className={`h-11 sm:h-10 rounded-xl border text-xs font-bold flex items-center justify-center gap-1 transition-all ${colors}`}
                         >
                           {method === "cash" && <Banknote className="h-3.5 w-3.5" />}
                           {method === "qr" && <QrCode className="h-3.5 w-3.5" />}
@@ -2212,6 +2212,7 @@ export default function Sales() {
                       </Select>
                       <Input
                         type="number"
+                        inputMode="decimal"
                         min="0"
                         step="any"
                         disabled={globalDiscountType === "none"}
@@ -2310,7 +2311,7 @@ export default function Sales() {
                     type="button"
                     variant="outline"
                     onClick={() => { setIsCreateOpen(false); resetForm(); }}
-                    className="h-10 px-3 rounded-xl border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white text-xs font-bold shrink-0"
+                    className="h-12 sm:h-10 px-4 rounded-xl border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white text-xs font-bold shrink-0"
                   >
                     Cancelar
                   </Button>
@@ -2323,10 +2324,10 @@ export default function Sales() {
                       (paymentMethod !== "credit" && !openingStatus?.hasActive && user?.role !== "admin") ||
                       !creditDataComplete
                     }
-                    className={`flex-1 h-10 rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-1.5 transition-all ${
+                    className={`flex-1 h-12 sm:h-10 rounded-xl text-sm font-black shadow-md flex items-center justify-center gap-2 transition-all ${
                       paymentMethod === "credit" && !creditDataComplete 
                         ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700" 
-                        : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 hover:shadow-emerald-500/20"
+                        : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 hover:shadow-emerald-500/20 active:scale-[0.99]"
                     }`}
                   >
                     {createSaleMutation.isPending ? (

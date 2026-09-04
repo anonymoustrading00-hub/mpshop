@@ -269,14 +269,34 @@
        bloquea el scroll vertical táctil. Se maneja el overflow horizontal con
        max-width en los contenedores hijos en su lugar. */
     -webkit-overflow-scrolling: touch;
-    /* Espacio para el bottom nav en móvil */
-    padding-bottom: calc(env(safe-area-inset-bottom) + 5rem);
+    /* Espacio para el bottom nav en móvil con safe area de iPhone */
+    padding-bottom: calc(env(safe-area-inset-bottom) + 5.5rem);
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: 1024px) {
     .page-shell {
-      padding-bottom: 1.5rem;
+      padding-bottom: 2rem;
     }
+  }
+
+  /* Prevenir zoom forzado molesto en Safari iOS en inputs */
+  @media (max-width: 767px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Utilidades táctiles móviles y tablets */
+  .touch-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
   }
 
   .page-shell::before {

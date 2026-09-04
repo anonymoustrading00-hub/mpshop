@@ -37,7 +37,7 @@ export default function MobileBottomNav() {
   const items = user.role === "admin" ? ADMIN_ITEMS : DELIVERY_ITEMS;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white/95 backdrop-blur-xl border-t border-slate-200 shadow-[0_-4px_24px_-6px_rgba(15,23,42,0.12)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-white/95 backdrop-blur-xl border-t border-slate-200 shadow-[0_-4px_24px_-6px_rgba(15,23,42,0.12)]">
       {/* Safe area for iPhone home indicator */}
       <div className="flex items-stretch pb-[env(safe-area-inset-bottom)]">
         {items.map((item) => {

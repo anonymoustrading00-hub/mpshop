@@ -146,7 +146,7 @@ function Router() {
     <>
       {showTopHeader ? <AppHeader /> : null}
       <MobileBottomNav />
-      <div className="pb-20 md:pb-0">
+      <div className="pb-24 lg:pb-0">
         <Switch>
           <Route path={"/"} component={Home} />
           <Route path="/units">

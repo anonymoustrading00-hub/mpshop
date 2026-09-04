@@ -143,7 +143,7 @@ export default function AppHeader() {
     <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-2xl border-b border-slate-200/80 shadow-[0_4px_20px_-10px_rgba(15,23,42,0.1)]">
 
       {/* ══ TOP TIER: Brand & Profile (Desktop) ════════════════════ */}
-      <div className="hidden md:flex w-full items-center justify-between px-6 py-3">
+      <div className="hidden lg:flex w-full items-center justify-between px-6 py-3">
         {/* Logo & Brand */}
         <Link href="/">
           <div className="group flex shrink-0 cursor-pointer items-center gap-3">
@@ -250,9 +250,9 @@ export default function AppHeader() {
         )}
       </div>
 
-      {/* ══ BOTTOM TIER: Navigation — 2 Rows (Desktop/Tablet) ═══════ */}
+      {/* ══ BOTTOM TIER: Navigation — 2 Rows (Desktop) ════════════ */}
       {user && (
-        <div className="hidden md:block w-full border-t border-slate-100/80 bg-slate-50/40">
+        <div className="hidden lg:block w-full border-t border-slate-100/80 bg-slate-50/40">
           {/* Fila 1 — Módulos Operativos */}
           {visibleRow1.length > 0 && (
             <div className="flex items-center gap-x-1 w-full px-6 pt-1.5 pb-0 overflow-x-auto scrollbar-none">
@@ -274,8 +274,8 @@ export default function AppHeader() {
         </div>
       )}
 
-      {/* ══ MOBILE (< md) ═══════════════════════════════════════════ */}
-      <div className="flex md:hidden items-center justify-between w-full px-4 py-3">
+      {/* ══ MOBILE & TABLET (< lg) ════════════════════════════════════ */}
+      <div className="flex lg:hidden items-center justify-between w-full px-4 py-3">
         <Link href="/">
           <div className="flex items-center gap-2.5">
             <img src={companyConfig?.logo || "/logo.png"} alt={companyConfig?.name || "Logo"} className="h-9 w-auto object-contain" />

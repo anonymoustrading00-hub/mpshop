@@ -1188,6 +1188,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                     </Button>
                     <Input
                       type="number"
+                      inputMode="numeric"
                       min={1}
                       max={500}
                       value={quantity}
@@ -1251,6 +1252,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                   </label>
                   <Input
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     value={purchasePrice}
                     onChange={(e) => setPurchasePrice(e.target.value)}
@@ -1265,6 +1267,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                   </label>
                   <Input
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     value={salePrice}
                     onChange={(e) => setSalePrice(e.target.value)}
@@ -1279,6 +1282,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                   </label>
                   <Input
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     value={discountPrice}
                     onChange={(e) => setDiscountPrice(e.target.value)}
@@ -1293,6 +1297,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                   </label>
                   <Input
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     value={wholesalePrice}
                     onChange={(e) => setWholesalePrice(e.target.value)}
@@ -1553,7 +1558,6 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  multiple
                   className="hidden"
                   onChange={(e) => handlePhotoFiles(e.target.files)}
                 />
@@ -1576,9 +1580,10 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                       <button
                         type="button"
                         onClick={() => removePhoto(idx)}
-                        className="absolute top-1 right-1 w-5 h-5 bg-red-600 rounded-full text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                        className="absolute top-1 right-1 w-6 h-6 bg-red-600 rounded-full text-white flex items-center justify-center opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-md"
+                        title="Eliminar foto"
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-3.5 w-3.5" />
                       </button>
                       {idx === 0 && (
                         <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] text-center py-0.5 font-bold">
