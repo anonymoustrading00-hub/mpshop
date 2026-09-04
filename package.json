@@ -16,11 +16,12 @@
     "db:ensure-tables": "tsx scripts/ensure_tables.ts",
     "db:migrate": "drizzle-kit migrate",
     "db:seed-admin": "tsx scripts/seed_railway_admin.ts",
+    "db:seed-dashboard": "tsx scripts/seed_dashboard_demo_data.ts",
     "db:seed-products": "tsx seed_all_required_products.ts",
     "db:seed-devices": "tsx scripts/seed_device_catalogs.ts",
     "db:fix-units": "tsx scripts/fix_units_table.ts",
     "db:fix-columns": "tsx scripts/fix_missing_columns.ts",
-    "railway:predeploy": "pnpm run db:ensure-tables && pnpm run db:fix-columns && pnpm run db:seed-admin && pnpm run db:seed-products",
+    "railway:predeploy": "pnpm run db:ensure-tables && pnpm run db:fix-columns && pnpm run db:seed-admin && pnpm run db:seed-products && pnpm run db:seed-dashboard",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {
