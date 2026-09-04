@@ -230,6 +230,12 @@ function UnitCard({
               )}
             </div>
           )}
+
+          {unit.damageNotes && (
+            <p className="text-[11px] text-amber-900 bg-amber-50/90 border border-amber-200/80 rounded-md px-2 py-1 line-clamp-2 font-medium mt-1">
+              <span className="font-bold">📝 Detalle:</span> {unit.damageNotes}
+            </p>
+          )}
         </div>
       </div>
 
@@ -490,6 +496,11 @@ function PrintableCard({ unit }: { unit: any }) {
             {specs.ram && <span>RAM: {specs.ram}</span>}
             {specs.storage && <span>Almacenamiento: {specs.storage}</span>}
             {unit.condition && <span>Estado: {unit.condition}/10</span>}
+          </div>
+        )}
+        {unit.damageNotes && (
+          <div className="print-specs" style={{ color: "#92400e", background: "#fef3c7", padding: "4px 8px", borderRadius: "4px", margin: "4px 0", fontSize: "11px", fontWeight: 700 }}>
+            📝 Detalle adicional: <span style={{ fontWeight: 600 }}>{unit.damageNotes}</span>
           </div>
         )}
         <div className="print-price">
@@ -1549,6 +1560,17 @@ export default function Catalog() {
                         <div className="text-xs text-green-700 font-semibold mb-1">Batería</div>
                         <div className="text-sm font-bold text-green-700">{BATTERY_LABEL[selectedUnit.batteryHealth] || "N/D"}</div>
                       </div>
+                    </div>
+                  )}
+
+                  {selectedUnit.damageNotes && (
+                    <div className="bg-amber-50/90 border-2 border-amber-200/80 rounded-xl p-3.5 shadow-sm">
+                      <div className="text-xs font-black text-amber-900 mb-1 flex items-center gap-1.5 uppercase tracking-wider">
+                        <span>📝</span> Detalle adicional del equipo:
+                      </div>
+                      <p className="text-xs text-amber-950 font-bold leading-relaxed whitespace-pre-line">
+                        {selectedUnit.damageNotes}
+                      </p>
                     </div>
                   )}
 

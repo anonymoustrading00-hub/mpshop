@@ -183,6 +183,7 @@ export function CommercialSheetModal({
       `🔥 *FICHA COMERCIAL — ${unit.brand} ${unit.model}*\n` +
       `📌 *Código:* ${unit.code}\n` +
       `⭐ *Estado Estético:* ${unit.condition ? `${unit.condition}/10` : "Excelente"}\n` +
+      (unit.damageNotes ? `📝 *Detalle Adicional:* ${unit.damageNotes}\n` : "") +
       `💰 *PRECIO:* ${priceStr}\n\n` +
       `📋 *Especificaciones Principales:*\n${specsList}\n\n` +
       (unit.tiktokUrl ? `🎵 *Ver Video del Equipo en TikTok:* ${unit.tiktokUrl}\n\n` : "") +
@@ -206,6 +207,7 @@ export function CommercialSheetModal({
       `🔥 ${unit.brand} ${unit.model}\n` +
       `Código: ${unit.code}\n` +
       `Estado: ${unit.condition}/10\n` +
+      (unit.damageNotes ? `Detalle Adicional: ${unit.damageNotes}\n` : "") +
       `Precio: ${priceStr}\n\n` +
       `Especificaciones:\n${specsList}\n\n` +
       (unit.tiktokUrl ? `Video en TikTok: ${unit.tiktokUrl}\n\n` : "") +
@@ -581,6 +583,23 @@ export function CommercialSheetModal({
                   </div>
                 </div>
 
+                {/* ─── DETALLE ADICIONAL DEL EQUIPO / OBSERVACIONES ─── */}
+                {unit.damageNotes && (
+                  <div className="bg-amber-50/90 border-2 border-amber-300/80 rounded-xl p-3.5 flex items-start gap-3 shadow-sm">
+                    <div className="p-2 bg-amber-200/80 text-amber-900 rounded-lg shrink-0 text-base">
+                      📝
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] text-amber-900 font-black block uppercase tracking-wider">
+                        Detalle adicional del equipo:
+                      </span>
+                      <p className="text-xs text-amber-950 font-bold leading-relaxed mt-0.5 whitespace-pre-line">
+                        {unit.damageNotes}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* ─── BANNER DE PRECIO DE OFERTA DE ALTO IMPACTO (ESTILO FLYER) ─── */}
                 <div className="bg-gradient-to-r from-red-600 via-red-700 to-slate-950 text-white rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
                   <div>
@@ -667,7 +686,7 @@ function CommercialSheetPrintable({
       style={{
         width: `${PAGE_PX_W}px`,
         boxSizing: "border-box",
-        padding: "24px 28px",
+        padding: "20px 24px",
         background: "#ffffff",
         color: "#0f172a",
         fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
@@ -679,8 +698,8 @@ function CommercialSheetPrintable({
           background: "linear-gradient(135deg, #090d16 0%, #0f172a 60%, #7f1d1d 100%)",
           color: "#ffffff",
           borderRadius: "14px",
-          padding: "16px 20px",
-          marginBottom: "14px",
+          padding: "14px 18px",
+          marginBottom: "10px",
           border: "1px solid #1e293b",
         }}
       >
@@ -807,7 +826,7 @@ function CommercialSheetPrintable({
       </div>
 
       {/* ── SECCIÓN DE LAS 3 FOTOGRAFÍAS PRINCIPALES (PROPORCIÓN ORIGINAL 100% INTACTA) ── */}
-      <div style={{ marginBottom: "12px" }}>
+      <div style={{ marginBottom: "10px" }}>
         <div style={{ fontSize: "11px", fontWeight: 900, textTransform: "uppercase", color: "#dc2626", letterSpacing: "0.5px", marginBottom: "6px" }}>
           📸 Fotografías Reales del Equipo (3 Vistas)
         </div>
@@ -841,7 +860,7 @@ function CommercialSheetPrintable({
             </div>
             <div
               style={{
-                height: "170px",
+                height: "155px",
                 padding: "6px",
                 background: "#ffffff",
                 display: "flex",
@@ -898,7 +917,7 @@ function CommercialSheetPrintable({
             </div>
             <div
               style={{
-                height: "170px",
+                height: "155px",
                 padding: "6px",
                 background: "#ffffff",
                 display: "flex",
@@ -955,7 +974,7 @@ function CommercialSheetPrintable({
             </div>
             <div
               style={{
-                height: "170px",
+                height: "155px",
                 padding: "6px",
                 background: "#ffffff",
                 display: "flex",
@@ -1131,14 +1150,42 @@ function CommercialSheetPrintable({
         </div>
       </div>
 
+      {/* ── DETALLE ADICIONAL DEL EQUIPO / OBSERVACIONES ── */}
+      {unit.damageNotes && (
+        <div
+          style={{
+            background: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
+            border: "1.5px solid #fde68a",
+            borderLeft: "5px solid #d97706",
+            borderRadius: "10px",
+            padding: "8px 12px",
+            marginBottom: "10px",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "10px",
+            boxSizing: "border-box",
+          }}
+        >
+          <div style={{ fontSize: "16px", lineHeight: "1", marginTop: "1px" }}>📝</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: "9px", fontWeight: 900, color: "#92400e", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              Detalle adicional del equipo:
+            </div>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: "#78350f", marginTop: "2px", lineHeight: "1.35", wordBreak: "break-word" }}>
+              {unit.damageNotes}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── BANNER DE PRECIO ESPECIAL DE OFERTA (ESTILO DELL VOSTRO) ── */}
       <div
         style={{
           background: "linear-gradient(135deg, #b91c1c 0%, #dc2626 50%, #0f172a 100%)",
           color: "#ffffff",
           borderRadius: "14px",
-          padding: "14px 20px",
-          marginBottom: "14px",
+          padding: "12px 18px",
+          marginBottom: "10px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",

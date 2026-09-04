@@ -132,48 +132,54 @@ export function CommercialCatalogModal({
         specs.storage && ["💾 Disco", specs.storage],
         specs.screenSize && ["🖥️ Pantalla", specs.screenSize],
         specs.gpu     && ["🎮 Gráfica", specs.gpu],
-        specs.resolution && ["📐 Resolución", specs.resolution],
+        specs.resolution && ["📐 Res.", specs.resolution],
       ].filter(Boolean) as [string, string][]).slice(0, 6)
         .map(([k, v]) => `
-          <div style="font-size:11px;color:#1e293b;display:flex;align-items:center;gap:6px;min-height:22px;line-height:1.4;">
-            <span style="font-weight:700;color:#0f172a;white-space:nowrap;flex-shrink:0;font-size:11px;line-height:1.4;">${k}:</span>
-            <span style="color:#1e293b;font-weight:600;font-size:11px;line-height:1.4;word-break:break-word;">${v}</span>
+          <div style="font-size:12.5px;color:#1e293b;display:flex;align-items:center;gap:6px;min-height:22px;line-height:1.35;">
+            <span style="font-weight:800;color:#0f172a;white-space:nowrap;flex-shrink:0;font-size:12.5px;">${k}:</span>
+            <span style="color:#1e293b;font-weight:700;font-size:12.5px;word-break:break-word;">${v}</span>
           </div>`).join("");
 
       const photoHTML = unit.mainPhoto
-        ? `<img src="${unit.mainPhoto}" alt="${unit.brand} ${unit.model}" crossorigin="anonymous" style="width:100%;height:160px;object-fit:contain;" />`
-        : `<div style="text-align:center;color:#94a3b8;"><div style="font-size:40px;">💻</div><div style="font-size:10px;font-weight:700;margin-top:6px;">Sin Fotografía</div></div>`;
+        ? `<img src="${unit.mainPhoto}" alt="${unit.brand} ${unit.model}" crossorigin="anonymous" style="width:100%;height:150px;object-fit:contain;" />`
+        : `<div style="text-align:center;color:#94a3b8;"><div style="font-size:38px;">💻</div><div style="font-size:11px;font-weight:700;margin-top:4px;">Sin Fotografía</div></div>`;
 
       const priceHTML = `
-        <div style="font-size:9.5px;color:#64748b;font-weight:700;letter-spacing:0.4px;margin-bottom:2px;">PRECIO VENTA UNIT (BS)</div>
-        <div style="font-size:23px;font-weight:900;color:${acc};background:${pg};padding:4px 14px;border-radius:10px;border:1.5px solid ${pb};">${price}</div>
+        <div style="font-size:10.5px;color:#475569;font-weight:800;letter-spacing:0.4px;margin-bottom:2px;">PRECIO VENTA UNIT (BS)</div>
+        <div style="font-size:25px;font-weight:900;color:${acc};background:${pg};padding:4px 14px;border-radius:10px;border:1.5px solid ${pb};line-height:1.1;">${price}</div>
       `;
 
       return `
-        <div style="background:white;border-radius:14px;border:1.5px solid #e2e8f0;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);display:flex;position:relative;min-height:200px;">
+        <div style="background:white;border-radius:12px;border:1.5px solid #e2e8f0;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.05);display:flex;position:relative;box-sizing:border-box;">
           <div style="width:5px;background:linear-gradient(180deg,${acc},${acc}88);flex-shrink:0;"></div>
-          <div style="position:absolute;top:10px;left:16px;background:${acc};color:white;font-weight:900;font-size:12px;border-radius:8px;padding:3px 10px;box-shadow:0 2px 8px rgba(0,0,0,0.2);">#${posStr}</div>
-          <div style="width:180px;min-width:180px;background:linear-gradient(135deg,#f1f5f9,#e2e8f0);display:flex;align-items:center;justify-content:center;padding:10px;border-right:1px solid #e2e8f0;">
+          <div style="position:absolute;top:8px;left:14px;background:${acc};color:white;font-weight:900;font-size:13px;border-radius:8px;padding:3px 9px;box-shadow:0 2px 8px rgba(0,0,0,0.2);">#${posStr}</div>
+          <div style="width:175px;min-width:175px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);display:flex;align-items:center;justify-content:center;padding:8px;border-right:1px solid #e2e8f0;box-sizing:border-box;">
             ${photoHTML}
           </div>
-          <div style="flex:1;padding:14px 16px 12px;display:flex;flex-direction:column;justify-content:space-between;">
+          <div style="flex:1;padding:10px 14px 10px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
             <div>
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;margin-top:2px;">
-                <span style="font-family:monospace;font-size:10px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:6px;border:1px solid #bfdbfe;">COD: ${unit.code}</span>
-                ${cond ? `<span style="font-size:10px;font-weight:700;background:${cond.color}20;color:${cond.color};padding:2px 8px;border-radius:6px;border:1px solid ${cond.color}40;">⭐ ${cond.label}</span>` : ""}
-                ${unit.batteryHealth && unit.batteryHealth !== "n_a" ? `<span style="font-size:10px;font-weight:700;background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:6px;">🔋 Batería: ${unit.batteryHealth === "plugged_only" || unit.batteryHealth === "bad_plugged_only" ? "Solo conectada" : unit.batteryHealth === "good" ? "100%" : unit.batteryHealth === "fair" ? "70%" : /^\d+$/.test(unit.batteryHealth) ? `${unit.batteryHealth}%` : unit.batteryHealth}</span>` : ""}
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;margin-top:1px;">
+                <span style="font-family:monospace;font-size:11.5px;font-weight:800;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:6px;border:1px solid #bfdbfe;">COD: ${unit.code}</span>
+                ${cond ? `<span style="font-size:11.5px;font-weight:800;background:${cond.color}20;color:${cond.color};padding:2px 8px;border-radius:6px;border:1px solid ${cond.color}40;">⭐ ${cond.label}</span>` : ""}
+                ${unit.batteryHealth && unit.batteryHealth !== "n_a" ? `<span style="font-size:11.5px;font-weight:800;background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:6px;">🔋 Batería: ${unit.batteryHealth === "plugged_only" || unit.batteryHealth === "bad_plugged_only" ? "Solo conectada" : unit.batteryHealth === "good" ? "100%" : unit.batteryHealth === "fair" ? "70%" : /^\d+$/.test(unit.batteryHealth) ? `${unit.batteryHealth}%` : unit.batteryHealth}</span>` : ""}
+                ${unit.tiktokUrl ? `<span style="font-size:11px;font-weight:800;background:#fce7f3;color:#9d174d;padding:2px 8px;border-radius:6px;">🎵 Video TikTok</span>` : ""}
               </div>
-              <div style="font-weight:900;font-size:17px;color:#0f172a;letter-spacing:-0.3px;line-height:1.2;">${unit.brand} ${unit.model}</div>
-              <div style="font-size:11px;color:#64748b;font-weight:600;margin-top:2px;text-transform:uppercase;letter-spacing:0.5px;">${unit.type === "laptop" ? "LAPTOP / COMPUTADOR PORTÁTIL" : unit.type === "phone" ? "TELÉFONO INTELIGENTE" : unit.type === "tablet" ? "TABLET" : unit.type === "monitor" ? "MONITOR" : (unit.type || "")}</div>
+              <div style="font-weight:900;font-size:19px;color:#0f172a;letter-spacing:-0.4px;line-height:1.25;">${unit.brand} ${unit.model}</div>
+              <div style="font-size:11.5px;color:#475569;font-weight:700;margin-top:1px;text-transform:uppercase;letter-spacing:0.5px;">${unit.type === "laptop" ? "LAPTOP / COMPUTADOR PORTÁTIL" : unit.type === "phone" ? "TELÉFONO INTELIGENTE" : unit.type === "tablet" ? "TABLET" : unit.type === "monitor" ? "MONITOR" : (unit.type || "")}</div>
             </div>
             ${Object.keys(specs).length > 0 ? `
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;background:#f8fafc;border-radius:10px;padding:8px 12px;border:1px solid #e2e8f0;margin:6px 0;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;background:#f8fafc;border-radius:8px;padding:6px 12px;border:1.5px solid #e2e8f0;margin:5px 0;">
               ${specsRows}
             </div>` : ""}
-            <div style="display:flex;align-items:center;justify-content:space-between;border-top:1.5px solid #f1f5f9;padding-top:10px;">
-              <div style="display:flex;flex-direction:column;gap:4px;">
-                <span style="font-size:10px;font-weight:700;background:#dcfce7;color:#166534;padding:3px 10px;border-radius:20px;border:1px solid #86efac;">✓ STOCK DISPONIBLE</span>
-                <div style="font-size:10px;color:#64748b;font-weight:600;">📲 ${company.whatsapp}</div>
+            ${unit.damageNotes ? `
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #d97706;border-radius:6px;padding:4px 8px;margin:3px 0;display:flex;align-items:flex-start;gap:6px;box-sizing:border-box;">
+              <span style="font-size:11.5px;font-weight:900;color:#92400e;flex-shrink:0;white-space:nowrap;">📝 Detalle adicional:</span>
+              <span style="font-size:11.5px;font-weight:700;color:#78350f;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${unit.damageNotes}</span>
+            </div>` : ""}
+            <div style="display:flex;align-items:center;justify-content:space-between;border-top:1.5px solid #f1f5f9;padding-top:7px;margin-top:3px;">
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <span style="font-size:11px;font-weight:800;background:#dcfce7;color:#166534;padding:3px 10px;border-radius:20px;border:1px solid #86efac;display:inline-block;">✓ STOCK DISPONIBLE</span>
+                <div style="font-size:11.5px;color:#334155;font-weight:700;">📲 ${company.whatsapp}</div>
               </div>
               <div style="text-align:right;">${priceHTML}</div>
             </div>
@@ -182,42 +188,42 @@ export function CommercialCatalogModal({
     }).join("");
 
     return `
-      <div style="display:flex;flex-direction:column;height:100%;min-height:1056px;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-        <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%);padding:18px 24px 14px;position:relative;overflow:hidden;">
+      <div style="display:flex;flex-direction:column;height:100%;min-height:1056px;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;box-sizing:border-box;">
+        <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%);padding:14px 22px 12px;position:relative;overflow:hidden;box-sizing:border-box;">
           <div style="display:flex;align-items:center;justify-content:space-between;position:relative;">
             <div style="display:flex;align-items:center;gap:14px;">
               ${company.logo
-                ? `<img src="${company.logo}" alt="${company.name}" style="height:52px;width:auto;object-fit:contain;background:white;border-radius:10px;padding:4px;box-shadow:0 4px 14px rgba(0,0,0,0.3);" />`
-                : `<div style="background:linear-gradient(135deg,#2563eb,#1d4ed8);border-radius:12px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(37,99,235,0.5);border:2px solid rgba(255,255,255,0.15);"><span style="color:white;font-weight:900;font-size:20px;letter-spacing:-1px;">HK</span></div>`
+                ? `<img src="${company.logo}" alt="${company.name}" style="height:48px;width:auto;object-fit:contain;background:white;border-radius:10px;padding:3px;box-shadow:0 4px 14px rgba(0,0,0,0.3);" />`
+                : `<div style="background:linear-gradient(135deg,#2563eb,#1d4ed8);border-radius:12px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(37,99,235,0.5);border:2px solid rgba(255,255,255,0.15);"><span style="color:white;font-weight:900;font-size:20px;letter-spacing:-1px;">HK</span></div>`
               }
               <div>
-                <div style="color:white;font-weight:900;font-size:20px;letter-spacing:0.5px;line-height:1;">${company.name}</div>
-                <div style="color:#93c5fd;font-size:11px;font-weight:600;margin-top:3px;letter-spacing:0.8px;">CATÁLOGO OFICIAL DE EQUIPOS TECNOLÓGICOS</div>
+                <div style="color:white;font-weight:900;font-size:21px;letter-spacing:0.5px;line-height:1.1;">${company.name}</div>
+                <div style="color:#93c5fd;font-size:11.5px;font-weight:700;margin-top:2px;letter-spacing:0.8px;">CATÁLOGO OFICIAL DE EQUIPOS TECNOLÓGICOS</div>
               </div>
             </div>
             <div style="text-align:right;">
               <div style="color:white;font-weight:900;font-size:13px;">Pág. ${pageIndex + 1} / ${totalPages}</div>
-              <div style="color:#94a3b8;font-size:10px;margin-top:2px;">${today}</div>
+              <div style="color:#94a3b8;font-size:10.5px;margin-top:2px;">${today}</div>
             </div>
           </div>
-          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
             ${[["🛡️", company.warrantyBadge], ["🚚", company.shippingBadge], ["✅", company.qualityBadge], ["⚡", "Entrega Inmediata"]]
-              .map(([icon, text]) => `<div style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:4px 12px;color:white;font-size:10px;font-weight:700;">${icon} ${text}</div>`).join("")}
+              .map(([icon, text]) => `<div style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);border-radius:20px;padding:3px 12px;color:white;font-size:11px;font-weight:700;">${icon} ${text}</div>`).join("")}
           </div>
         </div>
-        <div style="height:4px;background:linear-gradient(90deg,#2563eb,#7c3aed,#2563eb);"></div>
-        <div style="flex:1;padding:16px 20px;display:flex;flex-direction:column;gap:14px;background:#f8fafc;">
+        <div style="height:3px;background:linear-gradient(90deg,#2563eb,#7c3aed,#2563eb);"></div>
+        <div style="flex:1;padding:12px 18px;display:flex;flex-direction:column;gap:10px;background:#f8fafc;box-sizing:border-box;">
           ${itemsHTML}
         </div>
-        <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;">
-          <div style="display:flex;gap:20px;align-items:center;">
-            <div style="color:white;font-size:11px;font-weight:700;">📱 WhatsApp: <span style="color:#93c5fd;">${company.whatsapp}</span></div>
-            <div style="color:#64748b;font-size:10px;">|</div>
-            <div style="color:#94a3b8;font-size:10px;font-weight:600;">📍 ${company.address}</div>
+        <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:10px 22px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;">
+          <div style="display:flex;gap:18px;align-items:center;">
+            <div style="color:white;font-size:12px;font-weight:700;">📱 WhatsApp: <span style="color:#93c5fd;">${company.whatsapp}</span></div>
+            <div style="color:#64748b;font-size:11px;">|</div>
+            <div style="color:#94a3b8;font-size:11px;font-weight:600;">📍 ${company.address}</div>
           </div>
           <div style="text-align:right;">
-            <div style="color:#60a5fa;font-size:10px;font-weight:700;">HK EQUIPOS TECNOLÓGICOS</div>
-            <div style="color:#475569;font-size:9px;">Pág. ${pageIndex + 1} de ${totalPages}</div>
+            <div style="color:#60a5fa;font-size:11px;font-weight:800;">${company.name}</div>
+            <div style="color:#64748b;font-size:10px;">Pág. ${pageIndex + 1} de ${totalPages}</div>
           </div>
         </div>
       </div>`;
@@ -457,9 +463,9 @@ function CatalogPageContent({ pageItems, pageIndex, totalPages, company }: { pag
   const today = new Date().toLocaleDateString("es-BO", { year: "numeric", month: "long", day: "numeric" });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: "1123px" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: "1056px", boxSizing: "border-box" }}>
       {/* HEADER */}
-      <div style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%)", padding: "18px 24px 14px", position: "relative", overflow: "hidden" }}>
+      <div style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%)", padding: "14px 22px 12px", position: "relative", overflow: "hidden", boxSizing: "border-box" }}>
         <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 20% 50%, rgba(59,130,246,0.15) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(99,102,241,0.1) 0%, transparent 40%)" }} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
@@ -467,26 +473,26 @@ function CatalogPageContent({ pageItems, pageIndex, totalPages, company }: { pag
               <img
                 src={company.logo}
                 alt={company.name}
-                style={{ height: "52px", width: "auto", objectFit: "contain", background: "white", borderRadius: "10px", padding: "4px", boxShadow: "0 4px 14px rgba(0,0,0,0.3)" }}
+                style={{ height: "48px", width: "auto", objectFit: "contain", background: "white", borderRadius: "10px", padding: "3px", boxShadow: "0 4px 14px rgba(0,0,0,0.3)" }}
               />
             ) : (
-              <div style={{ background: "linear-gradient(135deg, #2563eb, #1d4ed8)", borderRadius: "12px", width: "52px", height: "52px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 14px rgba(37,99,235,0.5)", border: "2px solid rgba(255,255,255,0.15)" }}>
+              <div style={{ background: "linear-gradient(135deg, #2563eb, #1d4ed8)", borderRadius: "12px", width: "48px", height: "48px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 14px rgba(37,99,235,0.5)", border: "2px solid rgba(255,255,255,0.15)" }}>
                 <span style={{ color: "white", fontWeight: 900, fontSize: "20px", letterSpacing: "-1px" }}>HK</span>
               </div>
             )}
             <div>
-              <div style={{ color: "white", fontWeight: 900, fontSize: "20px", letterSpacing: "0.5px", lineHeight: "1" }}>{company.name}</div>
-              <div style={{ color: "#93c5fd", fontSize: "11px", fontWeight: 600, marginTop: "3px", letterSpacing: "0.8px" }}>CATALOGO OFICIAL DE EQUIPOS TECNOLOGICOS</div>
+              <div style={{ color: "white", fontWeight: 900, fontSize: "21px", letterSpacing: "0.5px", lineHeight: "1.1" }}>{company.name}</div>
+              <div style={{ color: "#93c5fd", fontSize: "11.5px", fontWeight: 700, margin: "2px 0 0 0", letterSpacing: "0.8px" }}>CATÁLOGO OFICIAL DE EQUIPOS TECNOLÓGICOS</div>
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ color: "white", fontWeight: 900, fontSize: "13px" }}>Pag. {pageIndex + 1} / {totalPages}</div>
-            <div style={{ color: "#94a3b8", fontSize: "10px", marginTop: "2px" }}>{today}</div>
+            <div style={{ color: "white", fontWeight: 900, fontSize: "13px" }}>Pág. {pageIndex + 1} / {totalPages}</div>
+            <div style={{ color: "#94a3b8", fontSize: "10.5px", marginTop: "2px" }}>{today}</div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
           {[["🛡️", company.warrantyBadge], ["🚚", company.shippingBadge], ["✅", company.qualityBadge], ["⚡", "Entrega Inmediata"]].map((b, i) => (
-            <div key={i} style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "20px", padding: "4px 12px", color: "white", fontSize: "10px", fontWeight: 700 }}>
+            <div key={i} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: "20px", padding: "3px 12px", color: "white", fontSize: "11px", fontWeight: 700 }}>
               {b[0]} {b[1]}
             </div>
           ))}
@@ -494,71 +500,76 @@ function CatalogPageContent({ pageItems, pageIndex, totalPages, company }: { pag
       </div>
 
       {/* Separador */}
-      <div style={{ height: "4px", background: "linear-gradient(90deg, #2563eb, #7c3aed, #2563eb)" }} />
+      <div style={{ height: "3px", background: "linear-gradient(90deg, #2563eb, #7c3aed, #2563eb)" }} />
 
       {/* PRODUCTOS */}
-      <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: "14px", background: "#f8fafc" }}>
+      <div style={{ flex: 1, padding: "12px 18px", display: "flex", flexDirection: "column", gap: "10px", background: "#f8fafc", boxSizing: "border-box" }}>
         {pageItems.map((unit: any, unitIdx: number) => {
-          const posStr = String(unit.catalogIndex).padStart(2, "0");
+          const posStr = String(unit.catalogIndex ?? unitIdx + 1).padStart(2, "0");
           const specs = unit.specs || {};
           const condKey = unit.condition ? String(Math.round(Number(unit.condition))) : null;
           const cond = condKey && CONDITION_LABEL[condKey] ? CONDITION_LABEL[condKey] : null;
           const price = unit.salePrice > 0 ? `Bs. ${(unit.salePrice / 100).toFixed(0)}` : "Consultar";
-          const discountPrice = unit.discountPrice && unit.discountPrice > 0 ? `Bs. ${(unit.discountPrice / 100).toFixed(0)}` : null;
           const accentColor = unitIdx === 0 ? "#2563eb" : unitIdx === 1 ? "#7c3aed" : "#059669";
           const priceGradient = unitIdx === 0 ? "linear-gradient(135deg, #eff6ff, #dbeafe)" : unitIdx === 1 ? "linear-gradient(135deg, #f5f3ff, #ede9fe)" : "linear-gradient(135deg, #f0fdf4, #dcfce7)";
           const priceBorder = unitIdx === 0 ? "#93c5fd" : unitIdx === 1 ? "#c4b5fd" : "#86efac";
 
           return (
-            <div key={unit.id} style={{ background: "white", borderRadius: "14px", border: "1.5px solid #e2e8f0", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.06)", display: "flex", position: "relative", minHeight: "200px" }}>
+            <div key={unit.id} style={{ background: "white", borderRadius: "12px", border: "1.5px solid #e2e8f0", overflow: "hidden", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", display: "flex", position: "relative", boxSizing: "border-box" }}>
               <div style={{ width: "5px", background: `linear-gradient(180deg, ${accentColor}, ${accentColor}88)`, flexShrink: 0 }} />
-              <div style={{ position: "absolute", top: "10px", left: "16px", background: accentColor, color: "white", fontWeight: 900, fontSize: "12px", borderRadius: "8px", padding: "3px 10px", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>#{posStr}</div>
-              <div style={{ width: "180px", minWidth: "180px", background: "linear-gradient(135deg, #f1f5f9, #e2e8f0)", display: "flex", alignItems: "center", justifyContent: "center", padding: "10px", borderRight: "1px solid #e2e8f0" }}>
+              <div style={{ position: "absolute", top: "8px", left: "14px", background: accentColor, color: "white", fontWeight: 900, fontSize: "13px", borderRadius: "8px", padding: "3px 9px", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>#{posStr}</div>
+              <div style={{ width: "175px", minWidth: "175px", background: "linear-gradient(135deg, #f8fafc, #f1f5f9)", display: "flex", alignItems: "center", justifyContent: "center", padding: "8px", borderRight: "1px solid #e2e8f0", boxSizing: "border-box" }}>
                 {unit.mainPhoto ? (
-                  <img src={unit.mainPhoto} alt={`${unit.brand} ${unit.model}`} style={{ width: "100%", height: "160px", objectFit: "contain" }} crossOrigin="anonymous" />
+                  <img src={unit.mainPhoto} alt={`${unit.brand} ${unit.model}`} style={{ width: "100%", height: "150px", objectFit: "contain" }} crossOrigin="anonymous" />
                 ) : (
                   <div style={{ textAlign: "center", color: "#94a3b8" }}>
-                    <div style={{ fontSize: "40px" }}>💻</div>
-                    <div style={{ fontSize: "10px", fontWeight: 700, marginTop: "6px" }}>Sin Fotografia</div>
+                    <div style={{ fontSize: "38px" }}>💻</div>
+                    <div style={{ fontSize: "11px", fontWeight: 700, marginTop: "4px" }}>Sin Fotografía</div>
                   </div>
                 )}
               </div>
-              <div style={{ flex: 1, padding: "14px 16px 12px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <div style={{ flex: 1, padding: "10px 14px 10px", display: "flex", flexDirection: "column", justifyContent: "space-between", boxSizing: "border-box" }}>
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: "6px", marginTop: "2px" }}>
-                    <span style={{ fontFamily: "monospace", fontSize: "10px", fontWeight: 700, background: "#dbeafe", color: "#1d4ed8", padding: "2px 8px", borderRadius: "6px", border: "1px solid #bfdbfe" }}>COD: {unit.code}</span>
-                    {cond && <span style={{ fontSize: "10px", fontWeight: 700, background: cond.color + "20", color: cond.color, padding: "2px 8px", borderRadius: "6px", border: `1px solid ${cond.color}40` }}>⭐ {cond.label}</span>}
-                    {unit.batteryHealth && unit.batteryHealth !== "n_a" && <span style={{ fontSize: "10px", fontWeight: 700, background: "#d1fae5", color: "#065f46", padding: "2px 8px", borderRadius: "6px" }}>🔋 Batería: {unit.batteryHealth === "plugged_only" || unit.batteryHealth === "bad_plugged_only" ? "Solo conectada" : unit.batteryHealth === "good" ? "100%" : unit.batteryHealth === "fair" ? "70%" : /^\d+$/.test(unit.batteryHealth) ? `${unit.batteryHealth}%` : unit.batteryHealth}</span>}
-                    {unit.tiktokUrl && <span style={{ fontSize: "10px", fontWeight: 700, background: "#fce7f3", color: "#9d174d", padding: "2px 8px", borderRadius: "6px" }}>🎵 Video TikTok</span>}
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: "4px", marginTop: "1px" }}>
+                    <span style={{ fontFamily: "monospace", fontSize: "11.5px", fontWeight: 800, background: "#dbeafe", color: "#1d4ed8", padding: "2px 8px", borderRadius: "6px", border: "1px solid #bfdbfe" }}>COD: {unit.code}</span>
+                    {cond && <span style={{ fontSize: "11.5px", fontWeight: 800, background: cond.color + "20", color: cond.color, padding: "2px 8px", borderRadius: "6px", border: `1px solid ${cond.color}40` }}>⭐ {cond.label}</span>}
+                    {unit.batteryHealth && unit.batteryHealth !== "n_a" && <span style={{ fontSize: "11.5px", fontWeight: 800, background: "#d1fae5", color: "#065f46", padding: "2px 8px", borderRadius: "6px" }}>🔋 Batería: {unit.batteryHealth === "plugged_only" || unit.batteryHealth === "bad_plugged_only" ? "Solo conectada" : unit.batteryHealth === "good" ? "100%" : unit.batteryHealth === "fair" ? "70%" : /^\d+$/.test(unit.batteryHealth) ? `${unit.batteryHealth}%` : unit.batteryHealth}</span>}
+                    {unit.tiktokUrl && <span style={{ fontSize: "11px", fontWeight: 800, background: "#fce7f3", color: "#9d174d", padding: "2px 8px", borderRadius: "6px" }}>🎵 Video TikTok</span>}
                   </div>
-                  <div style={{ fontWeight: 900, fontSize: "17px", color: "#0f172a", letterSpacing: "-0.3px", lineHeight: "1.2" }}>{unit.brand} {unit.model}</div>
-                  {unit.type && <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 600, marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{unit.type === "laptop" ? "LAPTOP / COMPUTADOR PORTATIL" : unit.type === "phone" ? "TELEFONO INTELIGENTE" : unit.type === "tablet" ? "TABLET" : unit.type === "monitor" ? "MONITOR" : unit.type === "charger" ? "CARGADOR" : unit.type === "accessory" ? "ACCESORIO" : unit.type}</div>}
+                  <div style={{ fontWeight: 900, fontSize: "19px", color: "#0f172a", letterSpacing: "-0.4px", lineHeight: "1.25" }}>{unit.brand} {unit.model}</div>
+                  {unit.type && <div style={{ fontSize: "11.5px", color: "#475569", fontWeight: 700, marginTop: "1px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{unit.type === "laptop" ? "LAPTOP / COMPUTADOR PORTÁTIL" : unit.type === "phone" ? "TELÉFONO INTELIGENTE" : unit.type === "tablet" ? "TABLET" : unit.type === "monitor" ? "MONITOR" : unit.type === "charger" ? "CARGADOR" : unit.type === "accessory" ? "ACCESORIO" : unit.type}</div>}
                 </div>
                 {Object.keys(specs).length > 0 && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px", background: "#f8fafc", borderRadius: "10px", padding: "8px 12px", border: "1px solid #e2e8f0", margin: "6px 0" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 14px", background: "#f8fafc", borderRadius: "8px", padding: "6px 12px", border: "1.5px solid #e2e8f0", margin: "5px 0" }}>
                     {([
                       specs.cpu && ["⚙️ CPU", specs.cpu],
                       specs.ram && ["🧠 RAM", specs.ram],
                       specs.storage && ["💾 Disco", specs.storage],
                       specs.screenSize && ["🖥️ Pantalla", specs.screenSize],
                       specs.gpu && ["🎮 Gráfica", specs.gpu],
-                      specs.resolution && ["📐 Resolución", specs.resolution],
+                      specs.resolution && ["📐 Res.", specs.resolution],
                     ].filter(Boolean) as [string, string][]).slice(0, 6).map((item, i) => (
-                      <div key={i} style={{ fontSize: "11px", color: "#1e293b", display: "flex", alignItems: "center", gap: "6px", minHeight: "22px", lineHeight: "1.4" }}>
-                        <span style={{ fontWeight: 700, color: "#0f172a", whiteSpace: "nowrap", flexShrink: 0, fontSize: "11px" }}>{item[0]}:</span>
-                        <span style={{ color: "#1e293b", fontWeight: 600, fontSize: "11px", wordBreak: "break-word" }}>{item[1]}</span>
+                      <div key={i} style={{ fontSize: "12.5px", color: "#1e293b", display: "flex", alignItems: "center", gap: "6px", minHeight: "22px", lineHeight: "1.35" }}>
+                        <span style={{ fontWeight: 800, color: "#0f172a", whiteSpace: "nowrap", flexShrink: 0, fontSize: "12.5px" }}>{item[0]}:</span>
+                        <span style={{ color: "#1e293b", fontWeight: 700, fontSize: "12.5px", wordBreak: "break-word" }}>{item[1]}</span>
                       </div>
                     ))}
                   </div>
                 )}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1.5px solid #f1f5f9", paddingTop: "10px" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    <span style={{ fontSize: "10px", fontWeight: 700, background: "#dcfce7", color: "#166534", padding: "3px 10px", borderRadius: "20px", border: "1px solid #86efac" }}>✓ STOCK DISPONIBLE</span>
-                    <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 600 }}>📲 {company.whatsapp}</div>
+                {unit.damageNotes && (
+                  <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderLeft: "4px solid #d97706", borderRadius: "6px", padding: "4px 8px", margin: "3px 0", display: "flex", alignItems: "flex-start", gap: "6px", boxSizing: "border-box" }}>
+                    <span style={{ fontSize: "11.5px", fontWeight: 900, color: "#92400e", flexShrink: 0, whiteSpace: "nowrap" }}>📝 Detalle adicional:</span>
+                    <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#78350f", lineHeight: "1.3", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{unit.damageNotes}</span>
+                  </div>
+                )}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1.5px solid #f1f5f9", paddingTop: "7px", marginTop: "3px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 800, background: "#dcfce7", color: "#166534", padding: "3px 10px", borderRadius: "20px", border: "1px solid #86efac", display: "inline-block" }}>✓ STOCK DISPONIBLE</span>
+                    <div style={{ fontSize: "11.5px", color: "#334155", fontWeight: 700 }}>📲 {company.whatsapp}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: 700, letterSpacing: "0.4px", marginBottom: "2px" }}>PRECIO VENTA UNIT (BS)</div>
-                    <div style={{ fontSize: "23px", fontWeight: 900, color: accentColor, background: priceGradient, padding: "4px 14px", borderRadius: "10px", border: `1.5px solid ${priceBorder}` }}>{price}</div>
+                    <div style={{ fontSize: "10.5px", color: "#475569", fontWeight: 800, letterSpacing: "0.4px", marginBottom: "2px" }}>PRECIO VENTA UNIT (BS)</div>
+                    <div style={{ fontSize: "25px", fontWeight: 900, color: accentColor, background: priceGradient, padding: "4px 14px", borderRadius: "10px", border: `1.5px solid ${priceBorder}`, lineHeight: 1.1 }}>{price}</div>
                   </div>
                 </div>
               </div>
@@ -568,15 +579,15 @@ function CatalogPageContent({ pageItems, pageIndex, totalPages, company }: { pag
       </div>
 
       {/* FOOTER */}
-      <div style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)", padding: "12px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
-          <div style={{ color: "white", fontSize: "11px", fontWeight: 700 }}>📱 WhatsApp: <span style={{ color: "#93c5fd" }}>{company.whatsapp}</span></div>
-          <div style={{ color: "#64748b", fontSize: "10px" }}>|</div>
-          <div style={{ color: "#94a3b8", fontSize: "10px", fontWeight: 600 }}>📍 {company.address}</div>
+      <div style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)", padding: "10px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", boxSizing: "border-box" }}>
+        <div style={{ display: "flex", gap: "18px", alignItems: "center" }}>
+          <div style={{ color: "white", fontSize: "12px", fontWeight: 700 }}>📱 WhatsApp: <span style={{ color: "#93c5fd" }}>{company.whatsapp}</span></div>
+          <div style={{ color: "#64748b", fontSize: "11px" }}>|</div>
+          <div style={{ color: "#94a3b8", fontSize: "11px", fontWeight: 600 }}>📍 {company.address}</div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ color: "#60a5fa", fontSize: "10px", fontWeight: 700 }}>HK EQUIPOS TECNOLOGICOS</div>
-          <div style={{ color: "#475569", fontSize: "9px" }}>Pag. {pageIndex + 1} de {totalPages}</div>
+          <div style={{ color: "#60a5fa", fontSize: "11px", fontWeight: 800 }}>{company.name}</div>
+          <div style={{ color: "#64748b", fontSize: "10px" }}>Pág. {pageIndex + 1} de {totalPages}</div>
         </div>
       </div>
     </div>
