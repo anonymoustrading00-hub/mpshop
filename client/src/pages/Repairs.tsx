@@ -311,7 +311,6 @@ function RepairDetailsDialog({
     </Dialog>
   );
 }
-
 function Field({ label, value }: { label: string; value: any }) {
   return (
     <div>
@@ -321,7 +320,8 @@ function Field({ label, value }: { label: string; value: any }) {
   );
 }
 
-function CompleteRepairDialog({
+// ─── COMPLETE DIALOG (Cierre técnico de la orden de taller) ───────────────────
+function CompleteDialog({
   open,
   onOpenChange,
   repair,
@@ -331,34 +331,21 @@ function CompleteRepairDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   repair: any;
-  onConfirm: (payload: {
+  onConfirm: (data: {
     laborCost: number;
     partsCost: number;
     notes: string;
-    resolutionType?: ResolutionType;
+    resolutionType: ResolutionType;
     extendWarrantyDays?: number;
     warrantyId?: number;
-    customerResolution?: "refund" | "exchange" | "none";
-    refundAmount?: number;
-    refundPaymentMethod?: "cash" | "qr" | "transfer";
-    replacementUnitId?: number;
-    priceDifference?: number;
-    differencePaymentMethod?: "cash" | "qr" | "transfer";
   }) => void;
   isPending: boolean;
 }) {
   const [laborCost, setLaborCost] = useState("");
   const [partsCost, setPartsCost] = useState("");
   const [notes, setNotes] = useState("");
-  const [resolutionType, setResolutionType] = useState<ResolutionType | null>(null);
+  const [resolutionType, setResolutionType] = useState<ResolutionType | null>("return_to_customer");
   const [extendDays, setExtendDays] = useState(30);
-
-  // Compensación al cliente cuando retorna a inventario de venta
-  const [customerResolution, setCustomerResolution] = useState<"refund" | "exchange" | "none">("none");
-  const [refundAmount, setRefundAmount] = useState("");
-  const [refundPaymentMethod, setRefundPaymentMethod] = useState<"cash" | "qr" | "transfer">("cash");
-  const [replacementUnitId, setReplacementUnitId] = useState<number | null>(null);
-  const [differencePaymentMethod, setDifferencePaymentMethod] = useState<"cash" | "qr" | "transfer">("cash");
 
   // Detección de 2do ingreso: otras repairs completadas para esta misma unidad
   const { data: completedHistory } = trpc.repairs.list.useQuery(
@@ -379,76 +366,14 @@ function CompleteRepairDialog({
   );
   const activeWarranty = warrantiesData?.items?.[0] ?? null;
 
-  // Unidades disponibles en stock para reemplazo / cambio
-  const { data: availableUnitsData } = trpc.units.list.useQuery(
-    { status: "available", limit: 100 },
-    { enabled: open }
-  );
-  const availableUnits = (availableUnitsData?.items || []).filter((u: any) => u.id !== repair?.unitId);
-
-  // Cálculo de precios para cambio de equipo
-  const selectedReplacementUnit = availableUnits.find((u: any) => u.id === replacementUnitId) || null;
-  const originalPriceCents = repair?.unitSalePrice || 0;
-  const replacementPriceCents = selectedReplacementUnit?.salePrice || 0;
-  const priceDiffCents = selectedReplacementUnit ? replacementPriceCents - originalPriceCents : 0;
-
-  // Buscador con autocompletar para cambio de equipo (busca por nombre, modelo, QR, barras, procesador, RAM, etc.)
-  const [unitSearchQuery, setUnitSearchQuery] = useState("");
-
-  const getUnitSearchText = (u: any) => {
-    const specs = typeof u.specs === "object" && u.specs !== null ? u.specs : {};
-    const specsStr = Object.entries(specs)
-      .map(([k, v]) => `${k} ${v}`)
-      .join(" ");
-    return `${u.code || ""} ${u.brand || ""} ${u.model || ""} ${u.serialNumber || ""} ${u.barcode || ""} ${u.rmaNumber || ""} ${specsStr}`.toLowerCase();
-  };
-
-  const filteredAvailableUnits = useMemo(() => {
-    if (!unitSearchQuery.trim()) return availableUnits;
-    const terms = unitSearchQuery.trim().toLowerCase().split(/\s+/);
-    return availableUnits.filter((u: any) => {
-      const text = getUnitSearchText(u);
-      return terms.every((t) => text.includes(t));
-    });
-  }, [availableUnits, unitSearchQuery]);
-
-  const handleBarcodeOrSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (filteredAvailableUnits.length === 1) {
-        setReplacementUnitId(filteredAvailableUnits[0].id);
-        setUnitSearchQuery("");
-      } else if (filteredAvailableUnits.length > 1) {
-        const query = unitSearchQuery.trim().toLowerCase();
-        const exact = filteredAvailableUnits.find(
-          (u: any) =>
-            u.code?.toLowerCase() === query ||
-            u.serialNumber?.toLowerCase() === query ||
-            u.barcode?.toLowerCase() === query
-        );
-        if (exact) {
-          setReplacementUnitId(exact.id);
-          setUnitSearchQuery("");
-        }
-      }
-    }
-  };
-
-  // Resetear al abrir (preseleccionar return_to_inventory por defecto)
+  // Resetear al abrir
   useEffect(() => {
     if (open) {
       setLaborCost("");
       setPartsCost("");
       setNotes("");
-      setResolutionType("return_to_inventory");
+      setResolutionType("return_to_customer");
       setExtendDays(30);
-      setCustomerResolution("none");
-      const unitSalePrice = repair?.unitSalePrice || 0;
-      setRefundAmount(unitSalePrice > 0 ? (unitSalePrice / 100).toFixed(2) : "");
-      setRefundPaymentMethod("cash");
-      setReplacementUnitId(null);
-      setDifferencePaymentMethod("cash");
-      setUnitSearchQuery("");
     }
   }, [open, repair]);
 
@@ -469,23 +394,6 @@ function CompleteRepairDialog({
     const laborCents = laborCost ? Math.round(parseFloat(laborCost) * 100) : 0;
     const partsCents = partsCost ? Math.round(parseFloat(partsCost) * 100) : 0;
 
-    let refundCents: number | undefined = undefined;
-    if (resolutionType === "return_to_inventory" && customerResolution === "refund") {
-      const amt = parseFloat(refundAmount);
-      if (isNaN(amt) || amt <= 0) {
-        toast.error("Por favor ingresa un monto válido a devolver al cliente");
-        return;
-      }
-      refundCents = Math.round(amt * 100);
-    }
-
-    if (resolutionType === "return_to_inventory" && customerResolution === "exchange") {
-      if (!replacementUnitId) {
-        toast.error("Por favor selecciona el equipo disponible que se entregará al cliente");
-        return;
-      }
-    }
-
     onConfirm({
       laborCost: laborCents,
       partsCost: partsCents,
@@ -493,12 +401,6 @@ function CompleteRepairDialog({
       resolutionType,
       extendWarrantyDays: resolutionType === "return_to_customer" ? extendDays : undefined,
       warrantyId: resolutionType === "return_to_customer" && activeWarranty ? activeWarranty.id : undefined,
-      customerResolution: resolutionType === "return_to_inventory" ? customerResolution : undefined,
-      refundAmount: refundCents,
-      refundPaymentMethod: customerResolution === "refund" ? refundPaymentMethod : undefined,
-      replacementUnitId: customerResolution === "exchange" ? (replacementUnitId ?? undefined) : undefined,
-      priceDifference: customerResolution === "exchange" ? priceDiffCents : undefined,
-      differencePaymentMethod: customerResolution === "exchange" && priceDiffCents !== 0 ? differencePaymentMethod : undefined,
     });
   };
 
@@ -508,39 +410,31 @@ function CompleteRepairDialog({
     ? "Confirmar cierre"
     : resolutionType === "return_to_customer"
     ? "✅ Confirmar: Ya Reparada → Devolver al Cliente"
-    : "✅ Confirmar: Ya Reparada → Retornar a Inventario (Disponible)";
+    : "✅ Confirmar: Retornar a Inventario de Tienda";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[92vh] overflow-y-auto p-6">
+      <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-y-auto p-6">
         <DialogHeader className="pb-3 border-b">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2 text-emerald-800 text-lg font-bold">
-              <CheckCircle className="h-5 w-5 text-emerald-600" />
-              Finalizar Reparación — Orden {rmaLabel}
-            </DialogTitle>
-          </div>
+          <DialogTitle className="flex items-center gap-2 text-emerald-800 text-lg font-bold">
+            <CheckCircle className="h-5 w-5 text-emerald-600" />
+            Finalizar Orden de Taller — {rmaLabel}
+          </DialogTitle>
           <DialogDescription className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-2">
             <span className="font-semibold text-slate-800">
               {repair?.unitBrand} {repair?.unitModel}
             </span>
             <span>•</span>
-            <span>Código: <strong className="text-slate-700">{repair?.unitCode}</strong></span>
-            {repair?.unitSalePrice ? (
-              <>
-                <span>•</span>
-                <span>Precio Venta Orig.: <strong className="text-emerald-700">{formatCurrency(repair.unitSalePrice)}</strong></span>
-              </>
-            ) : null}
+            <span>Código: <strong className="text-slate-700">#{repair?.unitCode}</strong></span>
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-3">
+        <div className="space-y-4 py-3">
           {/* 1. Costos y notas técnicas */}
           <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 space-y-3">
             <div className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
               <BadgeCent className="h-3.5 w-3.5 text-slate-500" />
-              1. Costos y Observaciones de Taller
+              1. Costos Técnicos de Reparación
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -582,14 +476,14 @@ function CompleteRepairDialog({
           <div className="space-y-3">
             <div className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
               <PackageOpen className="h-3.5 w-3.5 text-slate-500" />
-              2. Destino del Equipo Reparado
+              2. Destino del Equipo
             </div>
 
             {isSecondEntry && (
               <div className="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs">
                 <History className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
                 <div>
-                  <strong className="font-semibold">Reingreso previo detectado:</strong> Este equipo ya tuvo {otherCompleted.length} reparación(es) previa(s). Si los problemas persisten, considera la <em>Opción B</em> para retornar el equipo a stock y compensar al cliente.
+                  <strong className="font-semibold">Reingreso previo detectado:</strong> Este equipo ya tuvo {otherCompleted.length} reparación(es) previa(s).
                 </div>
               </div>
             )}
@@ -615,10 +509,10 @@ function CompleteRepairDialog({
                   <div className="flex-1">
                     <div className="flex items-center gap-2 font-bold text-sm text-slate-900">
                       <Shield className="h-4 w-4 text-emerald-700" />
-                      Opción A — Devolver al cliente (Equipo Reparado)
+                      Opción A — Ya Reparada → Devolver al Cliente
                     </div>
                     <p className="text-xs text-slate-600 mt-0.5">
-                      El cliente se lleva el mismo equipo. La unidad se mantiene como Vendida y la garantía continúa activa.
+                      El cliente retira su equipo reparado. La unidad se mantiene como Vendida y la garantía continúa activa.
                     </p>
 
                     {resolutionType === "return_to_customer" && (
@@ -675,338 +569,14 @@ function CompleteRepairDialog({
                   <div className="flex-1">
                     <div className="flex items-center gap-2 font-bold text-sm text-slate-900">
                       <PackageOpen className="h-4 w-4 text-blue-700" />
-                      Opción B — Retornar a inventario (Disponible para la venta)
+                      Opción B — Retornar a Inventario de Tienda (Stock / Uso interno)
                     </div>
                     <p className="text-xs text-slate-600 mt-0.5">
-                      El equipo reparado regresa al stock disponible de la tienda. La garantía anterior del cliente se da por concluida.
+                      El equipo no se entrega al cliente; queda en inventario disponible de la tienda. La garantía anterior concluye.
                     </p>
-
                     {resolutionType === "return_to_inventory" && (
-                      <div className="mt-4 pt-4 border-t border-blue-200 space-y-3 cursor-default" onClick={(e) => e.stopPropagation()}>
-                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-                          <ArrowRightLeft className="h-3.5 w-3.5 text-blue-600" />
-                          ¿Cómo se compensa al cliente?:
-                        </div>
-
-                        {/* Selector de tipo de compensación */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                          {/* 1. Devolución de dinero */}
-                          <div
-                            onClick={() => setCustomerResolution("refund")}
-                            className={`p-3 rounded-lg border-2 cursor-pointer transition-all flex flex-col justify-between ${
-                              customerResolution === "refund"
-                                ? "border-emerald-500 bg-emerald-50 text-emerald-950 shadow-sm"
-                                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                            }`}
-                          >
-                            <div className="flex items-center gap-1.5 font-bold text-xs">
-                              <DollarSign className="h-4 w-4 text-emerald-600 shrink-0" />
-                              <span>Devolución de Dinero</span>
-                            </div>
-                            <span className="text-[11px] text-slate-500 mt-1">Egreso de caja al cliente</span>
-                          </div>
-
-                          {/* 2. Cambio por otro equipo */}
-                          <div
-                            onClick={() => setCustomerResolution("exchange")}
-                            className={`p-3 rounded-lg border-2 cursor-pointer transition-all flex flex-col justify-between ${
-                              customerResolution === "exchange"
-                                ? "border-indigo-500 bg-indigo-50 text-indigo-950 shadow-sm"
-                                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                            }`}
-                          >
-                            <div className="flex items-center gap-1.5 font-bold text-xs">
-                              <Repeat className="h-4 w-4 text-indigo-600 shrink-0" />
-                              <span>Cambio de Equipo</span>
-                            </div>
-                            <span className="text-[11px] text-slate-500 mt-1">Entregar otro del stock</span>
-                          </div>
-
-                          {/* 3. Ya resuelto / Sin movimiento */}
-                          <div
-                            onClick={() => setCustomerResolution("none")}
-                            className={`p-3 rounded-lg border-2 cursor-pointer transition-all flex flex-col justify-between ${
-                              customerResolution === "none"
-                                ? "border-slate-600 bg-slate-100 text-slate-900 shadow-sm"
-                                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                            }`}
-                          >
-                            <div className="flex items-center gap-1.5 font-bold text-xs">
-                              <CheckCircle2 className="h-4 w-4 text-slate-600 shrink-0" />
-                              <span>Ya compensado en RMA</span>
-                            </div>
-                            <span className="text-[11px] text-slate-500 mt-1">Sin movimiento de dinero</span>
-                          </div>
-                        </div>
-
-                        {/* Sub-formulario: Reembolso */}
-                        {customerResolution === "refund" && (
-                          <div className="p-3.5 bg-emerald-50/90 border border-emerald-300 rounded-xl space-y-3">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div>
-                                <Label className="text-xs font-bold text-emerald-900 mb-1 block">Monto a reembolsar (Bs):</Label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  value={refundAmount}
-                                  onChange={(e) => setRefundAmount(e.target.value)}
-                                  placeholder="0.00"
-                                  className="h-9 text-sm font-bold text-emerald-900 bg-white border-emerald-300"
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-xs font-bold text-emerald-900 mb-1 block">Caja de egreso:</Label>
-                                <Select value={refundPaymentMethod} onValueChange={(v: any) => setRefundPaymentMethod(v)}>
-                                  <SelectTrigger className="h-9 text-xs bg-white border-emerald-300">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="cash">Efectivo (Caja Física)</SelectItem>
-                                    <SelectItem value="qr">QR Simple / Banco</SelectItem>
-                                    <SelectItem value="transfer">Transferencia Bancaria</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-                            <p className="text-[11px] text-emerald-800 flex items-center gap-1">
-                              💡 Se registrará automáticamente un <strong>Egreso de Caja</strong> y un <strong>Gasto Operativo</strong> por este importe.
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Sub-formulario: Cambio de equipo con BUSCADOR Y AUTOCOMPLETAR */}
-                        {customerResolution === "exchange" && (
-                          <div className="p-3.5 bg-indigo-50/90 border border-indigo-300 rounded-xl space-y-3">
-                            <div>
-                              <div className="flex items-center justify-between mb-1.5">
-                                <Label className="text-xs font-bold text-indigo-950 block">
-                                  Buscar equipo sustituto del inventario disponible:
-                                </Label>
-                                <span className="text-[11px] text-indigo-700 font-medium flex items-center gap-1">
-                                  <QrCode className="h-3.5 w-3.5 text-indigo-600" />
-                                  Compatible con lector de QR / Barras
-                                </span>
-                              </div>
-
-                              {/* Si ya hay un equipo seleccionado */}
-                              {selectedReplacementUnit ? (
-                                <div className="p-3 bg-white rounded-xl border-2 border-indigo-500 shadow-sm space-y-2">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="flex items-start gap-2.5">
-                                      <div className="h-9 w-9 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0 mt-0.5">
-                                        <Laptop className="h-5 w-5 text-indigo-700" />
-                                      </div>
-                                      <div>
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <span className="px-1.5 py-0.5 rounded bg-indigo-600 text-white font-mono text-[11px] font-bold">
-                                            #{selectedReplacementUnit.code}
-                                          </span>
-                                          <span className="font-bold text-sm text-slate-900">
-                                            {selectedReplacementUnit.brand} {selectedReplacementUnit.model}
-                                          </span>
-                                        </div>
-                                        <div className="text-xs text-slate-600 mt-1 flex flex-wrap items-center gap-2">
-                                          {selectedReplacementUnit.specs?.processor && (
-                                            <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
-                                              <Cpu className="h-3 w-3 text-slate-500" /> {selectedReplacementUnit.specs.processor}
-                                            </span>
-                                          )}
-                                          {selectedReplacementUnit.specs?.ram && (
-                                            <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">
-                                              {selectedReplacementUnit.specs.ram}
-                                            </span>
-                                          )}
-                                          {selectedReplacementUnit.specs?.storage && (
-                                            <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
-                                              <HardDrive className="h-3 w-3 text-slate-500" /> {selectedReplacementUnit.specs.storage}
-                                            </span>
-                                          )}
-                                          {selectedReplacementUnit.serialNumber && (
-                                            <span className="font-mono text-slate-500 text-[11px]">
-                                              S/N: {selectedReplacementUnit.serialNumber}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="text-right shrink-0">
-                                      <div className="text-sm font-black text-indigo-950">
-                                        {formatCurrency(selectedReplacementUnit.salePrice)}
-                                      </div>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                          setReplacementUnitId(null);
-                                          setUnitSearchQuery("");
-                                        }}
-                                        className="h-7 text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50 mt-1.5"
-                                      >
-                                        Cambiar equipo
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : (
-                                /* Buscador interactivo con autocompletar */
-                                <div className="space-y-2">
-                                  <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-500 pointer-events-none" />
-                                    <Input
-                                      type="text"
-                                      value={unitSearchQuery}
-                                      onChange={(e) => setUnitSearchQuery(e.target.value)}
-                                      onKeyDown={handleBarcodeOrSearchKeyDown}
-                                      placeholder="Escribe o escanea: marca, modelo, código QR, serial, barras, RAM, procesador..."
-                                      className="pl-9 pr-9 h-10 text-xs bg-white border-indigo-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg shadow-sm"
-                                      autoFocus
-                                    />
-                                    {unitSearchQuery ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => setUnitSearchQuery("")}
-                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100"
-                                      >
-                                        <X className="h-3.5 w-3.5" />
-                                      </button>
-                                    ) : (
-                                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                        <Barcode className="h-4 w-4 text-slate-400" />
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* Lista de resultados de autocompletado */}
-                                  <div className="max-h-56 overflow-y-auto rounded-lg border border-indigo-200 bg-white shadow-sm divide-y divide-slate-100">
-                                    {availableUnits.length === 0 ? (
-                                      <div className="p-4 text-center text-xs text-amber-700 bg-amber-50/50">
-                                        No hay equipos en estado disponible actualmente en el inventario.
-                                      </div>
-                                    ) : filteredAvailableUnits.length === 0 ? (
-                                      <div className="p-4 text-center text-xs text-slate-500">
-                                        No se encontraron equipos disponibles con "<strong>{unitSearchQuery}</strong>".
-                                      </div>
-                                    ) : (
-                                      filteredAvailableUnits.map((u: any) => {
-                                        const diff = (u.salePrice || 0) - originalPriceCents;
-                                        return (
-                                          <div
-                                            key={u.id}
-                                            onClick={() => {
-                                              setReplacementUnitId(u.id);
-                                              setUnitSearchQuery("");
-                                            }}
-                                            className="p-2.5 hover:bg-indigo-50/80 cursor-pointer transition-colors flex items-center justify-between gap-3 group"
-                                          >
-                                            <div className="flex items-center gap-2.5 min-w-0">
-                                              <div className="h-8 w-8 rounded-lg bg-slate-100 group-hover:bg-indigo-100 flex items-center justify-center shrink-0 text-slate-600 group-hover:text-indigo-700 transition-colors">
-                                                <Laptop className="h-4 w-4" />
-                                              </div>
-                                              <div className="min-w-0">
-                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                  <span className="px-1.5 py-0.5 rounded bg-slate-100 group-hover:bg-indigo-200 text-slate-800 group-hover:text-indigo-950 font-mono text-[11px] font-bold">
-                                                    #{u.code}
-                                                  </span>
-                                                  <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-900">
-                                                    {u.brand} {u.model}
-                                                  </span>
-                                                </div>
-                                                <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                                  {u.specs?.processor && <span>{u.specs.processor}</span>}
-                                                  {u.specs?.ram && <span>• {u.specs.ram}</span>}
-                                                  {u.specs?.storage && <span>• {u.specs.storage}</span>}
-                                                  {u.serialNumber && (
-                                                    <span className="font-mono text-slate-400">
-                                                      • S/N: {u.serialNumber}
-                                                    </span>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            </div>
-
-                                            <div className="text-right shrink-0">
-                                              <div className="text-xs font-black text-slate-900 group-hover:text-indigo-900">
-                                                {formatCurrency(u.salePrice)}
-                                              </div>
-                                              <div className="text-[10px] mt-0.5">
-                                                {diff > 0 ? (
-                                                  <span className="text-emerald-700 font-semibold bg-emerald-50 px-1 py-0.5 rounded">
-                                                    +Bs. {(diff / 100).toFixed(2)}
-                                                  </span>
-                                                ) : diff < 0 ? (
-                                                  <span className="text-red-600 font-semibold bg-red-50 px-1 py-0.5 rounded">
-                                                    -Bs. {(Math.abs(diff) / 100).toFixed(2)}
-                                                  </span>
-                                                ) : (
-                                                  <span className="text-slate-500">Mismo precio</span>
-                                                )}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        );
-                                      })
-                                    )}
-                                  </div>
-                                  {filteredAvailableUnits.length > 0 && (
-                                    <div className="flex items-center justify-between text-[10px] text-indigo-700 px-1">
-                                      <span>{filteredAvailableUnits.length} equipo(s) disponible(s)</span>
-                                      <span>💡 Haz clic en uno o presiona <strong>Enter</strong> para seleccionar</span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            {selectedReplacementUnit && (
-                              <div className="p-3 bg-white rounded-lg border border-indigo-200 text-xs space-y-2">
-                                <div className="grid grid-cols-2 gap-2 text-slate-600 pb-2 border-b">
-                                  <div>Equipo original devuelto: <span className="font-semibold text-slate-800">{formatCurrency(originalPriceCents)}</span></div>
-                                  <div>Equipo sustituto ({selectedReplacementUnit.code}): <span className="font-semibold text-slate-800">{formatCurrency(selectedReplacementUnit.salePrice)}</span></div>
-                                </div>
-
-                                <div className="flex items-center justify-between font-bold text-xs pt-1">
-                                  <span>Diferencia comercial:</span>
-                                  <span className={priceDiffCents > 0 ? "text-emerald-700 font-bold" : priceDiffCents < 0 ? "text-red-600 font-bold" : "text-slate-700"}>
-                                    {priceDiffCents > 0
-                                      ? `+Bs. ${(priceDiffCents / 100).toFixed(2)} (Cliente PAGA la diferencia)`
-                                      : priceDiffCents < 0
-                                      ? `-Bs. ${(Math.abs(priceDiffCents) / 100).toFixed(2)} (Tienda REEMBOLSA la diferencia)`
-                                      : "Bs. 0.00 (Mismo valor - sin diferencia)"}
-                                  </span>
-                                </div>
-
-                                {priceDiffCents !== 0 && (
-                                  <div className="pt-2 flex items-center gap-2">
-                                    <Label className="text-xs font-medium text-slate-700 shrink-0">Caja para diferencia:</Label>
-                                    <Select value={differencePaymentMethod} onValueChange={(v: any) => setDifferencePaymentMethod(v)}>
-                                      <SelectTrigger className="h-8 text-xs bg-slate-50 flex-1">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="cash">Efectivo</SelectItem>
-                                        <SelectItem value="qr">QR Simple</SelectItem>
-                                        <SelectItem value="transfer">Transferencia</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                )}
-
-                                <p className="text-[11px] text-indigo-800 pt-1">
-                                  💡 El nuevo equipo pasará a <strong>Vendido</strong> y se le generará una <strong>nueva garantía</strong> transferida al cliente.
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Sub-formulario: Sin compensación ahora */}
-                        {customerResolution === "none" && (
-                          <div className="p-2.5 bg-slate-100 rounded-lg text-[11px] text-slate-600 border border-slate-200 flex items-center gap-1.5">
-                            <CheckCircle2 className="h-4 w-4 text-slate-500 shrink-0" />
-                            <span>No se realizarán egresos ni ingresos de caja. Útil si la compensación ya fue tramitada o convenida en RMA/Devoluciones.</span>
-                          </div>
-                        )}
+                      <div className="mt-2.5 pt-2.5 border-t border-blue-200/80 text-[11px] text-blue-800">
+                        💡 Si el cliente solicita reembolso o cambio de equipo, recuerda que se gestiona directamente desde <strong>Garantías / Ventas</strong>.
                       </div>
                     )}
                   </div>
@@ -1683,7 +1253,7 @@ export default function Repairs() {
       </Dialog>
 
       {/* Modal Finalizar Reparación (con flujo bifucardo) */}
-      <CompleteRepairDialog
+      <CompleteDialog
         open={isCompleteOpen}
         onOpenChange={setIsCompleteOpen}
         repair={selectedRepair}

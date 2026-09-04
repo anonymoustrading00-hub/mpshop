@@ -101,6 +101,7 @@ function buildWarrantyView(w: any, unit: any, sale: any, customer: any, returnRm
     saleNumber: sale?.saleNumber || null,
     saleDate: sale?.createdAt || w.createdAt,
     saleTotal: sale?.total || null,
+    unitSalePrice: unit?.salePrice || sale?.total || 0,
     // Customer info
     customerName: customer?.name || sale?.customerName || "Cliente Venta Directa",
     customerPhone: customer?.phone || null,

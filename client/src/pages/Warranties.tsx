@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
@@ -29,9 +30,12 @@ import {
   Wrench,
   Grid,
   List,
+  ArrowRight,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/currency";
 
 export default function Warranties() {
+  const [, setLocation] = useLocation();
   const { activeBranchId } = useBranch();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "expiring_soon" | "expired" | "claimed">("all");
@@ -118,14 +122,25 @@ export default function Warranties() {
     setSelectedWarranty(w);
     setRmaReason("");
     setRmaResolution("");
-    setReenterRepair(true);
     setIsRmaOpen(true);
   };
 
-  const handleSubmitRma = () => {
+  const handleGoToCancelSale = () => {
+    if (!selectedWarranty) return;
+    setIsRmaOpen(false);
+    if (selectedWarranty.saleId) {
+      toast.info(`Abriendo módulo de Ventas para anular la venta #${selectedWarranty.saleNumber || selectedWarranty.saleId}...`);
+      setLocation(`/sales?anular=${selectedWarranty.saleId}`);
+    } else {
+      toast.info("Abriendo módulo de Ventas...");
+      setLocation(`/sales?search=${encodeURIComponent(selectedWarranty.saleNumber || selectedWarranty.unitCode || "")}`);
+    }
+  };
+
+  const handleSubmitRmaToRepair = () => {
     if (!selectedWarranty) return;
     if (!rmaReason.trim()) {
-      toast.error("Por favor ingresa el motivo de la devolución");
+      toast.error("Por favor ingresa el motivo de la falla antes de enviar a taller");
       return;
     }
 
@@ -133,8 +148,8 @@ export default function Warranties() {
       unitId: selectedWarranty.unitId,
       warrantyId: selectedWarranty.id,
       reason: rmaReason.trim(),
-      resolution: rmaResolution.trim() || undefined,
-      reenteredRepair: reenterRepair,
+      resolution: "Ingreso a taller técnico para reparación en garantía",
+      reenteredRepair: true,
     });
   };
 
@@ -571,67 +586,121 @@ export default function Warranties() {
         </div>
       )}
 
-      {/* Modal: Registrar Devolución RMA directa desde Garantías */}
+      {/* Modal: Procesar Devolución / RMA por Garantía */}
       <Dialog open={isRmaOpen} onOpenChange={setIsRmaOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-purple-700 font-bold">
-              <RefreshCw className="h-5 w-5" />
+        <DialogContent className="sm:max-w-lg max-h-[92vh] overflow-y-auto p-6">
+          <DialogHeader className="pb-3 border-b">
+            <DialogTitle className="flex items-center gap-2 text-purple-800 text-lg font-bold">
+              <RefreshCw className="h-5 w-5 text-purple-600" />
               Procesar Devolución / RMA por Garantía
             </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Selecciona la acción requerida ante el reclamo del cliente.
+            </DialogDescription>
           </DialogHeader>
 
           {selectedWarranty && (
             <div className="space-y-4 py-2 text-sm">
-              <div className="p-3 bg-purple-50 rounded-xl border border-purple-200">
-                <div className="font-mono text-xs font-bold text-purple-700">{selectedWarranty.unitCode}</div>
-                <div className="font-bold text-slate-900 text-base">{selectedWarranty.unitBrand} {selectedWarranty.unitModel}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Cliente: <span className="font-medium text-foreground">{selectedWarranty.customerName}</span>
+              {/* Ficha informativa del equipo y venta */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-purple-700 bg-purple-100/80 px-2 py-0.5 rounded">
+                    #{selectedWarranty.unitCode}
+                  </span>
+                  {(selectedWarranty.unitSalePrice || selectedWarranty.saleTotal) ? (
+                    <span className="font-bold text-emerald-700 text-sm">
+                      {formatCurrency(selectedWarranty.unitSalePrice || selectedWarranty.saleTotal)}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="font-bold text-slate-900 text-sm">
+                  {selectedWarranty.unitBrand} {selectedWarranty.unitModel}
+                </div>
+                <div className="text-slate-600 flex flex-wrap items-center gap-3 pt-1 border-t border-slate-200/60">
+                  <div>Cliente: <strong className="text-slate-800">{selectedWarranty.customerName}</strong></div>
+                  {selectedWarranty.saleNumber && (
+                    <div>Venta: <strong className="text-slate-800 font-mono">#{selectedWarranty.saleNumber}</strong></div>
+                  )}
+                  {selectedWarranty.customerPhone && (
+                    <div>Tel: <span className="text-slate-700">{selectedWarranty.customerPhone}</span></div>
+                  )}
                 </div>
               </div>
 
+              {/* Motivo de la falla */}
               <div>
-                <label className="text-xs font-semibold block mb-1">Motivo de Devolución / Falla Reportada *</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Motivo de la Devolución / Falla Reportada:
+                </label>
                 <Textarea
                   value={rmaReason}
                   onChange={(e) => setRmaReason(e.target.value)}
-                  placeholder="Ej: Falla en teclado, la pantalla parpadea, equipo no enciende..."
-                  rows={3}
+                  placeholder="Ej: Falla en teclado, la pantalla parpadea, cliente solicita devolución..."
+                  className="text-xs min-h-[65px] bg-white"
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-semibold block mb-1">Resolución / Solución Otorgada (Opcional)</label>
-                <Input
-                  value={rmaResolution}
-                  onChange={(e) => setRmaResolution(e.target.value)}
-                  placeholder="Ej. Cambio de equipo por falla de fábrica, reembolso..."
-                />
-              </div>
+              {/* Las 2 opciones de resolución comercial */}
+              <div className="space-y-3 pt-1">
+                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Selecciona la resolución para el cliente:
+                </div>
 
-              <div className="flex items-center space-x-2 pt-2 border-t">
-                <Checkbox
-                  id="reenter-repair"
-                  checked={reenterRepair}
-                  onCheckedChange={(c) => setReenterRepair(!!c)}
-                />
-                <label htmlFor="reenter-repair" className="text-xs font-semibold cursor-pointer">
-                  Reingresar equipo a Taller Técnico (Traspaso automático a revisión)
-                </label>
+                {/* Opción 1: Devolver al Cliente (Anular Venta / Reembolso) */}
+                <div
+                  onClick={handleGoToCancelSale}
+                  className="p-4 rounded-xl border-2 border-red-200 bg-red-50/50 hover:bg-red-50 hover:border-red-400 cursor-pointer transition-all flex items-start gap-3 group shadow-sm"
+                >
+                  <div className="h-10 w-10 rounded-lg bg-red-100 flex items-center justify-center shrink-0 text-red-600 mt-0.5 group-hover:bg-red-200 transition-colors">
+                    <XCircle className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm text-red-900">
+                        1. Devolver al Cliente (Anular Venta / Reembolso)
+                      </h4>
+                      <ArrowRight className="h-4 w-4 text-red-400 group-hover:text-red-700 group-hover:translate-x-1 transition-all shrink-0" />
+                    </div>
+                    <p className="text-xs text-red-800/80 mt-1 leading-relaxed">
+                      Dirige al módulo de <strong>Ventas</strong> para anular la venta y registrar el egreso de dinero al cliente en caja.
+                    </p>
+                    <div className="mt-2 text-[11px] text-red-700 bg-white/80 p-2 rounded-lg border border-red-200">
+                      💡 <em>¿El cliente prefiere cambiar por otro equipo?</em> Es el mismo proceso: se anula la venta original y se genera una <strong>Venta Nueva</strong> con el nuevo equipo que elija en el catálogo.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Opción 2: Ingresar a Taller Técnico */}
+                <div
+                  onClick={handleSubmitRmaToRepair}
+                  className="p-4 rounded-xl border-2 border-blue-200 bg-blue-50/50 hover:bg-blue-50 hover:border-blue-400 cursor-pointer transition-all flex items-start gap-3 group shadow-sm"
+                >
+                  <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0 text-blue-600 mt-0.5 group-hover:bg-blue-200 transition-colors">
+                    <Wrench className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm text-blue-900">
+                        2. Ingresar a Taller Técnico (Reparación en Garantía)
+                      </h4>
+                      {createReturnMutation.isPending ? (
+                        <span className="text-xs text-blue-600 font-bold">Ingresando...</span>
+                      ) : (
+                        <ArrowRight className="h-4 w-4 text-blue-400 group-hover:text-blue-700 group-hover:translate-x-1 transition-all shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-xs text-blue-800/80 mt-1 leading-relaxed">
+                      El equipo ingresa a revisión y reparación técnica. <strong>No hay ningún movimiento de dinero</strong> en caja y la garantía se pausa automáticamente.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setIsRmaOpen(false)}>Cancelar</Button>
-            <Button
-              onClick={handleSubmitRma}
-              disabled={createReturnMutation.isPending}
-              className="bg-purple-600 hover:bg-purple-700 text-white gap-2 font-bold"
-            >
-              <RefreshCw className="h-4 w-4" />
-              {createReturnMutation.isPending ? "Registrando..." : "Confirmar Devolución RMA"}
+          <DialogFooter className="pt-2 border-t">
+            <Button variant="outline" onClick={() => setIsRmaOpen(false)}>
+              Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>

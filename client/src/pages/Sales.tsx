@@ -719,6 +719,20 @@ export default function Sales() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [lastSaleNumber, setLastSaleNumber] = useState("");
 
+  // Si se ingresa desde el módulo de Garantías / RMA con ?anular=ID o ?saleId=ID
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const anularParam = params.get("anular") || params.get("saleId");
+    if (anularParam) {
+      const sId = parseInt(anularParam, 10);
+      if (!isNaN(sId) && sId > 0) {
+        setDetailSaleId(sId);
+        setCancelReason("Devolución por Garantía / RMA");
+        setIsDetailOpen(true);
+      }
+    }
+  }, []);
+
   const [productSearch, setProductSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
