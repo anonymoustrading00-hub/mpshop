@@ -42,6 +42,8 @@ function buildWarrantyView(w: any, unit: any, sale: any, customer: any, returnRm
   //    El cliente puede registrar nuevas devoluciones mientras la garantía esté vigente.
   if (sale?.status === "cancelled" || w.status === "cancelled") {
     resolvedStatus = "cancelled";
+  } else if (w.status === "claimed" || unit?.status === "available") {
+    resolvedStatus = "claimed";
   } else if (isPausedByRepair) {
     resolvedStatus = "paused";
   } else if (pausedAt && remainingDaysAtPause !== null) {

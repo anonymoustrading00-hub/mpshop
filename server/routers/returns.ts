@@ -275,7 +275,7 @@ export const returnsRouter = router({
         }
 
         // â”€â”€ Reembolso de dinero al cliente â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        if (!input.reenteredRepair && input.refundAmount && input.refundAmount > 0 && input.refundPaymentMethod) {
+        if (input.refundAmount && input.refundAmount > 0 && input.refundPaymentMethod) {
           // Egreso de caja
           const { MOCK_FINANCIAL_TRANSACTIONS, MOCK_OPERATIONAL_EXPENSES } = await import("../db");
           MOCK_FINANCIAL_TRANSACTIONS.push({
@@ -314,8 +314,8 @@ export const returnsRouter = router({
           mockClaimWarranty(input.unitId, input.warrantyId);
         }
 
-        // â”€â”€ Reemplazo directo (sin taller) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        if (!input.reenteredRepair && input.replacementUnitId) {
+        // ── Reemplazo de equipo ──────────────────────────────────────────
+        if (input.replacementUnitId) {
           const replacedUnit = MOCK_UNITS[unitIdx];
           const replacementUnit = MOCK_UNITS.find((u: any) => u.id === input.replacementUnitId);
           const netCostToCompany = Math.max(0, (replacementUnit?.purchasePrice || 0) - (input.replacementCostDifference || 0));
@@ -412,7 +412,7 @@ export const returnsRouter = router({
       }
 
       // â”€â”€ Reembolso de dinero al cliente â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      if (!input.reenteredRepair && input.refundAmount && input.refundAmount > 0 && input.refundPaymentMethod) {
+      if (input.refundAmount && input.refundAmount > 0 && input.refundPaymentMethod) {
         // Egreso de caja
         await db.insert(schema.financialTransactions).values({
           branchId: unit.branchId || ctx.branchId || 1,
@@ -446,8 +446,8 @@ export const returnsRouter = router({
         await dbClaimWarranty(db, input.unitId, input.warrantyId);
       }
 
-      // â”€â”€ Reemplazo directo (sin taller) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      if (!input.reenteredRepair && input.replacementUnitId) {
+      // ── Reemplazo de equipo ──────────────────────────────────────────
+      if (input.replacementUnitId) {
         const [replacementUnit] = await db.select().from(units).where(eq(units.id, input.replacementUnitId)).limit(1);
         const netCostToCompany = Math.max(0, (replacementUnit?.purchasePrice || 0) - (input.replacementCostDifference || 0));
 

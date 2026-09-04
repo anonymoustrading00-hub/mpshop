@@ -320,6 +320,8 @@ export const repairsRouter = router({
               unitBrand: unit?.brand || "—",
               unitModel: unit?.model || "—",
               unitType: unit?.type || "laptop",
+              unitSalePrice: unit?.salePrice || 0,
+              unitPurchasePrice: unit?.purchasePrice || 0,
               technicianName: "Demo Técnico",
               partsUsed: r.partsUsed ? (typeof r.partsUsed === "string" ? JSON.parse(r.partsUsed) : r.partsUsed) : [],
               laborCost: ctx.user.role === "seller" ? 0 : r.laborCost,
@@ -374,6 +376,8 @@ export const repairsRouter = router({
           unitBrand: units.brand,
           unitModel: units.model,
           unitType: units.type,
+          unitSalePrice: units.salePrice,
+          unitPurchasePrice: units.purchasePrice,
           technicianId: repairs.technicianId,
           technicianName: users.name,
           startDate: repairs.startDate,
@@ -569,6 +573,13 @@ export const repairsRouter = router({
         extendWarrantyDays: z.number().min(1).max(365).optional(),
         warrantyId: z.number().optional(),
         secondaryRepairNotes: z.string().optional(),
+        // === Opciones de compensación al cliente si retorna a inventario de venta ===
+        customerResolution: z.enum(["refund", "exchange", "none"]).optional(),
+        refundAmount: z.number().min(0).optional(), // en centavos
+        refundPaymentMethod: z.enum(["cash", "qr", "transfer"]).optional(),
+        replacementUnitId: z.number().optional(),
+        priceDifference: z.number().optional(), // en centavos (+ cliente paga, - tienda reembolsa)
+        differencePaymentMethod: z.enum(["cash", "qr", "transfer"]).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -655,6 +666,148 @@ export const repairsRouter = router({
             } else if (input.resolutionType === "return_to_inventory") {
               finalUnitStatus = "available";
               resolutionNotes = "Retornado a inventario de venta";
+
+              // 1. Cerrar la garantía previa de esta unidad para que no quede activa en inventario
+              MOCK_WARRANTIES.forEach((w: any) => {
+                if (w.unitId === repair.unitId && w.status !== "cancelled") {
+                  w.status = "claimed";
+                  w.pausedAt = null;
+                  w.remainingDaysAtPause = null;
+                }
+              });
+
+              // 2. Compensación al cliente
+              const unit = MOCK_UNITS[unitIdx];
+              const rmaCode = repair.otNumber || repair.rmaNumber || `#${repair.id}`;
+
+              if (input.customerResolution === "refund" && input.refundAmount && input.refundAmount > 0) {
+                const { MOCK_FINANCIAL_TRANSACTIONS, MOCK_OPERATIONAL_EXPENSES } = await import("../db");
+                const method = input.refundPaymentMethod || "cash";
+
+                // Egreso en Caja
+                MOCK_FINANCIAL_TRANSACTIONS.push({
+                  id: MOCK_FINANCIAL_TRANSACTIONS.length + 1,
+                  branchId: 1,
+                  type: "expense",
+                  category: "warranty_refund",
+                  amount: input.refundAmount,
+                  paymentMethod: method,
+                  referenceId: repair.id,
+                  userId: ctx.user.id,
+                  notes: `Reembolso garantía / devolución de cliente - ${unit?.brand || ""} ${unit?.model || ""} (${rmaCode})`,
+                  createdAt: new Date().toISOString(),
+                });
+
+                // Gasto operativo
+                MOCK_OPERATIONAL_EXPENSES.push({
+                  id: MOCK_OPERATIONAL_EXPENSES.length + 1,
+                  branchId: 1,
+                  description: `Reembolso Garantía - ${unit?.brand || ""} ${unit?.model || ""} (${rmaCode})`,
+                  category: "warranty_refund",
+                  costType: "warranty_cost",
+                  referenceType: "repair",
+                  referenceId: repair.id,
+                  isAutomatic: 1,
+                  amount: input.refundAmount,
+                  paymentMethod: method,
+                  expenseDate: new Date().toISOString(),
+                  status: "paid",
+                  userId: ctx.user.id,
+                  notes: `Devolución de dinero al cliente por retorno de equipo a inventario`,
+                  createdAt: new Date().toISOString(),
+                });
+
+                resolutionNotes += ` | Reembolso cliente: Bs. ${(input.refundAmount / 100).toFixed(2)} (${method})`;
+              } else if (input.customerResolution === "exchange" && input.replacementUnitId) {
+                const repIdx = MOCK_UNITS.findIndex((u: any) => u.id === input.replacementUnitId);
+                if (repIdx !== -1) {
+                  const repUnit = MOCK_UNITS[repIdx];
+                  MOCK_UNITS[repIdx] = { ...repUnit, status: "sold", updatedAt: new Date().toISOString() };
+
+                  MOCK_UNIT_EVENTS.push({
+                    id: Date.now() + 1,
+                    unitId: repUnit.id,
+                    eventType: "sold",
+                    fromStatus: "available",
+                    toStatus: "sold",
+                    userId: ctx.user.id,
+                    notes: `Entregado al cliente como cambio/reemplazo de garantía por equipo ${unit?.code || repair.unitId} (${rmaCode})`,
+                    createdAt: new Date().toISOString(),
+                  });
+
+                  const diff = input.priceDifference || 0;
+                  const diffMethod = input.differencePaymentMethod || "cash";
+                  const { MOCK_FINANCIAL_TRANSACTIONS, MOCK_OPERATIONAL_EXPENSES } = await import("../db");
+
+                  if (diff > 0) {
+                    // Cliente paga diferencia -> Ingreso en caja
+                    MOCK_FINANCIAL_TRANSACTIONS.push({
+                      id: MOCK_FINANCIAL_TRANSACTIONS.length + 1,
+                      branchId: 1,
+                      type: "income",
+                      category: "sale",
+                      amount: diff,
+                      paymentMethod: diffMethod,
+                      referenceId: repair.id,
+                      userId: ctx.user.id,
+                      notes: `Cobro diferencia cambio de equipo garantía - ${unit?.code} por ${repUnit.code} (${rmaCode})`,
+                      createdAt: new Date().toISOString(),
+                    });
+                  } else if (diff < 0) {
+                    // Tienda devuelve diferencia -> Egreso en caja
+                    const refundDiff = Math.abs(diff);
+                    MOCK_FINANCIAL_TRANSACTIONS.push({
+                      id: MOCK_FINANCIAL_TRANSACTIONS.length + 1,
+                      branchId: 1,
+                      type: "expense",
+                      category: "warranty_refund",
+                      amount: refundDiff,
+                      paymentMethod: diffMethod,
+                      referenceId: repair.id,
+                      userId: ctx.user.id,
+                      notes: `Reembolso diferencia cambio de equipo garantía - ${unit?.code} por ${repUnit.code} (${rmaCode})`,
+                      createdAt: new Date().toISOString(),
+                    });
+
+                    MOCK_OPERATIONAL_EXPENSES.push({
+                      id: MOCK_OPERATIONAL_EXPENSES.length + 1,
+                      branchId: 1,
+                      description: `Reembolso diferencia cambio garantía - ${unit?.code} por ${repUnit.code}`,
+                      category: "warranty_refund",
+                      costType: "warranty_cost",
+                      referenceType: "repair",
+                      referenceId: repair.id,
+                      isAutomatic: 1,
+                      amount: refundDiff,
+                      paymentMethod: diffMethod,
+                      expenseDate: new Date().toISOString(),
+                      status: "paid",
+                      userId: ctx.user.id,
+                      notes: `Diferencia a favor del cliente en cambio por equipo de menor valor`,
+                      createdAt: new Date().toISOString(),
+                    });
+                  }
+
+                  // Emitir garantía para la unidad de reemplazo
+                  const prevW = (MOCK_WARRANTIES as any[]).find((w: any) => w.unitId === repair.unitId);
+                  const wDays = prevW?.days || 30;
+                  const now = new Date();
+                  const end = new Date(now.getTime() + wDays * 24 * 60 * 60 * 1000);
+                  MOCK_WARRANTIES.push({
+                    id: Date.now() + 2,
+                    unitId: repUnit.id,
+                    saleId: prevW?.saleId || null,
+                    startDate: now.toISOString(),
+                    endDate: end.toISOString(),
+                    days: wDays,
+                    status: "active",
+                    terms: `Garantía transferida por cambio de equipo (${rmaCode}). Original: ${unit?.code || repair.unitId}`,
+                    createdAt: now.toISOString(),
+                  });
+
+                  resolutionNotes += ` | Cambio por equipo: ${repUnit.code} ${repUnit.brand} ${repUnit.model}`;
+                }
+              }
             }
 
             MOCK_UNITS[unitIdx] = { ...MOCK_UNITS[unitIdx], status: finalUnitStatus, updatedAt: new Date().toISOString() };
@@ -823,6 +976,129 @@ export const repairsRouter = router({
         } else if (input.resolutionType === "return_to_inventory") {
           finalUnitStatus = "available";
           resolutionNotes = "Retornado a inventario de venta";
+
+          // 1. Cerrar la garantía previa de esta unidad para que no figure activa en inventario
+          await db
+            .update(warranties)
+            .set({ status: "claimed", pausedAt: null, remainingDaysAtPause: null })
+            .where(eq(warranties.unitId, repair.unitId));
+
+          // 2. Compensación al cliente
+          const [u] = await db.select().from(units).where(eq(units.id, repair.unitId)).limit(1);
+          const branchId = u?.branchId || ctx.branchId || 1;
+          const rmaCode = repair.otNumber || repair.rmaNumber || `#${repair.id}`;
+
+          if (input.customerResolution === "refund" && input.refundAmount && input.refundAmount > 0) {
+            const method = input.refundPaymentMethod || "cash";
+
+            // Egreso de Caja
+            await db.insert(schema.financialTransactions).values({
+              branchId,
+              type: "expense",
+              category: "warranty_refund",
+              amount: input.refundAmount,
+              paymentMethod: method,
+              referenceId: repair.id,
+              userId: ctx.user.id,
+              notes: `Reembolso garantía / devolución de cliente - ${u?.brand || ""} ${u?.model || ""} (${rmaCode})`,
+            });
+
+            // Gasto operativo
+            await db.insert(schema.operationalExpenses).values({
+              branchId,
+              description: `Reembolso Garantía - ${u?.brand || ""} ${u?.model || ""} (${rmaCode})`,
+              category: "warranty_refund",
+              costType: "warranty_cost",
+              referenceType: "repair",
+              referenceId: repair.id,
+              isAutomatic: 1,
+              amount: input.refundAmount,
+              paymentMethod: method,
+              expenseDate: new Date(),
+              status: "paid",
+              userId: ctx.user.id,
+              notes: `Devolución de dinero al cliente por retorno de equipo a inventario`,
+            });
+
+            resolutionNotes += ` | Reembolso cliente: Bs. ${(input.refundAmount / 100).toFixed(2)} (${method})`;
+          } else if (input.customerResolution === "exchange" && input.replacementUnitId) {
+            const [repUnit] = await db.select().from(units).where(eq(units.id, input.replacementUnitId)).limit(1);
+            if (repUnit) {
+              await db.update(units).set({ status: "sold", updatedAt: new Date() }).where(eq(units.id, repUnit.id));
+
+              await db.insert(unitEvents).values({
+                unitId: repUnit.id,
+                eventType: "sold",
+                fromStatus: "available",
+                toStatus: "sold",
+                userId: ctx.user.id,
+                notes: `Entregado al cliente como cambio/reemplazo de garantía por equipo ${u?.code || repair.unitId} (${rmaCode})`,
+              });
+
+              const diff = input.priceDifference || 0;
+              const diffMethod = input.differencePaymentMethod || "cash";
+
+              if (diff > 0) {
+                // Cliente paga diferencia -> Ingreso en caja
+                await db.insert(schema.financialTransactions).values({
+                  branchId,
+                  type: "income",
+                  category: "sale",
+                  amount: diff,
+                  paymentMethod: diffMethod,
+                  referenceId: repair.id,
+                  userId: ctx.user.id,
+                  notes: `Cobro diferencia cambio de equipo garantía - ${u?.code} por ${repUnit.code} (${rmaCode})`,
+                });
+              } else if (diff < 0) {
+                // Tienda reembolsa diferencia -> Egreso en caja
+                const refundDiff = Math.abs(diff);
+                await db.insert(schema.financialTransactions).values({
+                  branchId,
+                  type: "expense",
+                  category: "warranty_refund",
+                  amount: refundDiff,
+                  paymentMethod: diffMethod,
+                  referenceId: repair.id,
+                  userId: ctx.user.id,
+                  notes: `Reembolso diferencia cambio de equipo garantía - ${u?.code} por ${repUnit.code} (${rmaCode})`,
+                });
+
+                await db.insert(schema.operationalExpenses).values({
+                  branchId,
+                  description: `Reembolso diferencia cambio garantía - ${u?.code} por ${repUnit.code}`,
+                  category: "warranty_refund",
+                  costType: "warranty_cost",
+                  referenceType: "repair",
+                  referenceId: repair.id,
+                  isAutomatic: 1,
+                  amount: refundDiff,
+                  paymentMethod: diffMethod,
+                  expenseDate: new Date(),
+                  status: "paid",
+                  userId: ctx.user.id,
+                  notes: `Diferencia a favor del cliente en cambio por equipo de menor valor`,
+                });
+              }
+
+              // Emitir garantía para la nueva unidad de reemplazo
+              const [prevW] = await db.select().from(warranties).where(eq(warranties.unitId, repair.unitId)).limit(1);
+              const wDays = prevW?.days || 30;
+              const now = new Date();
+              const end = new Date(now.getTime() + wDays * 24 * 60 * 60 * 1000);
+              await db.insert(warranties).values({
+                unitId: repUnit.id,
+                saleId: prevW?.saleId || null,
+                startDate: now,
+                endDate: end,
+                days: wDays,
+                status: "active",
+                terms: `Garantía transferida por cambio de equipo (${rmaCode}). Original: ${u?.code || repair.unitId}`,
+              });
+
+              resolutionNotes += ` | Cambio por equipo: ${repUnit.code} ${repUnit.brand} ${repUnit.model}`;
+            }
+          }
         }
 
         await db

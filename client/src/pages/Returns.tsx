@@ -10,10 +10,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { RefreshCw, Plus, Search, AlertCircle, Wrench, Wallet, QrCode, Landmark, DollarSign, ShieldCheck } from "lucide-react";
+import { RefreshCw, Plus, Search, AlertCircle, Wrench, Wallet, QrCode, Landmark, DollarSign, ShieldCheck, PackageOpen } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 
 export default function Returns() {
+  const utils = trpc.useUtils();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [unitCodeInput, setUnitCodeInput] = useState("");
   const [foundUnit, setFoundUnit] = useState<any>(null);
@@ -45,13 +46,20 @@ export default function Returns() {
   const createReturnMutation = trpc.returns.create.useMutation({
     onSuccess: () => {
       const msg = reenterRepair
-        ? "Devolución registrada. La unidad ingresó a Taller y la garantía fue pausada."
+        ? doRefund
+          ? "Devolución registrada: Unidad ingresó a taller y se procesó el reembolso de caja."
+          : "Devolución registrada. La unidad ingresó a Taller y la garantía fue pausada."
         : doRefund
         ? "Devolución registrada. Reembolso de caja procesado y garantía marcada como reclamada."
         : "Devolución registrada correctamente.";
       toast.success(msg);
       closeDialog();
       refetch();
+      utils.returns.invalidate();
+      utils.units.invalidate();
+      utils.warranties.invalidate();
+      utils.repairs.invalidate();
+      (utils.finance as any)?.getGlobalBalances?.invalidate?.();
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -86,12 +94,12 @@ export default function Returns() {
   const handleCreateReturn = () => {
     if (!foundUnit) { toast.error("Selecciona una unidad válida"); return; }
     if (!reason.trim()) { toast.error("Ingresa el motivo de devolución"); return; }
-    if (!reenterRepair && doRefund) {
+    if (doRefund) {
       const amt = parseFloat(refundAmount);
       if (isNaN(amt) || amt <= 0) { toast.error("Ingresa un monto de reembolso válido"); return; }
     }
 
-    const refundCents = (!reenterRepair && doRefund && refundAmount)
+    const refundCents = (doRefund && refundAmount)
       ? Math.round(parseFloat(refundAmount) * 100)
       : undefined;
 
@@ -102,7 +110,7 @@ export default function Returns() {
       resolution,
       reenteredRepair: reenterRepair,
       refundAmount: refundCents,
-      refundPaymentMethod: (!reenterRepair && doRefund) ? refundPaymentMethod : undefined,
+      refundPaymentMethod: doRefund ? refundPaymentMethod : undefined,
     });
   };
 
@@ -113,7 +121,7 @@ export default function Returns() {
     (globalBalances?.transfer ?? 0);
 
   const refundCents = refundAmount ? Math.round(parseFloat(refundAmount) * 100) : 0;
-  const isInsufficient = doRefund && !reenterRepair && refundCents > 0 && selectedBalance < refundCents;
+  const isInsufficient = doRefund && refundCents > 0 && selectedBalance < refundCents;
 
   const BOX_CONFIG = [
     { method: "cash", label: "Efectivo", icon: Wallet, color: "emerald", balance: globalBalances?.cash ?? 0 },
@@ -283,7 +291,7 @@ export default function Returns() {
               {/* Opción A: reingresa a taller */}
               <div
                 className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${reenterRepair ? "border-blue-500 bg-blue-50" : "border-slate-200 bg-white hover:border-blue-200"}`}
-                onClick={() => { setReenterRepair(true); setDoRefund(false); }}
+                onClick={() => setReenterRepair(true)}
               >
                 <div className={`mt-0.5 h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center ${reenterRepair ? "border-blue-500 bg-blue-500" : "border-slate-300"}`}>
                   {reenterRepair && <div className="h-2 w-2 rounded-full bg-white" />}
@@ -292,11 +300,11 @@ export default function Returns() {
                   <p className="text-sm font-bold text-blue-900 flex items-center gap-1.5">
                     <Wrench className="h-3.5 w-3.5" /> Reingresar a Taller
                   </p>
-                  <p className="text-xs text-slate-500 mt-0.5">El equipo entra al taller. La garantía se pausa automáticamente.</p>
+                  <p className="text-xs text-slate-500 mt-0.5">El equipo entra al taller para reparación o revisión técnica.</p>
                 </div>
               </div>
 
-              {/* Opción B: devolución directa + reembolso */}
+              {/* Opción B: devolución directa (sin taller) */}
               <div
                 className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${!reenterRepair ? "border-amber-500 bg-amber-50" : "border-slate-200 bg-white hover:border-amber-200"}`}
                 onClick={() => setReenterRepair(false)}
@@ -304,77 +312,81 @@ export default function Returns() {
                 <div className={`mt-0.5 h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center ${!reenterRepair ? "border-amber-500 bg-amber-500" : "border-slate-300"}`}>
                   {!reenterRepair && <div className="h-2 w-2 rounded-full bg-white" />}
                 </div>
-                <div className="flex-1">
+                <div>
                   <p className="text-sm font-bold text-amber-900 flex items-center gap-1.5">
-                    <DollarSign className="h-3.5 w-3.5" /> Devolución directa (sin taller)
+                    <PackageOpen className="h-3.5 w-3.5" /> Devolución directa (sin taller)
                   </p>
-                  <p className="text-xs text-slate-500 mt-0.5">El equipo se devuelve y/o se reembolsa el dinero al cliente.</p>
-
-                  {/* Sub-opción reembolso */}
-                  {!reenterRepair && (
-                    <div className="mt-3 space-y-3">
-                      <div
-                        className={`flex items-center gap-2 cursor-pointer`}
-                        onClick={(e) => { e.stopPropagation(); setDoRefund(!doRefund); }}
-                      >
-                        <Checkbox checked={doRefund} onCheckedChange={(c) => setDoRefund(!!c)} />
-                        <span className="text-xs font-bold text-slate-700">Devolver dinero al cliente</span>
-                      </div>
-
-                      {doRefund && (
-                        <div className="space-y-3 pl-2">
-                          {/* Selector de caja con saldos */}
-                          <div className="grid grid-cols-3 gap-2">
-                            {BOX_CONFIG.map((box) => (
-                              <button
-                                key={box.method}
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); setRefundPaymentMethod(box.method); }}
-                                className={`flex flex-col items-start gap-1 p-2 rounded-xl border-2 text-left transition-all ${
-                                  refundPaymentMethod === box.method
-                                    ? `border-${box.color}-500 bg-${box.color}-50`
-                                    : "border-slate-200 bg-white hover:border-slate-300"
-                                }`}
-                              >
-                                <div className="flex items-center gap-1">
-                                  <box.icon className={`h-3.5 w-3.5 ${refundPaymentMethod === box.method ? `text-${box.color}-600` : "text-slate-400"}`} />
-                                  <span className="text-[10px] font-black uppercase tracking-wide">{box.label}</span>
-                                </div>
-                                <p className={`text-xs font-black tabular-nums ${box.balance > 0 ? `text-${box.color}-700` : "text-slate-400"}`}>
-                                  {formatCurrency(box.balance)}
-                                </p>
-                                <p className="text-[9px] text-slate-400">disponible</p>
-                              </button>
-                            ))}
-                          </div>
-
-                          {/* Monto a reembolsar */}
-                          <div>
-                            <Label className="text-xs font-semibold">Monto a reembolsar (Bs)</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0.01"
-                              value={refundAmount}
-                              onChange={(e) => setRefundAmount(e.target.value)}
-                              placeholder="0.00"
-                              className="mt-1 h-10"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </div>
-
-                          {/* Aviso saldo insuficiente */}
-                          {isInsufficient && (
-                            <div className="flex items-center gap-2 p-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 font-semibold">
-                              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                              Saldo insuficiente en {BOX_CONFIG.find(b => b.method === refundPaymentMethod)?.label}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <p className="text-xs text-slate-500 mt-0.5">El equipo se devuelve directamente sin abrir orden de taller.</p>
                 </div>
+              </div>
+
+              {/* Opción de Reembolso de Dinero al Cliente (Válido para ambos casos) */}
+              <div className="pt-2 border-t border-slate-200">
+                <div
+                  className="flex items-center gap-2 cursor-pointer p-1"
+                  onClick={() => setDoRefund(!doRefund)}
+                >
+                  <Checkbox checked={doRefund} onCheckedChange={(c) => setDoRefund(!!c)} />
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+                    Devolver dinero al cliente inmediatamente (Egreso de Caja)
+                  </span>
+                </div>
+
+                {doRefund && (
+                  <div className="mt-3 space-y-3 p-3 bg-white rounded-xl border border-emerald-200">
+                    {/* Selector de caja con saldos */}
+                    <div>
+                      <Label className="text-xs font-semibold mb-1 block text-slate-700">Seleccionar Caja de Egreso:</Label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {BOX_CONFIG.map((box) => (
+                          <button
+                            key={box.method}
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setRefundPaymentMethod(box.method); }}
+                            className={`flex flex-col items-start gap-1 p-2 rounded-xl border-2 text-left transition-all ${
+                              refundPaymentMethod === box.method
+                                ? "border-emerald-500 bg-emerald-50"
+                                : "border-slate-200 bg-white hover:border-slate-300"
+                            }`}
+                          >
+                            <div className="flex items-center gap-1">
+                              <box.icon className={`h-3.5 w-3.5 ${refundPaymentMethod === box.method ? "text-emerald-600" : "text-slate-400"}`} />
+                              <span className="text-[10px] font-black uppercase tracking-wide">{box.label}</span>
+                            </div>
+                            <p className={`text-xs font-black tabular-nums ${box.balance > 0 ? "text-emerald-700" : "text-slate-400"}`}>
+                              {formatCurrency(box.balance)}
+                            </p>
+                            <p className="text-[9px] text-slate-400">disponible</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Monto a reembolsar */}
+                    <div>
+                      <Label className="text-xs font-semibold">Monto a reembolsar (Bs)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="mt-1 h-10"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+
+                    {/* Aviso saldo insuficiente */}
+                    {isInsufficient && (
+                      <div className="flex items-center gap-2 p-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 font-semibold">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                        Saldo insuficiente en {BOX_CONFIG.find(b => b.method === refundPaymentMethod)?.label}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

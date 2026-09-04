@@ -39,6 +39,11 @@ import {
   FileText,
   Grid,
   List,
+  DollarSign,
+  Repeat,
+  CheckCircle2,
+  BadgeCent,
+  ArrowRightLeft,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { WorkOrderModal } from "@/components/WorkOrderModal";
@@ -79,7 +84,9 @@ function RepairDetailsDialog({
   // Usar el historial de OTs del Kardex
   const unitRepairs: any[] = (unit as any)?.repairHistory || [];
   const warrantyHistory: any[] = (unit as any)?.warrantyHistory || [];
-  const activeWarranties = warrantyHistory.filter((w: any) => w.status === "active");
+  const activeWarranties = unit?.status === "available"
+    ? []
+    : warrantyHistory.filter((w: any) => w.status === "active");
   const unitPhotos: string[] = unit?.photos
     ? (typeof unit.photos === "string" ? JSON.parse(unit.photos) : unit.photos)
     : [];
@@ -327,6 +334,12 @@ function CompleteRepairDialog({
     resolutionType?: ResolutionType;
     extendWarrantyDays?: number;
     warrantyId?: number;
+    customerResolution?: "refund" | "exchange" | "none";
+    refundAmount?: number;
+    refundPaymentMethod?: "cash" | "qr" | "transfer";
+    replacementUnitId?: number;
+    priceDifference?: number;
+    differencePaymentMethod?: "cash" | "qr" | "transfer";
   }) => void;
   isPending: boolean;
 }) {
@@ -335,6 +348,13 @@ function CompleteRepairDialog({
   const [notes, setNotes] = useState("");
   const [resolutionType, setResolutionType] = useState<ResolutionType | null>(null);
   const [extendDays, setExtendDays] = useState(30);
+
+  // Compensación al cliente cuando retorna a inventario de venta
+  const [customerResolution, setCustomerResolution] = useState<"refund" | "exchange" | "none">("none");
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundPaymentMethod, setRefundPaymentMethod] = useState<"cash" | "qr" | "transfer">("cash");
+  const [replacementUnitId, setReplacementUnitId] = useState<number | null>(null);
+  const [differencePaymentMethod, setDifferencePaymentMethod] = useState<"cash" | "qr" | "transfer">("cash");
 
   // Detección de 2do ingreso: otras repairs completadas para esta misma unidad
   const { data: completedHistory } = trpc.repairs.list.useQuery(
@@ -355,6 +375,19 @@ function CompleteRepairDialog({
   );
   const activeWarranty = warrantiesData?.items?.[0] ?? null;
 
+  // Unidades disponibles en stock para reemplazo / cambio
+  const { data: availableUnitsData } = trpc.units.list.useQuery(
+    { status: "available", limit: 100 },
+    { enabled: open }
+  );
+  const availableUnits = (availableUnitsData?.items || []).filter((u: any) => u.id !== repair?.unitId);
+
+  // Cálculo de precios para cambio de equipo
+  const selectedReplacementUnit = availableUnits.find((u: any) => u.id === replacementUnitId) || null;
+  const originalPriceCents = repair?.unitSalePrice || 0;
+  const replacementPriceCents = selectedReplacementUnit?.salePrice || 0;
+  const priceDiffCents = selectedReplacementUnit ? replacementPriceCents - originalPriceCents : 0;
+
   // Resetear al abrir (preseleccionar return_to_inventory por defecto)
   useEffect(() => {
     if (open) {
@@ -363,8 +396,14 @@ function CompleteRepairDialog({
       setNotes("");
       setResolutionType("return_to_inventory");
       setExtendDays(30);
+      setCustomerResolution("none");
+      const unitSalePrice = repair?.unitSalePrice || 0;
+      setRefundAmount(unitSalePrice > 0 ? (unitSalePrice / 100).toFixed(2) : "");
+      setRefundPaymentMethod("cash");
+      setReplacementUnitId(null);
+      setDifferencePaymentMethod("cash");
     }
-  }, [open]);
+  }, [open, repair]);
 
   const formatLongDate = (d: Date) =>
     d.toLocaleDateString("es-BO", { day: "2-digit", month: "long", year: "numeric" });
@@ -382,6 +421,24 @@ function CompleteRepairDialog({
     }
     const laborCents = laborCost ? Math.round(parseFloat(laborCost) * 100) : 0;
     const partsCents = partsCost ? Math.round(parseFloat(partsCost) * 100) : 0;
+
+    let refundCents: number | undefined = undefined;
+    if (resolutionType === "return_to_inventory" && customerResolution === "refund") {
+      const amt = parseFloat(refundAmount);
+      if (isNaN(amt) || amt <= 0) {
+        toast.error("Por favor ingresa un monto válido a devolver al cliente");
+        return;
+      }
+      refundCents = Math.round(amt * 100);
+    }
+
+    if (resolutionType === "return_to_inventory" && customerResolution === "exchange") {
+      if (!replacementUnitId) {
+        toast.error("Por favor selecciona el equipo disponible que se entregará al cliente");
+        return;
+      }
+    }
+
     onConfirm({
       laborCost: laborCents,
       partsCost: partsCents,
@@ -389,6 +446,12 @@ function CompleteRepairDialog({
       resolutionType,
       extendWarrantyDays: resolutionType === "return_to_customer" ? extendDays : undefined,
       warrantyId: resolutionType === "return_to_customer" && activeWarranty ? activeWarranty.id : undefined,
+      customerResolution: resolutionType === "return_to_inventory" ? customerResolution : undefined,
+      refundAmount: refundCents,
+      refundPaymentMethod: customerResolution === "refund" ? refundPaymentMethod : undefined,
+      replacementUnitId: customerResolution === "exchange" ? (replacementUnitId ?? undefined) : undefined,
+      priceDifference: customerResolution === "exchange" ? priceDiffCents : undefined,
+      differencePaymentMethod: customerResolution === "exchange" && priceDiffCents !== 0 ? differencePaymentMethod : undefined,
     });
   };
 
@@ -517,8 +580,160 @@ function CompleteRepairDialog({
                     <PackageOpen className="h-4 w-4" /> Opción B — Retornar al inventario de venta
                   </div>
                   <p className="text-xs text-slate-600">
-                    La unidad regresa al inventario como Disponible para una nueva venta.
+                    La unidad regresa al inventario como Disponible para una nueva venta. La garantía previa queda concluida.
                   </p>
+
+                  {resolutionType === "return_to_inventory" && (
+                    <div className="pt-3 mt-2 border-t border-blue-200/80 space-y-3 cursor-default" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 text-xs font-bold text-blue-950 uppercase tracking-wide">
+                        <BadgeCent className="h-4 w-4 text-blue-700" />
+                        Resolución comercial con el cliente:
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {/* 1. Devolución de dinero */}
+                        <div
+                          onClick={() => setCustomerResolution("refund")}
+                          className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${customerResolution === "refund" ? "border-emerald-500 bg-emerald-50/80 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}
+                        >
+                          <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800">
+                            <DollarSign className="h-4 w-4 text-emerald-600" />
+                            Devolución de Dinero
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1">Egreso de caja al cliente</p>
+                        </div>
+
+                        {/* 2. Cambio por otro equipo */}
+                        <div
+                          onClick={() => setCustomerResolution("exchange")}
+                          className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${customerResolution === "exchange" ? "border-indigo-500 bg-indigo-50/80 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}
+                        >
+                          <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800">
+                            <Repeat className="h-4 w-4 text-indigo-600" />
+                            Cambio de Equipo
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1">Entregar otro equipo del stock</p>
+                        </div>
+
+                        {/* 3. Sin compensación / Ya resuelto */}
+                        <div
+                          onClick={() => setCustomerResolution("none")}
+                          className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${customerResolution === "none" ? "border-slate-400 bg-slate-100/90 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}
+                        >
+                          <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800">
+                            <CheckCircle2 className="h-4 w-4 text-slate-600" />
+                            Ya resuelto en RMA
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1">Sin movimiento de caja</p>
+                        </div>
+                      </div>
+
+                      {/* Sub-formulario si es Reembolso */}
+                      {customerResolution === "refund" && (
+                        <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-lg space-y-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <Label className="text-xs font-semibold text-emerald-900">Monto a reembolsar (Bs):</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={refundAmount}
+                                onChange={(e) => setRefundAmount(e.target.value)}
+                                placeholder="0.00"
+                                className="h-8 text-xs font-bold text-emerald-800 bg-white"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs font-semibold text-emerald-900">Caja de egreso:</Label>
+                              <Select value={refundPaymentMethod} onValueChange={(v: any) => setRefundPaymentMethod(v)}>
+                                <SelectTrigger className="h-8 text-xs bg-white">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="cash">Efectivo (Caja Física)</SelectItem>
+                                  <SelectItem value="qr">QR Simple / Banco</SelectItem>
+                                  <SelectItem value="transfer">Transferencia Bancaria</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-emerald-700">
+                            💡 Se registrará un <strong>Egreso en Caja</strong> por este importe y la garantía del cliente anterior quedará concluida.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Sub-formulario si es Cambio de Equipo */}
+                      {customerResolution === "exchange" && (
+                        <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-lg space-y-2.5">
+                          <div>
+                            <Label className="text-xs font-semibold text-indigo-900">Seleccionar equipo de reemplazo (Disponible):</Label>
+                            {availableUnits.length === 0 ? (
+                              <p className="text-xs text-amber-700 mt-1">No hay otros equipos en estado disponible.</p>
+                            ) : (
+                              <Select
+                                value={replacementUnitId ? String(replacementUnitId) : ""}
+                                onValueChange={(v) => setReplacementUnitId(Number(v))}
+                              >
+                                <SelectTrigger className="h-8 text-xs bg-white mt-1">
+                                  <SelectValue placeholder="Elige un equipo del catálogo disponible..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {availableUnits.map((u: any) => (
+                                    <SelectItem key={u.id} value={String(u.id)}>
+                                      {u.code} — {u.brand} {u.model} ({formatCurrency(u.salePrice)})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </div>
+
+                          {selectedReplacementUnit && (
+                            <div className="p-2.5 bg-white rounded border border-indigo-200 text-xs space-y-1.5">
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Precio equipo devuelto:</span>
+                                <span className="font-semibold">{formatCurrency(originalPriceCents)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Precio equipo sustituto ({selectedReplacementUnit.code}):</span>
+                                <span className="font-semibold">{formatCurrency(selectedReplacementUnit.salePrice)}</span>
+                              </div>
+                              <div className="flex justify-between border-t pt-1 font-bold">
+                                <span>Diferencia comercial:</span>
+                                <span className={priceDiffCents > 0 ? "text-emerald-700 font-bold" : priceDiffCents < 0 ? "text-red-600 font-bold" : "text-slate-700"}>
+                                  {priceDiffCents > 0
+                                    ? `+Bs. ${(priceDiffCents / 100).toFixed(2)} (Cliente PAGA diferencia)`
+                                    : priceDiffCents < 0
+                                    ? `-Bs. ${(Math.abs(priceDiffCents) / 100).toFixed(2)} (Tienda REEMBOLSA diferencia)`
+                                    : "Bs. 0.00 (Cambio 1 a 1 sin diferencia)"}
+                                </span>
+                              </div>
+
+                              {priceDiffCents !== 0 && (
+                                <div className="pt-1 flex items-center gap-2">
+                                  <Label className="text-[11px] font-semibold text-slate-700 shrink-0">Caja para diferencia:</Label>
+                                  <Select value={differencePaymentMethod} onValueChange={(v: any) => setDifferencePaymentMethod(v)}>
+                                    <SelectTrigger className="h-7 text-[11px] bg-slate-50">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="cash">Efectivo</SelectItem>
+                                      <SelectItem value="qr">QR Simple</SelectItem>
+                                      <SelectItem value="transfer">Transferencia</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+                              <p className="text-[10px] text-indigo-700 pt-0.5">
+                                💡 El equipo nuevo pasará a <strong>Vendido</strong> y se le transferirá la garantía al cliente.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </Label>
               </div>
             </RadioGroup>
@@ -539,6 +754,7 @@ function CompleteRepairDialog({
 }
 
 export default function Repairs() {
+  const utils = trpc.useUtils();
   const { activeBranchId } = useBranch();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
@@ -604,10 +820,15 @@ export default function Repairs() {
 
   const updateRepairMutation = trpc.repairs.update.useMutation({
     onSuccess: () => {
-      toast.success("Reparación finalizada");
+      toast.success("✅ Reparación finalizada correctamente");
       setIsCompleteOpen(false);
       setSelectedRepair(null);
       refetch();
+      utils.repairs.invalidate();
+      utils.units.invalidate();
+      utils.warranties.invalidate();
+      (utils.finance as any)?.getGlobalBalances?.invalidate?.();
+      (utils.stats as any)?.getProfitability?.invalidate?.();
     },
     onError: (err) => toast.error(err.message),
   });
@@ -629,7 +850,7 @@ export default function Repairs() {
 
   const handleCreateRepair = () => {
     if (!foundUnit) {
-      toast.error("Debes seleccionar una laptop válida");
+      toast.error("Busca y selecciona una laptop primero");
       return;
     }
 
@@ -661,12 +882,16 @@ export default function Repairs() {
     resolutionType?: ResolutionType;
     extendWarrantyDays?: number;
     warrantyId?: number;
+    customerResolution?: "refund" | "exchange" | "none";
+    refundAmount?: number;
+    refundPaymentMethod?: "cash" | "qr" | "transfer";
+    replacementUnitId?: number;
+    priceDifference?: number;
+    differencePaymentMethod?: "cash" | "qr" | "transfer";
   }) => {
     updateRepairMutation.mutate({
       id: selectedRepair.id,
       status: "completed",
-      // El backend decide el estado final de la unidad a partir de resolutionType
-      // (return_to_inventory -> available, return_to_customer -> mantiene estado actual).
       targetUnitStatus: payload.resolutionType === "return_to_inventory" ? "available" : "sold",
       laborCost: payload.laborCost,
       partsCost: payload.partsCost,
@@ -674,6 +899,12 @@ export default function Repairs() {
       resolutionType: payload.resolutionType,
       extendWarrantyDays: payload.extendWarrantyDays,
       warrantyId: payload.warrantyId,
+      customerResolution: payload.customerResolution,
+      refundAmount: payload.refundAmount,
+      refundPaymentMethod: payload.refundPaymentMethod,
+      replacementUnitId: payload.replacementUnitId,
+      priceDifference: payload.priceDifference,
+      differencePaymentMethod: payload.differencePaymentMethod,
     });
   };
 
