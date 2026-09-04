@@ -64,23 +64,27 @@ async function seedDashboardDemoData() {
     );
 
     if (existingSales[0]?.cnt === 0) {
+      // Obtener un usuario para soldBy
+      const [usersList]: any = await connection.query(`SELECT id FROM users LIMIT 1`);
+      const soldById = usersList[0]?.id || 1;
+
       await connection.query(
         `INSERT INTO sales 
-          (saleNumber, total, \`status\`, branchId, createdAt, updatedAt)
+          (saleNumber, soldBy, subtotal, total, paymentMethod, \`status\`, branchId, createdAt)
          VALUES 
-          (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 15 DAY), NOW()),
-          (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 14 DAY), NOW()),
-          (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 10 DAY), NOW()),
-          (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 8 DAY), NOW()),
-          (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 5 DAY), NOW()),
-          (?, ?, ?, 1, DATE_SUB(NOW(), INTERVAL 3 DAY), NOW())`,
+          (?, ?, ?, ?, 'cash', ?, 1, DATE_SUB(NOW(), INTERVAL 15 DAY)),
+          (?, ?, ?, ?, 'cash', ?, 1, DATE_SUB(NOW(), INTERVAL 14 DAY)),
+          (?, ?, ?, ?, 'cash', ?, 1, DATE_SUB(NOW(), INTERVAL 10 DAY)),
+          (?, ?, ?, ?, 'cash', ?, 1, DATE_SUB(NOW(), INTERVAL 8 DAY)),
+          (?, ?, ?, ?, 'cash', ?, 1, DATE_SUB(NOW(), INTERVAL 5 DAY)),
+          (?, ?, ?, ?, 'cash', ?, 1, DATE_SUB(NOW(), INTERVAL 3 DAY))`,
         [
-          "V-001", 150000, "completed",
-          "V-002", 200000, "completed",
-          "V-003", 180000, "completed",
-          "V-004", 220000, "completed",
-          "V-005", 170000, "completed",
-          "V-006", 190000, "completed",
+          "V-001", soldById, 150000, 150000, "completed",
+          "V-002", soldById, 200000, 200000, "completed",
+          "V-003", soldById, 180000, 180000, "completed",
+          "V-004", soldById, 220000, 220000, "completed",
+          "V-005", soldById, 170000, 170000, "completed",
+          "V-006", soldById, 190000, 190000, "completed",
         ],
       );
 
@@ -97,21 +101,21 @@ async function seedDashboardDemoData() {
       if (Object.keys(saleMap).length > 0) {
         await connection.query(
           `INSERT INTO saleItems 
-            (saleId, unitId, quantity, finalUnitPrice, discountAmount)
+            (saleId, unitId, quantity, basePrice, finalUnitPrice, discountAmount, subtotal)
            VALUES 
-            (?, ?, 1, ?, 0),
-            (?, ?, 1, ?, 0),
-            (?, ?, 1, ?, 0),
-            (?, ?, 1, ?, 0),
-            (?, ?, 1, ?, 0),
-            (?, ?, 1, ?, 0)`,
+            (?, ?, 1, ?, ?, 0, ?),
+            (?, ?, 1, ?, ?, 0, ?),
+            (?, ?, 1, ?, ?, 0, ?),
+            (?, ?, 1, ?, ?, 0, ?),
+            (?, ?, 1, ?, ?, 0, ?),
+            (?, ?, 1, ?, ?, 0, ?)`,
           [
-            saleMap["V-001"], unitMap["UNI-00001"] || 1, 150000,
-            saleMap["V-002"], unitMap["UNI-00002"] || 2, 200000,
-            saleMap["V-003"], unitMap["UNI-00003"] || 3, 180000,
-            saleMap["V-004"], unitMap["UNI-00004"] || 4, 220000,
-            saleMap["V-005"], unitMap["UNI-00005"] || 5, 170000,
-            saleMap["V-006"], unitMap["UNI-00006"] || 6, 190000,
+            saleMap["V-001"], unitMap["UNI-00001"] || 1, 150000, 150000, 150000,
+            saleMap["V-002"], unitMap["UNI-00002"] || 2, 200000, 200000, 200000,
+            saleMap["V-003"], unitMap["UNI-00003"] || 3, 180000, 180000, 180000,
+            saleMap["V-004"], unitMap["UNI-00004"] || 4, 220000, 220000, 220000,
+            saleMap["V-005"], unitMap["UNI-00005"] || 5, 170000, 170000, 170000,
+            saleMap["V-006"], unitMap["UNI-00006"] || 6, 190000, 190000, 190000,
           ],
         );
       }
@@ -147,8 +151,8 @@ async function seedDashboardDemoData() {
     for (const exp of expenses) {
       await connection.query(
         `INSERT INTO financialTransactions 
-          (\`type\`, category, description, amount, paymentMethod, branchId, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, 'cash', 1, DATE_SUB(NOW(), INTERVAL ? DAY), NOW())`,
+          (\`type\`, category, notes, amount, paymentMethod, branchId, createdAt)
+         VALUES (?, ?, ?, ?, 'cash', 1, DATE_SUB(NOW(), INTERVAL ? DAY))`,
         ["expense", exp.category, `Gasto: ${exp.category}`, exp.amount, exp.offset],
       );
     }
