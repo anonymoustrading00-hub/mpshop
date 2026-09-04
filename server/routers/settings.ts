@@ -10,11 +10,11 @@ import { eq } from "drizzle-orm";
 // ─── Default company config (fallback cuando no hay BD o no hay config guardada) ───
 export const DEFAULT_COMPANY_CONFIG = {
   name: "HK EQUIPOS TECNOLÓGICOS",
-  subName: "VITALIA - CONTROL & VENTAS",
+  subName: "MP SHOP - CONTROL & VENTAS",
   slogan: "Tecnología que conecta contigo · Equipos Garantizados",
   phone: "+591 70000000",
   whatsapp: "+591 70000000",
-  email: "ventas@vitaliapro.com",
+  email: "ventas@mpshop.com",
   address: "Centro Comercial Tecnológico, La Paz - Bolivia",
   city: "La Paz, Bolivia",
   taxId: "1234567890",

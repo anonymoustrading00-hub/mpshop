@@ -5,7 +5,7 @@ const databaseUrl = process.env.DATABASE_URL;
 const username = process.env.ADMIN_USERNAME;
 const password = process.env.ADMIN_PASSWORD;
 const name = process.env.ADMIN_NAME || "Administrador";
-const email = process.env.ADMIN_EMAIL || "admin@vitalia.local";
+const email = process.env.ADMIN_EMAIL || "admin@mpshop.com";
 
 async function seedRailwayAdmin() {
   if (!databaseUrl) {

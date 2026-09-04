@@ -1,4 +1,4 @@
-# Vitalia - TODO
+# MP Shop - TODO
 
 ## Base de Datos
 - [x] Diseñar esquema de tablas (usuarios, pedidos, clientes, productos, inventario, pagos)

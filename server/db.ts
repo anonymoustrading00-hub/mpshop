@@ -165,7 +165,7 @@ export const MOCK_USERS: any[] = [
     createdAt: new Date(), 
     updatedAt: new Date(), 
     lastSignedIn: new Date(), 
-    email: "root@vitaliapro.com", 
+    email: "root@mpshop.com", 
     loginMethod: "traditional" 
   }
 ];

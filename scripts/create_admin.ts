@@ -15,7 +15,7 @@ async function createAdmin() {
   const passwordHash = "$2b$10$9Sg2Com1gCSFtFhWjxkBbuLzPA9ar0ucdiPLycgbOogdudS60Uwlu"; // 'admin'
   const name = "Administrador Principal";
   const role = "admin";
-  const email = "root@vitaliapro.com";
+  const email = "root@mpshop.com";
 
   console.log(`Checking if user ${username} exists...`);
   const [rows] = await connection.query('SELECT * FROM users WHERE username = ?', [username]);
