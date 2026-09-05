@@ -14,7 +14,7 @@ import {
   Activity, ShoppingBag, ShoppingCart, CheckCircle, Package, Printer, Pencil, Trash2, X, BookOpen, Video,
   ExternalLink, Play, FileText, Sparkles, Camera, ImagePlus,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Boxes, Layers, Table, Grid, List,
-  Wallet, Landmark, Smartphone, Tablet, Monitor, Plug, MoreHorizontal, AlertTriangle, TrendingUp, DollarSign, Minus
+  Wallet, Landmark, Smartphone, Tablet, Monitor, Plug, MoreHorizontal, AlertTriangle, TrendingUp, DollarSign, Minus, Check
 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -1681,7 +1681,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
         {/* ══════════ MODAL: EDITAR UNIDAD ══════════ */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto p-0 rounded-3xl border-0 shadow-2xl bg-white">
+          <DialogContent className="max-w-4xl w-[95vw] md:w-full max-h-[92vh] overflow-y-auto p-0 rounded-3xl border border-slate-200/80 shadow-2xl bg-white">
             {/* Header */}
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -1909,84 +1909,112 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                     </label>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5">
                     {/* Precio Compra */}
-                    <div className="p-3 rounded-xl border-2 border-emerald-200 bg-emerald-50/40 space-y-1.5 flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-[11px] font-bold text-emerald-900 leading-tight">🛒 Compra:</span>
-                        <Badge variant="outline" className="text-[9px] font-black bg-white text-emerald-800 border-emerald-300 px-1.5 py-0">
+                    <div className="p-3.5 rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 space-y-2 flex flex-col justify-between shadow-xs">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-xs font-black text-emerald-950 flex items-center gap-1">
+                          <span>🛒</span> Compra
+                        </span>
+                        <Badge variant="outline" className="text-[10px] font-black bg-white text-emerald-800 border-emerald-300 px-2 py-0.5 shrink-0 shadow-xs">
                           Costo
                         </Badge>
                       </div>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={editPurchasePrice}
-                        onChange={(e) => setEditPurchasePrice(e.target.value)}
-                        placeholder="0.00"
-                        className="h-10 font-black text-emerald-950 bg-white border-emerald-300 rounded-lg text-base text-center"
-                      />
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-700 pointer-events-none select-none">
+                          Bs.
+                        </span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={editPurchasePrice}
+                          onChange={(e) => setEditPurchasePrice(e.target.value)}
+                          placeholder="0.00"
+                          className="h-10 pl-9 font-black text-emerald-950 bg-white border-emerald-300 rounded-xl text-base text-right pr-3 focus-visible:ring-emerald-400"
+                        />
+                      </div>
                     </div>
 
                     {/* Precio Venta */}
-                    <div className="p-3 rounded-xl border-2 border-blue-200 bg-blue-50/40 space-y-1.5 flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-[11px] font-bold text-blue-900 leading-tight">💰 Unitario:</span>
-                        <Badge variant="outline" className="text-[9px] font-black bg-white text-blue-800 border-blue-300 px-1.5 py-0">
+                    <div className="p-3.5 rounded-2xl border-2 border-blue-200 bg-blue-50/40 space-y-2 flex flex-col justify-between shadow-xs">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-xs font-black text-blue-950 flex items-center gap-1">
+                          <span>💰</span> Unitario
+                        </span>
+                        <Badge variant="outline" className="text-[10px] font-black bg-white text-blue-800 border-blue-300 px-2 py-0.5 shrink-0 shadow-xs">
                           Público
                         </Badge>
                       </div>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={editSalePrice}
-                        onChange={(e) => setEditSalePrice(e.target.value)}
-                        placeholder="0.00"
-                        className="h-10 font-black text-blue-950 bg-white border-blue-300 rounded-lg text-base text-center"
-                      />
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-blue-700 pointer-events-none select-none">
+                          Bs.
+                        </span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={editSalePrice}
+                          onChange={(e) => setEditSalePrice(e.target.value)}
+                          placeholder="0.00"
+                          className="h-10 pl-9 font-black text-blue-950 bg-white border-blue-300 rounded-xl text-base text-right pr-3 focus-visible:ring-blue-400"
+                        />
+                      </div>
                     </div>
 
                     {/* Precio Descuento */}
-                    <div className="p-3 rounded-xl border-2 border-amber-200 bg-amber-50/40 space-y-1.5 flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-[11px] font-bold text-amber-900 leading-tight">🏷️ Descuento:</span>
-                        <Badge variant="outline" className="text-[9px] font-black bg-white text-amber-800 border-amber-300 px-1.5 py-0">
+                    <div className="p-3.5 rounded-2xl border-2 border-amber-200 bg-amber-50/40 space-y-2 flex flex-col justify-between shadow-xs">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-xs font-black text-amber-950 flex items-center gap-1">
+                          <span>🏷️</span> Descuento
+                        </span>
+                        <Badge variant="outline" className="text-[10px] font-black bg-white text-amber-800 border-amber-300 px-2 py-0.5 shrink-0 shadow-xs">
                           Oferta
                         </Badge>
                       </div>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={editDiscountPrice}
-                        onChange={(e) => setEditDiscountPrice(e.target.value)}
-                        placeholder="0.00"
-                        className="h-10 font-black text-amber-950 bg-white border-amber-300 rounded-lg text-base text-center"
-                      />
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700 pointer-events-none select-none">
+                          Bs.
+                        </span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={editDiscountPrice}
+                          onChange={(e) => setEditDiscountPrice(e.target.value)}
+                          placeholder="0.00"
+                          className="h-10 pl-9 font-black text-amber-950 bg-white border-amber-300 rounded-xl text-base text-right pr-3 focus-visible:ring-amber-400"
+                        />
+                      </div>
                     </div>
 
                     {/* Precio por Mayor */}
-                    <div className="p-3 rounded-xl border-2 border-teal-200 bg-teal-50/40 space-y-1.5 flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-[11px] font-bold text-teal-900 leading-tight">📦 Por Mayor:</span>
-                        <Badge variant="outline" className="text-[9px] font-black bg-white text-teal-800 border-teal-300 px-1.5 py-0">
+                    <div className="p-3.5 rounded-2xl border-2 border-purple-200 bg-purple-50/40 space-y-2 flex flex-col justify-between shadow-xs">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-xs font-black text-purple-950 flex items-center gap-1">
+                          <span>📦</span> Por Mayor
+                        </span>
+                        <Badge variant="outline" className="text-[10px] font-black bg-white text-purple-800 border-purple-300 px-2 py-0.5 shrink-0 shadow-xs">
                           Mayorista
                         </Badge>
                       </div>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={editWholesalePrice}
-                        onChange={(e) => setEditWholesalePrice(e.target.value)}
-                        placeholder="0.00"
-                        className="h-10 font-black text-teal-950 bg-white border-teal-300 rounded-lg text-base text-center"
-                      />
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-purple-700 pointer-events-none select-none">
+                          Bs.
+                        </span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={editWholesalePrice}
+                          onChange={(e) => setEditWholesalePrice(e.target.value)}
+                          placeholder="0.00"
+                          className="h-10 pl-9 font-black text-purple-950 bg-white border-purple-300 rounded-xl text-base text-right pr-3 focus-visible:ring-purple-400"
+                        />
+                      </div>
                     </div>
                   </div>
 
                   {/* Margen de ganancia calculado */}
                   {editPurchasePrice && editSalePrice && (
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                    <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                      <div className="flex items-center gap-2 font-bold text-slate-700">
                         <TrendingUp className="h-4 w-4 text-emerald-600" />
                         Margen Bruto Estimado por Unidad:
                       </div>
@@ -1996,7 +2024,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         const diff = price - cost;
                         const pct = cost > 0 ? Math.round((diff / cost) * 100) : 0;
                         return (
-                          <Badge className={`font-black text-xs ${diff >= 0 ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
+                          <Badge className={`font-black text-xs px-3 py-1 rounded-xl shadow-xs ${diff >= 0 ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
                             {diff >= 0 ? "+" : ""}Bs. {diff.toFixed(2)} ({pct}%)
                           </Badge>
                         );
@@ -2006,48 +2034,50 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                 </div>
 
                 {/* ─── 6. Control de Stock y Compras Adicionales (Caja / Finanzas) ─── */}
-                <div className="bg-gradient-to-br from-blue-50/80 via-slate-50 to-indigo-50/60 p-4 rounded-2xl border-2 border-blue-200/90 shadow-sm space-y-4">
+                <div className="bg-gradient-to-br from-blue-50/80 via-slate-50 to-indigo-50/60 p-4 sm:p-5 rounded-3xl border-2 border-blue-200/90 shadow-sm space-y-4">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div>
                       <div className="flex items-center gap-2 text-xs font-black text-blue-950 uppercase tracking-wider">
                         <Boxes className="h-4 w-4 text-blue-600" />
                         Stock & Compras a Caja
                       </div>
-                      <p className="text-[11px] text-slate-600">
-                        Unidades físicas en inventario y registro de nuevas compras que afectan la caja
+                      <p className="text-[11px] text-slate-600 mt-0.5">
+                        Unidades físicas en inventario y registro de nuevas compras con impacto directo en caja
                       </p>
                     </div>
-                    <Badge className="bg-blue-600 text-white font-black text-xs px-3 py-1 shadow-sm">
+                    <Badge className="bg-blue-600 text-white font-black text-xs px-3 py-1.5 rounded-xl shadow-sm">
                       📦 Stock Actual: {editCurrentStock} {editCurrentStock === 1 ? "unidad" : "unidades"}
                     </Badge>
                   </div>
 
                   {/* Panel de ingreso / compra de stock */}
-                  <div className="bg-white p-4 rounded-2xl border border-blue-200/80 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-black text-blue-900 flex items-center gap-1.5 uppercase tracking-wide">
+                  <div className="bg-white p-4 sm:p-5 rounded-2xl border border-blue-200/80 shadow-sm space-y-5">
+                    {/* Header del bloque */}
+                    <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-2 text-xs font-black text-blue-900 uppercase tracking-wide">
                         <Plus className="h-4 w-4 text-blue-600" />
                         Ingresar / Comprar Más Unidades (+Stock):
-                      </label>
+                      </div>
                       {addStockQty > 0 && (
-                        <Badge className="bg-emerald-600 text-white font-black text-xs animate-pulse">
-                          +{addStockQty} a comprar
+                        <Badge className="bg-emerald-600 text-white font-black text-xs px-3 py-1 rounded-xl shadow-xs animate-pulse">
+                          +{addStockQty} a comprar (Total: {editCurrentStock + addStockQty} unidades)
                         </Badge>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                      {/* Cantidad Stepper */}
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-700 block mb-1.5">
-                          Cantidad de unidades adicionales a ingresar:
-                        </label>
-                        <div className="flex items-center gap-2">
+                    {/* Fila 1: Stepper de cantidad */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 block">
+                        Cantidad de unidades adicionales a ingresar:
+                      </label>
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        {/* Stepper unificado */}
+                        <div className="inline-flex items-center rounded-2xl border-2 border-blue-200 bg-blue-50/40 p-1 shadow-xs">
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            className="h-10 w-10 p-0 text-slate-700 border-slate-300 rounded-xl shrink-0"
+                            className="h-10 w-10 p-0 text-slate-700 hover:bg-white hover:text-blue-700 rounded-xl shrink-0"
                             onClick={() => setAddStockQty((prev) => Math.max(0, prev - 1))}
                             disabled={addStockQty <= 0}
                           >
@@ -2060,132 +2090,201 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                             value={addStockQty === 0 ? "" : addStockQty}
                             onChange={(e) => setAddStockQty(Math.max(0, parseInt(e.target.value) || 0))}
                             placeholder="0"
-                            className="h-10 font-black text-center text-lg border-blue-300 rounded-xl w-16 shrink-0"
+                            className="h-10 w-20 border-0 bg-transparent font-black text-center text-xl text-blue-950 focus-visible:ring-0 shadow-none"
                           />
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            className="h-10 w-10 p-0 text-blue-700 border-blue-300 rounded-xl shrink-0"
+                            className="h-10 w-10 p-0 text-blue-700 hover:bg-white rounded-xl shrink-0"
                             onClick={() => setAddStockQty((prev) => prev + 1)}
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
-                          <div className="flex gap-1">
-                            {[1, 5, 10].map((n) => (
-                              <Button
-                                key={n}
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-10 px-2 text-xs font-black text-blue-700 border-blue-200 hover:bg-blue-50 rounded-xl"
-                                onClick={() => setAddStockQty((prev) => prev + n)}
-                              >
-                                +{n}
-                              </Button>
-                            ))}
-                            {addStockQty > 0 && (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                className="h-10 px-2 text-xs text-red-600 hover:bg-red-50 rounded-xl"
-                                onClick={() => setAddStockQty(0)}
-                                title="Reiniciar a 0"
-                              >
-                                ✕
-                              </Button>
-                            )}
-                          </div>
                         </div>
-                      </div>
 
-                      {/* Método de pago selector con Saldos */}
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-700 block mb-1.5">
-                          Forma de Pago de la Compra (Caja):
-                        </label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {/* Efectivo */}
-                          <button
-                            type="button"
-                            onClick={() => setAddStockPaymentMethod("cash")}
-                            className={`flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all text-center min-h-[52px] ${
-                              addStockPaymentMethod === "cash"
-                                ? "border-emerald-500 bg-emerald-50/80 shadow-sm"
-                                : "border-slate-200 bg-white hover:border-emerald-300"
-                            }`}
-                          >
-                            <div className="flex items-center gap-1">
-                              <Wallet className={`h-3.5 w-3.5 shrink-0 ${addStockPaymentMethod === "cash" ? "text-emerald-600" : "text-slate-400"}`} />
-                              <span className={`text-[10px] font-black uppercase truncate ${addStockPaymentMethod === "cash" ? "text-emerald-800" : "text-slate-600"}`}>
-                                Efectivo
-                              </span>
-                            </div>
-                            <p className="text-[10px] font-black text-emerald-700 tabular-nums mt-0.5">
-                              {formatCurrency(globalBalances?.cash ?? 0)}
-                            </p>
-                          </button>
-
-                          {/* QR */}
-                          <button
-                            type="button"
-                            onClick={() => setAddStockPaymentMethod("qr")}
-                            className={`flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all text-center min-h-[52px] ${
-                              addStockPaymentMethod === "qr"
-                                ? "border-blue-500 bg-blue-50/80 shadow-sm"
-                                : "border-slate-200 bg-white hover:border-blue-300"
-                            }`}
-                          >
-                            <div className="flex items-center gap-1">
-                              <QrCode className={`h-3.5 w-3.5 shrink-0 ${addStockPaymentMethod === "qr" ? "text-blue-600" : "text-slate-400"}`} />
-                              <span className={`text-[10px] font-black uppercase truncate ${addStockPaymentMethod === "qr" ? "text-blue-800" : "text-slate-600"}`}>
-                                QR
-                              </span>
-                            </div>
-                            <p className="text-[10px] font-black text-blue-700 tabular-nums mt-0.5">
-                              {formatCurrency(globalBalances?.qr ?? 0)}
-                            </p>
-                          </button>
-
-                          {/* Banco */}
-                          <button
-                            type="button"
-                            onClick={() => setAddStockPaymentMethod("transfer")}
-                            className={`flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all text-center min-h-[52px] ${
-                              addStockPaymentMethod === "transfer"
-                                ? "border-purple-500 bg-purple-50/80 shadow-sm"
-                                : "border-slate-200 bg-white hover:border-purple-300"
-                            }`}
-                          >
-                            <div className="flex items-center gap-1">
-                              <Landmark className={`h-3.5 w-3.5 shrink-0 ${addStockPaymentMethod === "transfer" ? "text-purple-600" : "text-slate-400"}`} />
-                              <span className={`text-[10px] font-black uppercase truncate ${addStockPaymentMethod === "transfer" ? "text-purple-800" : "text-slate-600"}`}>
-                                Banco
-                              </span>
-                            </div>
-                            <p className="text-[10px] font-black text-purple-700 tabular-nums mt-0.5">
-                              {formatCurrency(globalBalances?.transfer ?? 0)}
-                            </p>
-                          </button>
+                        {/* Botones de incremento rápido */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {[1, 5, 10, 20].map((n) => (
+                            <Button
+                              key={n}
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-10 px-3 text-xs font-black text-blue-700 border-blue-200 hover:bg-blue-50 hover:border-blue-300 rounded-xl"
+                              onClick={() => setAddStockQty((prev) => prev + n)}
+                            >
+                              +{n}
+                            </Button>
+                          ))}
+                          {addStockQty > 0 && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-10 px-3 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl"
+                              onClick={() => setAddStockQty(0)}
+                              title="Restablecer a 0"
+                            >
+                              ✕ Restablecer
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    {/* Alerta de Impacto Financiero en Caja */}
+                    {/* Fila 2: Selector de Forma de Pago con Saldos */}
+                    <div className="space-y-2 pt-2 border-t border-slate-100">
+                      <div className="flex items-center justify-between flex-wrap gap-1">
+                        <label className="text-xs font-bold text-slate-700">
+                          Forma de Pago de la Compra (Caja):
+                        </label>
+                        <span className="text-[11px] text-slate-400">
+                          (El egreso se registrará en esta cuenta de caja)
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {/* Efectivo */}
+                        <button
+                          type="button"
+                          onClick={() => setAddStockPaymentMethod("cash")}
+                          className={`flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all cursor-pointer text-left ${
+                            addStockPaymentMethod === "cash"
+                              ? "border-emerald-500 bg-emerald-50/70 shadow-sm ring-2 ring-emerald-200/50"
+                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
+                              addStockPaymentMethod === "cash" ? "bg-emerald-600 text-white" : "bg-emerald-100/80 text-emerald-700"
+                            }`}>
+                              <Wallet className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`text-xs font-black uppercase tracking-wider truncate ${
+                                addStockPaymentMethod === "cash" ? "text-emerald-950" : "text-slate-800"
+                              }`}>
+                                Efectivo
+                              </p>
+                              <p className="text-[11px] font-bold text-slate-500 truncate">
+                                Saldo: <span className="text-emerald-700 font-black">{formatCurrency(globalBalances?.cash ?? 0)}</span>
+                              </p>
+                            </div>
+                          </div>
+                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                            addStockPaymentMethod === "cash"
+                              ? "border-emerald-600 bg-emerald-600 text-white"
+                              : "border-slate-300 bg-white"
+                          }`}>
+                            {addStockPaymentMethod === "cash" && <Check className="h-3 w-3 stroke-[3]" />}
+                          </div>
+                        </button>
+
+                        {/* QR */}
+                        <button
+                          type="button"
+                          onClick={() => setAddStockPaymentMethod("qr")}
+                          className={`flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all cursor-pointer text-left ${
+                            addStockPaymentMethod === "qr"
+                              ? "border-blue-500 bg-blue-50/70 shadow-sm ring-2 ring-blue-200/50"
+                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
+                              addStockPaymentMethod === "qr" ? "bg-blue-600 text-white" : "bg-blue-100/80 text-blue-700"
+                            }`}>
+                              <QrCode className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`text-xs font-black uppercase tracking-wider truncate ${
+                                addStockPaymentMethod === "qr" ? "text-blue-950" : "text-slate-800"
+                              }`}>
+                                QR
+                              </p>
+                              <p className="text-[11px] font-bold text-slate-500 truncate">
+                                Saldo: <span className="text-blue-700 font-black">{formatCurrency(globalBalances?.qr ?? 0)}</span>
+                              </p>
+                            </div>
+                          </div>
+                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                            addStockPaymentMethod === "qr"
+                              ? "border-blue-600 bg-blue-600 text-white"
+                              : "border-slate-300 bg-white"
+                          }`}>
+                            {addStockPaymentMethod === "qr" && <Check className="h-3 w-3 stroke-[3]" />}
+                          </div>
+                        </button>
+
+                        {/* Banco */}
+                        <button
+                          type="button"
+                          onClick={() => setAddStockPaymentMethod("transfer")}
+                          className={`flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all cursor-pointer text-left ${
+                            addStockPaymentMethod === "transfer"
+                              ? "border-purple-500 bg-purple-50/70 shadow-sm ring-2 ring-purple-200/50"
+                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
+                              addStockPaymentMethod === "transfer" ? "bg-purple-600 text-white" : "bg-purple-100/80 text-purple-700"
+                            }`}>
+                              <Landmark className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`text-xs font-black uppercase tracking-wider truncate ${
+                                addStockPaymentMethod === "transfer" ? "text-purple-950" : "text-slate-800"
+                              }`}>
+                                Banco
+                              </p>
+                              <p className="text-[11px] font-bold text-slate-500 truncate">
+                                Saldo: <span className="text-purple-700 font-black">{formatCurrency(globalBalances?.transfer ?? 0)}</span>
+                              </p>
+                            </div>
+                          </div>
+                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                            addStockPaymentMethod === "transfer"
+                              ? "border-purple-600 bg-purple-600 text-white"
+                              : "border-slate-300 bg-white"
+                          }`}>
+                            {addStockPaymentMethod === "transfer" && <Check className="h-3 w-3 stroke-[3]" />}
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Fila 3: Alerta y Desglose de Impacto Financiero en Caja */}
                     {addStockQty > 0 && (
-                      <div className="p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-300/80 text-amber-950 space-y-2 shadow-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-black flex items-center gap-1.5 uppercase tracking-wide">
-                            <DollarSign className="h-4 w-4 text-amber-700" />
-                            Egreso Automático en Finanzas / Caja:
+                      <div className="p-4 rounded-2xl bg-amber-50/90 border-2 border-amber-300 text-amber-950 space-y-3 shadow-xs">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <span className="text-xs font-black flex items-center gap-1.5 uppercase tracking-wide text-amber-900">
+                            <DollarSign className="h-4 w-4 text-amber-600" />
+                            Egreso Automático en Caja / Finanzas:
                           </span>
-                          <span className="text-base font-black text-amber-950 tabular-nums bg-amber-100/90 px-3 py-0.5 rounded-lg border border-amber-300">
+                          <span className="text-base font-black text-red-700 tabular-nums bg-white px-3 py-0.5 rounded-xl border border-red-200 shadow-xs">
                             −Bs. {(addStockQty * (parseFloat(editPurchasePrice) || 0)).toFixed(2)}
                           </span>
                         </div>
-                        <p className="text-xs text-amber-900 leading-relaxed">
-                          Al guardar se crearán automáticamente <b>{addStockQty} {addStockQty === 1 ? "unidad" : "unidades"}</b> con códigos únicos secuenciales en el inventario y se registrará <b>1 orden de compra</b> con egreso de caja por <b>Bs. {(addStockQty * (parseFloat(editPurchasePrice) || 0)).toFixed(2)}</b> ({addStockPaymentMethod === "cash" ? "Efectivo" : addStockPaymentMethod === "qr" ? "QR" : "Transferencia"}).
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-amber-200/80 text-xs">
+                          <div className="bg-white/80 p-2.5 rounded-xl border border-amber-200/60">
+                            <span className="text-slate-500 block text-[11px]">Unidades Nuevas:</span>
+                            <span className="font-black text-slate-800 text-sm">+{addStockQty} {addStockQty === 1 ? "unidad" : "unidades"}</span>
+                          </div>
+                          <div className="bg-white/80 p-2.5 rounded-xl border border-amber-200/60">
+                            <span className="text-slate-500 block text-[11px]">Costo Unitario:</span>
+                            <span className="font-black text-slate-800 text-sm">Bs. {(parseFloat(editPurchasePrice) || 0).toFixed(2)}</span>
+                          </div>
+                          <div className="bg-white/80 p-2.5 rounded-xl border border-amber-200/60">
+                            <span className="text-slate-500 block text-[11px]">Caja Afectada:</span>
+                            <span className="font-black text-blue-700 text-sm capitalize">
+                              {addStockPaymentMethod === "cash" ? "Efectivo" : addStockPaymentMethod === "qr" ? "QR" : "Banco / Transferencia"}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-amber-900/90 leading-relaxed">
+                          ℹ️ Al guardar se generarán los códigos secuenciales en inventario y se descontará el dinero de la caja seleccionada.
                         </p>
                       </div>
                     )}
