@@ -806,12 +806,14 @@ export const reportsExcelRouter = router({
       for (const r of repairList as any[]) repMap.set(r.unitId, (repMap.get(r.unitId)||0)+(r.laborCost||0)+(r.partsCost||0));
 
       const today = cutoff.getTime();
-      const headers = ["Código", "Marca", "Modelo", "Tipo", "Estado", "Cond.", "P. Compra (Bs)", "Costo Reparación (Bs)", "Costo Total (Bs)", "P. Venta (Bs)", "Días en Inventario", "Fecha Registro"];
+      const headers = ["Código", "Marca", "Modelo", "Tipo", "Estado", "Cond.", "Fecha de Compra", "P. Compra (Bs)", "Costo Reparación (Bs)", "Costo Total (Bs)", "P. Venta (Bs)", "Días en Inventario", "Fecha Registro"];
       const rows = (unitList as any[]).map((u: any) => {
         const repCost = repMap.get(u.id) || 0;
+        const pDate = u.purchaseDate ? new Date(u.purchaseDate) : (u.createdAt ? new Date(u.createdAt) : null);
         const days = Math.max(0, Math.round((today - new Date(u.createdAt).getTime()) / 86400000));
         return [
           u.code, u.brand, u.model, u.type, u.status, u.condition || "—",
+          pDate ? pDate.toLocaleDateString("es-BO") : "—",
           fmtCents(u.purchasePrice || 0), fmtCents(repCost),
           fmtCents((u.purchasePrice||0) + repCost),
           fmtCents(u.salePrice || 0), days,

@@ -696,14 +696,16 @@ export const generateInventoryPDF = (data: any, companyConfig?: any) => {
     const sPrice = Number(u.salePrice || 0);
     const margin = sPrice - pCost;
     const marginPct = pCost > 0 ? Math.round((margin / pCost) * 100) : 0;
-    const purchaseDate = u.purchaseDate ? new Date(u.purchaseDate) : new Date(u.createdAt);
-    const days = Math.max(0, Math.floor((Date.now() - purchaseDate.getTime()) / 86400000));
+    const purchaseDate = u.purchaseDate ? new Date(u.purchaseDate) : (u.createdAt ? new Date(u.createdAt) : null);
+    const purchaseDateStr = purchaseDate ? format(purchaseDate, "dd/MM/yyyy") : "—";
+    const days = purchaseDate ? Math.max(0, Math.floor((Date.now() - purchaseDate.getTime()) / 86400000)) : 0;
 
     return [
       u.code || `UNI-${u.id}`,
       `${u.brand || ""} ${u.model || ""}`.trim() || "—",
       TYPE_SHORT[u.type] || u.type || "—",
       STATUS_TEXT[u.status] || u.status || "—",
+      purchaseDateStr,
       `${days} d`,
       formatBs(pCost),
       formatBs(sPrice),
@@ -713,20 +715,21 @@ export const generateInventoryPDF = (data: any, companyConfig?: any) => {
 
   (autoTable as any)(doc, {
     ...getTableOptions(y),
-    head: [["Codigo", "Marca / Modelo", "Tipo", "Estado", "Dias", "P. Compra", "P. Venta", "Margen Est."]],
+    head: [["Codigo", "Marca / Modelo", "Tipo", "Estado", "Fecha Compra", "Dias", "P. Compra", "P. Venta", "Margen Est."]],
     body: tableData,
     theme: "striped",
-    headStyles: { fillColor: [30, 58, 138], fontSize: 7.5 },
-    styles: { fontSize: 7, cellPadding: 1.8 },
+    headStyles: { fillColor: [30, 58, 138], fontSize: 7.2 },
+    styles: { fontSize: 6.8, cellPadding: 1.8 },
     columnStyles: {
-      0: { cellWidth: 20 },
-      1: { cellWidth: 46 },
-      2: { cellWidth: 18 },
-      3: { cellWidth: 22 },
-      4: { cellWidth: 12, halign: "center" },
-      5: { cellWidth: 22, halign: "right" },
-      6: { cellWidth: 22, halign: "right" },
-      7: { cellWidth: 22, halign: "right" },
+      0: { cellWidth: 18 },
+      1: { cellWidth: 40 },
+      2: { cellWidth: 16 },
+      3: { cellWidth: 20 },
+      4: { cellWidth: 18, halign: "center" },
+      5: { cellWidth: 12, halign: "center" },
+      6: { cellWidth: 20, halign: "right" },
+      7: { cellWidth: 20, halign: "right" },
+      8: { cellWidth: 22, halign: "right" },
     },
   });
 

@@ -223,6 +223,7 @@ export default function Reports() {
           : u.status === "reserved" ? "Reservado"
           : u.status === "returned" ? "Garantía"
           : u.status || "-",
+        "Fecha de Compra": purchaseDate ? format(purchaseDate, "dd/MM/yyyy") : "-",
         "Días en Stock": days,
         "Precio Compra (Bs.)": pCost,
         "Precio Venta (Bs.)": sPrice,
