@@ -155,7 +155,7 @@ export const purchases = mysqlTable("purchases", {
   totalAmount: int("totalAmount").notNull(), // Centavos
   status: mysqlEnum("status", ["pending", "received", "cancelled"]).default("pending").notNull(),
   paymentStatus: mysqlEnum("paymentStatus", ["pending", "paid"]).default("pending").notNull(),
-  paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer"]).default("cash"),
+  paymentMethod: mysqlEnum("paymentMethod", ["cash", "qr", "transfer", "credit"]).default("cash"),
   isCredit: int("isCredit").default(0),
   branchId: int("branchId").default(1),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

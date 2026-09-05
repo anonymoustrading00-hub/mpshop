@@ -1149,7 +1149,10 @@ export async function ensureTables() {
 
     // purchases.paymentMethod column
     await runSQL("purchases.paymentMethod column", `
-      ALTER TABLE purchases ADD COLUMN paymentMethod enum('cash','qr','transfer') NULL AFTER paymentStatus
+      ALTER TABLE purchases ADD COLUMN paymentMethod enum('cash','qr','transfer','credit') NULL AFTER paymentStatus
+    `);
+    await runSQL("purchases.paymentMethod enum upgrade", `
+      ALTER TABLE purchases MODIFY COLUMN paymentMethod enum('cash','qr','transfer','credit') NULL DEFAULT 'cash'
     `);
     await runSQL("purchases.isCredit column", `
       ALTER TABLE purchases ADD COLUMN isCredit int NOT NULL DEFAULT 0 AFTER paymentMethod
