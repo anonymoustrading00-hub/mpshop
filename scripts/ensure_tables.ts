@@ -344,13 +344,46 @@ export async function ensureTables() {
       CREATE TABLE IF NOT EXISTS accountsPayable (
         id int AUTO_INCREMENT NOT NULL,
         purchaseId int NOT NULL,
-        amount int NOT NULL,
-        dueDate timestamp NULL,
-        status enum('unpaid','partially_paid','paid') NOT NULL DEFAULT 'unpaid',
+        supplierId int NULL,
+        totalAmount int NOT NULL DEFAULT 0,
+        paidAmount int NOT NULL DEFAULT 0,
+        balance int NOT NULL DEFAULT 0,
+        dueDate varchar(10),
+        status enum('unpaid','partially_paid','paid','overdue') NOT NULL DEFAULT 'unpaid',
         createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT accountsPayable_id PRIMARY KEY(id)
       )
     `);
+
+    await runSQL("accountsPayable.supplierId column", `
+      ALTER TABLE accountsPayable ADD COLUMN supplierId int NULL AFTER purchaseId
+    `);
+    await runSQL("accountsPayable.totalAmount column", `
+      ALTER TABLE accountsPayable ADD COLUMN totalAmount int NOT NULL DEFAULT 0 AFTER supplierId
+    `);
+    await runSQL("accountsPayable.paidAmount column", `
+      ALTER TABLE accountsPayable ADD COLUMN paidAmount int NOT NULL DEFAULT 0 AFTER totalAmount
+    `);
+    await runSQL("accountsPayable.balance column", `
+      ALTER TABLE accountsPayable ADD COLUMN balance int NOT NULL DEFAULT 0 AFTER paidAmount
+    `);
+    await runSQL("accountsPayable.updatedAt column", `
+      ALTER TABLE accountsPayable ADD COLUMN updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `);
+    await runSQL("accountsPayable.dueDate modify", `
+      ALTER TABLE accountsPayable MODIFY COLUMN dueDate varchar(10) NULL
+    `);
+    await runSQL("accountsPayable.status modify", `
+      ALTER TABLE accountsPayable MODIFY COLUMN status enum('unpaid','partially_paid','paid','overdue') NOT NULL DEFAULT 'unpaid'
+    `);
+    try {
+      await connection.query("UPDATE accountsPayable SET totalAmount = amount WHERE totalAmount = 0 AND amount IS NOT NULL AND amount > 0");
+    } catch (_) {}
+    try {
+      await connection.query("UPDATE accountsPayable SET balance = totalAmount - paidAmount WHERE balance = 0 AND totalAmount > 0");
+    } catch (_) {}
+
 
     // ============================================================
     // 14. DELIVERY EXPENSES
@@ -1066,6 +1099,22 @@ export async function ensureTables() {
       )
     `);
 
+    await runSQL("accountsReceivable.adminOverrideUserId column", `
+      ALTER TABLE accountsReceivable ADD COLUMN adminOverrideUserId int NULL
+    `);
+    await runSQL("accountsReceivable.adminOverrideReason column", `
+      ALTER TABLE accountsReceivable ADD COLUMN adminOverrideReason text NULL
+    `);
+    await runSQL("accountsReceivable.updatedAt column", `
+      ALTER TABLE accountsReceivable ADD COLUMN updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `);
+    await runSQL("accountsReceivable.dueDate modify", `
+      ALTER TABLE accountsReceivable MODIFY COLUMN dueDate varchar(10) NULL
+    `);
+    await runSQL("accountsReceivable.status modify", `
+      ALTER TABLE accountsReceivable MODIFY COLUMN status enum('unpaid','partially_paid','paid','overdue') NOT NULL DEFAULT 'unpaid'
+    `);
+
     // creditPayments table
     await runSQL("creditPayments table", `
       CREATE TABLE IF NOT EXISTS creditPayments (
@@ -1084,6 +1133,13 @@ export async function ensureTables() {
         createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT creditPayments_id PRIMARY KEY(id)
       )
+    `);
+
+    await runSQL("creditPayments.accountsPayableId column", `
+      ALTER TABLE creditPayments ADD COLUMN accountsPayableId int NULL AFTER accountsReceivableId
+    `);
+    await runSQL("creditPayments.supplierId column", `
+      ALTER TABLE creditPayments ADD COLUMN supplierId int NULL AFTER customerId
     `);
 
     // purchaseItems table — add unitId column if missing

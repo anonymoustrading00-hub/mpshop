@@ -433,7 +433,7 @@ export type InsertPurchaseItem = typeof purchaseItems.$inferInsert;
 export const accountsPayable = mysqlTable("accountsPayable", {
   id: int("id").autoincrement().primaryKey(),
   purchaseId: int("purchaseId").notNull().references(() => purchases.id),
-  supplierId: int("supplierId").notNull().references(() => suppliers.id),
+  supplierId: int("supplierId").references(() => suppliers.id),
   totalAmount: int("totalAmount").notNull(),
   paidAmount: int("paidAmount").notNull().default(0),
   balance: int("balance").notNull(),
