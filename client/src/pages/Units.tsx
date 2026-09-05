@@ -932,7 +932,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
               {/* Total */}
               {!isLoading && (
                 <span className="text-xs font-semibold text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-lg">
-                  {unitsData?.total ?? 0} unidades
+                  {viewMode === "table" ? `${tableArticles.length} artículos (${unitsData?.total ?? 0} uds.)` : `${unitsData?.total ?? 0} unidades`}
                 </span>
               )}
             </div>
@@ -980,7 +980,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-amber-50/10">
-                    {tableArticles.map((item: any) => {
+                    {tableArticles.slice((page - 1) * pageSize, page * pageSize).map((item: any) => {
                       const isExpanded = expandedArticleKey === item.key;
                       return (
                         <React.Fragment key={item.key}>
@@ -1230,7 +1230,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
             {/* ── MODO TARJETAS (GRID) ───────────────────────────────────── */}
             {viewMode === "grid" && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {unitsData.items.map((unit: any) => {
+                {(unitsData.items as any[]).slice((page - 1) * pageSize, page * pageSize).map((unit: any) => {
                   const specs = unit.specs || {};
 
               return (
@@ -1364,9 +1364,10 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
             {/* ── BARRA DE PAGINACIÓN (grid y tabla) ───────────────────────── */}
             {viewMode !== "grouped" && (() => {
-              const total = unitsData?.total ?? 0;
+              const currentListLength = viewMode === "table" ? tableArticles.length : (unitsData?.items?.length ?? 0);
+              const total = viewMode === "table" ? tableArticles.length : (unitsData?.total ?? 0);
               const totalPages = Math.max(1, Math.ceil(total / pageSize));
-              if (totalPages <= 1) return null;
+              if (totalPages <= 1 && total <= pageSize) return null;
               return (
                 <div className="flex items-center justify-center gap-2 py-2">
                   <button
@@ -1434,7 +1435,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
                   <span className="text-xs font-semibold text-muted-foreground ml-2">
                     Página <strong>{page}</strong> de <strong>{totalPages}</strong>
-                    <span className="text-slate-400 ml-1">({total} total)</span>
+                    <span className="text-slate-400 ml-1">({total} {viewMode === "table" ? "artículos" : "unidades"})</span>
                   </span>
                 </div>
               );

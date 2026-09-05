@@ -26,7 +26,7 @@ async function cleanAllData() {
     `);
 
     const [flag]: any = await connection.query(
-      "SELECT `value` FROM systemSettings WHERE `key` = 'initial_clean_wipe_v2' LIMIT 1"
+      "SELECT `value` FROM systemSettings WHERE `key` = 'initial_clean_wipe_v3' LIMIT 1"
     );
 
     if (flag && flag[0]?.value === "true") {
@@ -113,10 +113,10 @@ async function cleanAllData() {
       console.log("[Clean] Branch check note:", branchErr);
     }
 
-    // Mark that clean wipe v2 has completed
+    // Mark that clean wipe v3 has completed
     await connection.query(`
       INSERT INTO systemSettings (\`key\`, \`value\`, updatedAt)
-      VALUES ('initial_clean_wipe_v2', 'true', NOW())
+      VALUES ('initial_clean_wipe_v3', 'true', NOW())
       ON DUPLICATE KEY UPDATE \`value\` = 'true', updatedAt = NOW()
     `);
 
