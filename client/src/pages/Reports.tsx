@@ -206,9 +206,11 @@ export default function Reports() {
       const pCost = (u.purchasePrice || 0) / 100;
       const sPrice = (u.salePrice || 0) / 100;
       const margin = sPrice - pCost;
-      const marginPct = pCost > 0 ? ((margin / pCost) * 100).toFixed(1) + "%" : "0%";
-      const purchaseDate = u.purchaseDate ? new Date(u.purchaseDate) : (u.createdAt ? new Date(u.createdAt) : null);
-      const days = purchaseDate ? Math.max(0, Math.floor((Date.now() - purchaseDate.getTime()) / 86400000)) : 0;
+      const purchaseMatch = u.purchaseId ? purchasesQuery.data?.find((p: any) => p.id === u.purchaseId) : null;
+      const rawDate = u.purchaseDate || purchaseMatch?.orderDate || purchaseMatch?.createdAt || u.createdAt;
+      const purchaseDate = rawDate ? new Date(rawDate) : null;
+      const validPurchaseDate = purchaseDate && !isNaN(purchaseDate.getTime()) ? format(purchaseDate, "dd/MM/yyyy") : "-";
+      const days = purchaseDate && !isNaN(purchaseDate.getTime()) ? Math.max(0, Math.floor((Date.now() - purchaseDate.getTime()) / 86400000)) : 0;
       return {
         "Código": u.code || `UNI-${u.id}`,
         "Tipo": u.type || "-",
@@ -223,7 +225,7 @@ export default function Reports() {
           : u.status === "reserved" ? "Reservado"
           : u.status === "returned" ? "Garantía"
           : u.status || "-",
-        "Fecha de Compra": purchaseDate ? format(purchaseDate, "dd/MM/yyyy") : "-",
+        "Fecha de Compra": validPurchaseDate,
         "Días en Stock": days,
         "Precio Compra (Bs.)": pCost,
         "Precio Venta (Bs.)": sPrice,

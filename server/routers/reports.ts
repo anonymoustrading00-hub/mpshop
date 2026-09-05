@@ -372,16 +372,32 @@ export const reportsRouter = router({
     const db = await getDb();
     let allUnits: any[] = [];
     let allRepairs: any[] = [];
+    let allPurchases: any[] = [];
 
     if (!db) {
       allUnits = (MOCK_UNITS as any[]) || [];
       allRepairs = (MOCK_REPAIRS as any[]) || [];
+      allPurchases = (MOCK_PURCHASES as any[]) || [];
     } else {
-      [allUnits, allRepairs] = await Promise.all([
+      [allUnits, allRepairs, allPurchases] = await Promise.all([
         db.select().from(units),
         db.select().from(repairs),
+        db.select().from(purchases),
       ]);
     }
+
+    const purchaseMap = new Map<number, any>();
+    allPurchases.forEach((p: any) => purchaseMap.set(p.id, p));
+
+    allUnits = allUnits.map((u: any) => {
+      const p = u.purchaseId ? purchaseMap.get(u.purchaseId) : null;
+      const effectivePurchaseDate = u.purchaseDate || (p ? (p.orderDate || p.createdAt) : u.createdAt);
+      return {
+        ...u,
+        purchaseDate: effectivePurchaseDate,
+        purchaseNumber: p?.purchaseNumber || null,
+      };
+    });
 
     const todayMs = Date.now();
 
@@ -790,17 +806,23 @@ export const reportsExcelRouter = router({
 
       let unitList: any[] = [];
       let repairList: any[] = [];
+      let purchaseList: any[] = [];
 
       if (!db) {
         unitList = (MOCK_UNITS as any[]).filter((u: any) => u.status !== "sold" && new Date(u.createdAt) <= cutoff);
         repairList = (MOCK_REPAIRS as any[]).filter((r: any) => r.status === "completed");
+        purchaseList = (MOCK_PURCHASES as any[]) || [];
       } else {
-        [unitList, repairList] = await Promise.all([
+        [unitList, repairList, purchaseList] = await Promise.all([
           db.select().from(units).where(and(ne(units.status, "sold"), lte(units.createdAt, cutoff))),
           db.select({ unitId: repairs.unitId, laborCost: repairs.laborCost, partsCost: repairs.partsCost })
             .from(repairs).where(eq(repairs.status, "completed")),
+          db.select().from(purchases),
         ]);
       }
+
+      const purchaseMap = new Map<number, any>();
+      for (const p of purchaseList as any[]) purchaseMap.set(p.id, p);
 
       const repMap = new Map<number, number>();
       for (const r of repairList as any[]) repMap.set(r.unitId, (repMap.get(r.unitId)||0)+(r.laborCost||0)+(r.partsCost||0));
@@ -809,11 +831,13 @@ export const reportsExcelRouter = router({
       const headers = ["Código", "Marca", "Modelo", "Tipo", "Estado", "Cond.", "Fecha de Compra", "P. Compra (Bs)", "Costo Reparación (Bs)", "Costo Total (Bs)", "P. Venta (Bs)", "Días en Inventario", "Fecha Registro"];
       const rows = (unitList as any[]).map((u: any) => {
         const repCost = repMap.get(u.id) || 0;
-        const pDate = u.purchaseDate ? new Date(u.purchaseDate) : (u.createdAt ? new Date(u.createdAt) : null);
+        const p = u.purchaseId ? purchaseMap.get(u.purchaseId) : null;
+        const rawDate = u.purchaseDate || (p ? (p.orderDate || p.createdAt) : u.createdAt);
+        const pDate = rawDate ? new Date(rawDate) : null;
         const days = Math.max(0, Math.round((today - new Date(u.createdAt).getTime()) / 86400000));
         return [
           u.code, u.brand, u.model, u.type, u.status, u.condition || "—",
-          pDate ? pDate.toLocaleDateString("es-BO") : "—",
+          pDate && !isNaN(pDate.getTime()) ? pDate.toLocaleDateString("es-BO") : "—",
           fmtCents(u.purchasePrice || 0), fmtCents(repCost),
           fmtCents((u.purchasePrice||0) + repCost),
           fmtCents(u.salePrice || 0), days,
