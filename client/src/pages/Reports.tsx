@@ -182,7 +182,7 @@ export default function Reports() {
       "Nº Compra": p.purchaseNumber,
       "Proveedor": p.supplier?.name || p.supplierName || "Proveedor General",
       "Teléfono Proveedor": p.supplier?.phone || "-",
-      "Fecha Orden": p.orderDate ? format(new Date(p.orderDate), "dd/MM/yyyy HH:mm") : "-",
+      "Fecha de Compra": (p.orderDate || p.createdAt) ? format(new Date(p.orderDate || p.createdAt), "dd/MM/yyyy HH:mm") : "-",
       "Estado": p.status === "received" ? "Recibido" : p.status === "cancelled" ? "Cancelado" : "Pendiente",
       "Método Pago": p.paymentMethod === "cash" ? "Efectivo"
         : p.paymentMethod === "qr" ? "QR"
@@ -576,6 +576,10 @@ function ExcelExportSection({ from, to }: { from: string; to: string }) {
     onSuccess: (data: any) => downloadBase64Excel(data.base64, data.filename),
     onError: (e: any) => alert("Error: " + e.message),
   });
+  const purchasesMut = (trpc.reportsExcel as any).purchasesExcel.useMutation({
+    onSuccess: (data: any) => downloadBase64Excel(data.base64, data.filename),
+    onError: (e: any) => alert("Error: " + e.message),
+  });
 
   const excelReports = [
     {
@@ -584,6 +588,13 @@ function ExcelExportSection({ from, to }: { from: string; to: string }) {
       icon: DollarSign,
       loading: financialMut.isPending,
       onClick: () => financialMut.mutate({ from, to }),
+    },
+    {
+      name: "Compras del Período Excel",
+      description: `Detalle de compras a proveedores con Fecha de Compra del período ${from} → ${to}`,
+      icon: ShoppingCart,
+      loading: purchasesMut.isPending,
+      onClick: () => purchasesMut.mutate({ from, to }),
     },
     {
       name: "Inventario a Fecha de Corte",
@@ -624,7 +635,7 @@ function ExcelExportSection({ from, to }: { from: string; to: string }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {excelReports.map((rep) => (
           <div key={rep.name} className="bg-white rounded-lg border border-gray-200 p-5 hover:border-emerald-300 transition-all">
             <div className="flex items-start gap-3 mb-3">

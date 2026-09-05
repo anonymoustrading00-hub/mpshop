@@ -914,4 +914,78 @@ export const reportsExcelRouter = router({
 
       return { base64, filename: `Garantias_Devoluciones_${input.from}_${input.to}.xlsx` };
     }),
+
+  /**
+   * Reporte de Compras del período en Excel
+   */
+  purchasesExcel: protectedProcedure
+    .input(z.object({ from: z.string(), to: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const fromDate = new Date(input.from + "T00:00:00");
+      const toDate   = new Date(input.to   + "T23:59:59");
+
+      let purchaseList: any[] = [];
+
+      if (!db) {
+        purchaseList = (MOCK_PURCHASES || []).filter((p: any) => {
+          const d = new Date(p.orderDate || p.createdAt);
+          return d >= fromDate && d <= toDate;
+        }).map((p: any) => {
+          const supplier = (MOCK_SUPPLIERS || []).find((s: any) => s.id === p.supplierId);
+          return { ...p, supplierName: supplier?.name || "Proveedor General" };
+        });
+      } else {
+        purchaseList = await db
+          .select({
+            id: purchases.id,
+            purchaseNumber: purchases.purchaseNumber,
+            orderDate: purchases.orderDate,
+            totalAmount: purchases.totalAmount,
+            status: purchases.status,
+            paymentStatus: purchases.paymentStatus,
+            paymentMethod: purchases.paymentMethod,
+            isCredit: purchases.isCredit,
+            createdAt: purchases.createdAt,
+            supplierName: suppliers.name,
+          })
+          .from(purchases)
+          .leftJoin(suppliers, eq(purchases.supplierId, suppliers.id))
+          .where(and(gte(purchases.orderDate, fromDate), lte(purchases.orderDate, toDate)))
+          .orderBy(desc(purchases.orderDate));
+      }
+
+      const headers = ["Nº Compra", "Proveedor", "Fecha de Compra", "Estado", "Método Pago", "Estado Pago", "A Crédito", "Total (Bs)"];
+      const rows = (purchaseList as any[]).map((p: any) => [
+        p.purchaseNumber,
+        p.supplierName || "Proveedor General",
+        new Date(p.orderDate || p.createdAt).toLocaleString("es-BO"),
+        p.status === "received" ? "Recibido" : p.status === "cancelled" ? "Cancelado" : "Pendiente",
+        p.paymentMethod || "Efectivo",
+        p.paymentStatus === "paid" ? "Pagado" : "Pendiente",
+        p.isCredit ? "Sí" : "No",
+        fmtCents(p.totalAmount || 0),
+      ]);
+
+      const totalMonto = (purchaseList as any[]).reduce((s: number, p: any) => s + (p.totalAmount || 0), 0);
+      const totalPagado = (purchaseList as any[]).filter((p: any) => p.paymentStatus === "paid").reduce((s: number, p: any) => s + (p.totalAmount || 0), 0);
+      const totalPendiente = totalMonto - totalPagado;
+
+      const summary = [
+        [dateHeader(input.from, input.to)],
+        [],
+        ["Total órdenes de compra", purchaseList.length],
+        ["Total compras (Bs)", fmtCents(totalMonto)],
+        ["Total pagado (Bs)", fmtCents(totalPagado)],
+        ["Saldo pendiente / Crédito (Bs)", fmtCents(totalPendiente)],
+      ];
+
+      const base64 = buildXlsx([
+        { name: "Compras", data: [headers, ...rows] },
+        { name: "Resumen", data: summary },
+      ]);
+
+      return { base64, filename: `Compras_${input.from}_${input.to}.xlsx` };
+    }),
 });

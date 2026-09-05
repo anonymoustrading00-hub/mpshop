@@ -575,9 +575,11 @@ export default function Purchases() {
                         </p>
                         <div className="flex items-center gap-1.5 mt-2">
                            <div className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center">
-                             <User className="h-3 w-3 text-slate-400" />
+                             <Calendar className="h-3 w-3 text-slate-400" />
                            </div>
-                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{new Date(purchase.createdAt).toLocaleDateString("es-BO")}</span>
+                           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
+                             Fecha de Compra: {new Date(purchase.orderDate || purchase.createdAt).toLocaleDateString("es-BO")}
+                           </span>
                         </div>
                       </div>
                       <div className="text-right">
@@ -616,7 +618,7 @@ export default function Purchases() {
                       <div className="grid">
                         <div>
                           <p><strong>Proveedor:</strong> {purchase.supplierName || "Sin Proveedor"}</p>
-                          <p><strong>Fecha:</strong> {new Date(purchase.createdAt).toLocaleDateString()}</p>
+                          <p><strong>Fecha de Compra:</strong> {new Date(purchase.orderDate || purchase.createdAt).toLocaleDateString("es-BO")}</p>
                         </div>
                         <div>
                           <p><strong>Método:</strong> {purchase.paymentMethod}</p>
@@ -640,7 +642,7 @@ export default function Purchases() {
                   <TableHead className="font-black text-xs uppercase text-slate-400">Estado</TableHead>
                   <TableHead className="font-black text-xs uppercase text-slate-400">Pago</TableHead>
                   <TableHead className="font-black text-xs uppercase text-slate-400 text-right">Total</TableHead>
-                  <TableHead className="font-black text-xs uppercase text-slate-400">Fecha</TableHead>
+                  <TableHead className="font-black text-xs uppercase text-slate-400">Fecha de Compra</TableHead>
                   <TableHead className="font-black text-xs uppercase text-slate-400 text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -716,8 +718,11 @@ export default function Purchases() {
                       <TableCell className="text-right">
                         <span className="text-base font-black text-slate-900">{formatCurrency(purchase.totalAmount)}</span>
                       </TableCell>
-                      <TableCell className="text-slate-500 text-xs font-medium">
-                        {new Date(purchase.createdAt).toLocaleString("es-BO", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      <TableCell className="text-slate-600 text-xs font-semibold whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                          <span>{new Date(purchase.orderDate || purchase.createdAt).toLocaleString("es-BO", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -759,7 +764,7 @@ export default function Purchases() {
                           <div className="grid">
                             <div>
                               <p><strong>Proveedor:</strong> {purchase.supplierName || "Sin Proveedor"}</p>
-                              <p><strong>Fecha:</strong> {new Date(purchase.createdAt).toLocaleDateString()}</p>
+                              <p><strong>Fecha de Compra:</strong> {new Date(purchase.orderDate || purchase.createdAt).toLocaleDateString("es-BO")}</p>
                             </div>
                             <div>
                               <p><strong>Método:</strong> {purchase.paymentMethod}</p>
@@ -1232,8 +1237,8 @@ function PurchaseDetailDialog({ purchase, open, onOpenChange }: any) {
                 <p className="font-bold text-slate-800">{purchase.supplierName || "Sin Proveedor"}</p>
               </div>
               <div>
-                <p className="text-slate-400 uppercase text-[10px] font-bold tracking-wider">Fecha</p>
-                <p className="font-bold text-slate-800">{new Date(purchase.createdAt).toLocaleString()}</p>
+                <p className="text-slate-400 uppercase text-[10px] font-bold tracking-wider">Fecha de Compra</p>
+                <p className="font-bold text-slate-800">{new Date(purchase.orderDate || purchase.createdAt).toLocaleString("es-BO")}</p>
               </div>
               <div>
                 <p className="text-slate-400 uppercase text-[10px] font-bold tracking-wider">Método de Pago</p>

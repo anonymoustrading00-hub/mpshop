@@ -265,7 +265,7 @@ export const generatePurchasesPDF = (purchases: any[], filters: any, companyConf
 
   (autoTable as any)(doc, {
     ...getTableOptions(y),
-    head: [["Nº Compra", "Proveedor", "Fecha", "Estado", "Método", "Pago", "Total"]],
+    head: [["Nº Compra", "Proveedor", "Fecha de Compra", "Estado", "Método", "Pago", "Total"]],
     body: tableData,
     styles: { fontSize: 8 },
   });
