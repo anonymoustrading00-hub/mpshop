@@ -243,8 +243,16 @@ export default function Purchases() {
   }, [purchases, searchQuery, filterPayment, filterDateFrom, filterDateTo]);
 
   const totalSpent = useMemo(() => {
-    return filteredPurchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
-  }, [filteredPurchases]);
+    const result = filteredPurchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+    console.log('🔍 DEBUG totalSpent:', { 
+      totalPurchases: purchases?.length || 0,
+      filteredCount: filteredPurchases.length, 
+      totalSpent: result,
+      filterDateFrom,
+      filterDateTo 
+    });
+    return result;
+  }, [filteredPurchases, purchases, filterDateFrom, filterDateTo]);
 
   const creditPurchasesCount = useMemo(() => {
     return filteredPurchases.filter(p => p.isCredit === 1).length;
