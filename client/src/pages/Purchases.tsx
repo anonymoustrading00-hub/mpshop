@@ -182,7 +182,7 @@ export default function Purchases() {
     if (e) e.preventDefault();
     // Las compras a crédito no requieren caja abierta (se registra la deuda, no sale efectivo)
     if (purchaseData.isCredit === 0 && !openingStatus?.hasActive) {
-      toast.error(`Caja cerrada: Para registrar compras en ${purchaseData.paymentMethod.toUpperCase()}, primero debes realizar la apertura de caja.`);
+      toast.error(`Abre la caja: La caja de ${purchaseData.paymentMethod.toUpperCase()} se encuentra cerrada. Primero debes realizar la apertura de caja para registrar compras.`);
       return;
     }
     if (items.length === 0) {
@@ -1156,7 +1156,7 @@ export default function Purchases() {
                 {!openingStatus?.hasActive && (
                   <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold flex items-center gap-2">
                     <XCircle className="h-4 w-4 shrink-0 text-amber-600" />
-                    <span>LA CAJA DE {purchaseData.paymentMethod.toUpperCase()} ESTÁ CERRADA. ABRA LA CAJA EN FINANZAS.</span>
+                    <span>ABRE LA CAJA: LA CAJA DE {purchaseData.paymentMethod.toUpperCase()} ESTÁ CERRADA. ABRA LA CAJA EN FINANZAS.</span>
                   </div>
                 )}
               </div>
@@ -1548,7 +1548,7 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
     }
     
     if (formData.initialStock > 0 && !openingStatus?.hasActive) {
-      toast.error("La caja seleccionada está cerrada. No se puede generar movimiento de efectivo.");
+      toast.error("Abre la caja: La caja seleccionada está cerrada. Primero debes realizar la apertura de caja para registrar compras.");
       return;
     }
 

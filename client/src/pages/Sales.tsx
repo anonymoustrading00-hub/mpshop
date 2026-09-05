@@ -1199,9 +1199,8 @@ export default function Sales() {
   );
 
   const submitSale = () => {
-    const isAdmin = user?.role === "admin";
-    if (paymentMethod !== "credit" && !openingStatus?.hasActive && !isAdmin) {
-      toast.error(`Caja cerrada: Para registrar ventas en ${paymentMethodLabel(paymentMethod)}, primero debes realizar la apertura de caja.`);
+    if (paymentMethod !== "credit" && !openingStatus?.hasActive) {
+      toast.error(`Abre la caja: La caja de ${paymentMethodLabel(paymentMethod)} se encuentra cerrada. Primero debes realizar la apertura de caja para registrar operaciones.`);
       return;
     }
 
@@ -2166,10 +2165,15 @@ export default function Sales() {
                   )}
 
                   {/* Alerta de caja si no está abierta */}
-                  {(!openingStatus?.hasActive && user?.role !== "admin" && paymentMethod !== "credit") && (
-                    <div className="mt-1.5 p-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold flex items-center gap-1.5">
-                      <XCircle className="h-3 w-3 shrink-0" />
-                      <span>Caja de {paymentMethodLabel(paymentMethod)} no abierta en Finanzas.</span>
+                  {(!openingStatus?.hasActive && paymentMethod !== "credit") && (
+                    <div className="mt-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs font-bold flex items-center justify-between gap-2 shadow-sm">
+                      <div className="flex items-center gap-1.5">
+                        <XCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <span>Abre la caja: La caja de {paymentMethodLabel(paymentMethod)} está cerrada.</span>
+                      </div>
+                      <Link to="/finance" className="text-amber-700 dark:text-amber-300 underline font-black text-[11px] shrink-0 hover:opacity-80">
+                        Ir a Finanzas
+                      </Link>
                     </div>
                   )}
                 </div>
@@ -2307,17 +2311,22 @@ export default function Sales() {
                     disabled={
                       createSaleMutation.isPending || 
                       computedCart.items.length === 0 || 
-                      (paymentMethod !== "credit" && !openingStatus?.hasActive && user?.role !== "admin") ||
+                      (paymentMethod !== "credit" && !openingStatus?.hasActive) ||
                       !creditDataComplete
                     }
                     className={`flex-1 h-12 sm:h-10 rounded-xl text-sm font-black shadow-md flex items-center justify-center gap-2 transition-all ${
-                      paymentMethod === "credit" && !creditDataComplete 
+                      (paymentMethod !== "credit" && !openingStatus?.hasActive) || (paymentMethod === "credit" && !creditDataComplete)
                         ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700" 
                         : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 hover:shadow-emerald-500/20 active:scale-[0.99]"
                     }`}
                   >
                     {createSaleMutation.isPending ? (
                       "Registrando..."
+                    ) : paymentMethod !== "credit" && !openingStatus?.hasActive ? (
+                      <>
+                        <XCircle className="h-4 w-4 text-amber-400" />
+                        <span>Abre la caja</span>
+                      </>
                     ) : (
                       <>
                         <CheckCircle2 className="h-4 w-4" />

@@ -1776,8 +1776,8 @@ export async function createPurchase(purchaseData: any, items: any[], userId?: n
 
   // Real DB logic
   return await db.transaction(async (tx: any) => {
-    // 0. Validar que la caja esté abierta para el método de pago seleccionado
-    if (purchaseData.paymentMethod) {
+    // 0. Validar que la caja esté abierta para el método de pago seleccionado cuando no es a crédito
+    if (purchaseData.isCredit !== 1 && purchaseData.paymentMethod && purchaseData.paymentMethod !== "credit") {
       const today = getLocalDateKey(new Date());
       if (today && userId) {
         await checkCashRegisterOpening(tx, userId, purchaseData.paymentMethod, today);
@@ -2553,9 +2553,8 @@ export async function deleteOperationalExpense(id: number) {
  * Si es QR o Transferencia y no está abierta, la abre automáticamente con fondo 0.
  */
 export async function checkCashRegisterOpening(dbOrTx: any, userId: number, paymentMethod: string, dateKey: string) {
-  // Validar rol del usuario: los admins pueden saltarse esta validación
-  const userRows = await dbOrTx.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
-  if (userRows[0]?.role === "admin") return;
+  // Las operaciones a crédito no afectan flujo de caja inmediato
+  if (paymentMethod === "credit") return;
 
   const existing = await dbOrTx
     .select()
@@ -2569,8 +2568,27 @@ export async function checkCashRegisterOpening(dbOrTx: any, userId: number, paym
     )
     .limit(1);
 
-  if (existing.length === 0) {
-    throw new Error(`No existe una apertura de caja activa para ${paymentMethod === 'cash' ? 'Efectivo' : paymentMethod.toUpperCase()}. Por favor, realice la apertura de caja primero.`);
+  let hasOpen = existing.length > 0;
+  if (!hasOpen && paymentMethod !== "cash") {
+    // Si la caja de QR o Transferencia no está abierta de forma individual,
+    // verificar si la caja principal de Efectivo está abierta
+    const cashOpening = await dbOrTx
+      .select()
+      .from(cashOpenings)
+      .where(
+        and(
+          eq(cashOpenings.responsibleUserId, userId),
+          sql`(${cashOpenings.paymentMethod} = 'cash' OR ${cashOpenings.paymentMethod} IS NULL)`,
+          eq(cashOpenings.status, "open")
+        )
+      )
+      .limit(1);
+    hasOpen = cashOpening.length > 0;
+  }
+
+  if (!hasOpen) {
+    const methodName = paymentMethod === 'cash' ? 'Efectivo' : paymentMethod === 'qr' ? 'QR' : paymentMethod === 'transfer' ? 'Transferencia' : paymentMethod.toUpperCase();
+    throw new Error(`Abre la caja: La caja de ${methodName} se encuentra cerrada. Por favor, realice la apertura de caja en Finanzas primero.`);
   }
 }
 

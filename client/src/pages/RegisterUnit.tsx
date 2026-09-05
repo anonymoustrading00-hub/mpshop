@@ -314,6 +314,10 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
   const { data: suppliersData } = trpc.suppliers.list.useQuery();
   const { data: globalBalances } = (trpc.finance as any).getGlobalBalances.useQuery();
+  const { data: openingStatus } = trpc.finance.hasActiveOpening.useQuery(
+    { paymentMethod: paymentMethod === "credit" ? "cash" : paymentMethod },
+    { enabled: paymentMethod !== "credit" }
+  );
 
   // Queries para catálogos de autocompletado
   const { data: brandsData } = trpc.deviceCatalogs.getBrands.useQuery();
@@ -772,6 +776,12 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     }
 
     const pPriceCents = purchasePrice ? Math.round(parseFloat(purchasePrice) * 100) : 0;
+    if (pPriceCents > 0 && paymentMethod !== "credit" && !openingStatus?.hasActive) {
+      const pLabel = paymentMethod === "cash" ? "Efectivo" : paymentMethod === "qr" ? "QR" : "Banco / Transferencia";
+      toast.error(`Abre la caja: La caja de ${pLabel} se encuentra cerrada. Primero debes realizar la apertura de caja para registrar compras.`);
+      return;
+    }
+
     const sPriceCents = salePrice ? Math.round(parseFloat(salePrice) * 100) : undefined;
     const dPriceCents = discountPrice ? Math.round(parseFloat(discountPrice) * 100) : undefined;
     const wPriceCents = wholesalePrice ? Math.round(parseFloat(wholesalePrice) * 100) : undefined;
@@ -1502,6 +1512,16 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                 </div>
               )}
 
+              {/* Alerta de caja si no está abierta */}
+              {paymentMethod !== "credit" && purchasePrice && parseFloat(purchasePrice) > 0 && !openingStatus?.hasActive && (
+                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-700 dark:text-amber-400 font-bold">
+                  <XCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <span>
+                    Abre la caja: La caja de {paymentMethod === "cash" ? "Efectivo" : paymentMethod === "qr" ? "QR" : "Banco / Transferencia"} se encuentra cerrada. Abra la caja en Finanzas antes de registrar compras.
+                  </span>
+                </div>
+              )}
+
               {/* Aviso de saldo insuficiente cuando se paga con caja */}
               {paymentMethod !== "credit" && purchasePrice && (() => {
                 const priceCents = Math.round(parseFloat(purchasePrice) * 100);
@@ -1713,11 +1733,28 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
             </div>
 
 
-            <Button onClick={handleSaveUnit} className="w-full gap-2 text-base py-5 font-black bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200" disabled={createUnitMutation.isPending}>
-              <CheckCircle className="h-5 w-5" />
-              {quantity > 1
-                ? `Guardar y Dar de Alta Lote (${quantity} Unidades)`
-                : "Guardar y Vincular Unidad"}
+            <Button
+              onClick={handleSaveUnit}
+              className={`w-full gap-2 text-base py-5 font-black text-white shadow-md transition-all ${
+                paymentMethod !== "credit" && !!purchasePrice && parseFloat(purchasePrice) > 0 && !openingStatus?.hasActive
+                  ? "bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600"
+                  : "bg-blue-600 hover:bg-blue-700 shadow-blue-200"
+              }`}
+              disabled={createUnitMutation.isPending || (paymentMethod !== "credit" && !!purchasePrice && parseFloat(purchasePrice) > 0 && !openingStatus?.hasActive)}
+            >
+              {paymentMethod !== "credit" && !!purchasePrice && parseFloat(purchasePrice) > 0 && !openingStatus?.hasActive ? (
+                <>
+                  <XCircle className="h-5 w-5 text-amber-400" />
+                  Abre la caja para continuar
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-5 w-5" />
+                  {quantity > 1
+                    ? `Guardar y Dar de Alta Lote (${quantity} Unidades)`
+                    : "Guardar y Vincular Unidad"}
+                </>
+              )}
             </Button>
           </CardContent>
         </Card>

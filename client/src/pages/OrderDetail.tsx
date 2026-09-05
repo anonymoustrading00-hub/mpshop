@@ -109,7 +109,7 @@ export default function OrderDetail() {
 
   const handleRecordPayment = () => {
     if (!openingStatus?.hasActive) {
-      toast.error(`Caja cerrada: Para cobrar en ${paymentMethod === 'cash' ? 'Efectivo' : paymentMethod.toUpperCase()}, primero debes realizar la apertura de caja.`);
+      toast.error(`Abre la caja: La caja de ${paymentMethod === 'cash' ? 'Efectivo' : paymentMethod.toUpperCase()} se encuentra cerrada. Primero debes realizar la apertura de caja.`);
       return;
     }
     recordPaymentMutation.mutate({

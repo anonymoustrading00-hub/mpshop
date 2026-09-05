@@ -21,7 +21,9 @@ import {
   MOCK_SALE_ITEMS,
   syncMocksToDisk,
   createAutomaticOperationalExpense,
+  checkCashRegisterOpening,
 } from "../db";
+import { getLocalDateKey } from "../_core/date_utils";
 import { generatedCodes, units, unitEvents, purchases, purchaseItems, suppliers, financialTransactions, operationalExpenses, users, repairs, warranties, returns, saleItems, sales, systemSettings, branches, accountsPayable } from "../../drizzle/schema";
 import * as schema from "../../drizzle/schema";
 import { eq, ne, like, or, and, desc, sql, asc, inArray } from "drizzle-orm";
@@ -765,6 +767,12 @@ export const unitsRouter = router({
               status: "unpaid",
             });
           } else {
+            // Validar apertura de caja si hay salida de dinero real
+            if (totalPurchaseAmount > 0 && input.paymentMethod && input.paymentMethod !== "credit") {
+              const today = getLocalDateKey(new Date()) || new Date().toISOString().split("T")[0];
+              await checkCashRegisterOpening(tx, ctx.user.id, input.paymentMethod, today);
+            }
+
             // Egreso de caja consolidado (transacción financiera real del lote)
             await tx.insert(financialTransactions).values({
               branchId: input.branchId || 1,
