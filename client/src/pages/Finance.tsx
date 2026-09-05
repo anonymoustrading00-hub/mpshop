@@ -162,6 +162,7 @@ export default function Finance() {
   const { activeBranchId, setActiveBranchId, branches } = useBranch();
   const { data: transactions, isLoading } = trpc.finance.getTransactions.useQuery();
   const { data: cashOpenings, isLoading: isLoadingOpenings } = trpc.finance.getCashOpenings.useQuery();
+  const { data: globalBalances } = trpc.finance.getGlobalBalances.useQuery({ branchId: activeBranchId });
   const { data: currentUser } = trpc.auth.me.useQuery();
   const { data: companyData } = trpc.settings.getCompanyConfig.useQuery();
   const { data: allUsers } = trpc.finance.listResponsibleUsers.useQuery();
@@ -175,19 +176,19 @@ export default function Finance() {
     [allUsers]
   );
 
-  const cashIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && !t.isOpening && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
-  const cashExpense = (transactions as any[])?.filter((t: any) => t.type === "expense" && !t.isClosure && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const baseCashIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && !t.isOpening && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const baseCashExpense = (transactions as any[])?.filter((t: any) => t.type === "expense" && !t.isClosure && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
   const cashPurchases = (transactions as any[])?.filter((t: any) => t.type === "expense" && !t.isClosure && t.category === "purchase" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
   const otherExpenses = (transactions as any[])?.filter((t: any) => t.type === "expense" && !t.isClosure && t.category !== "purchase" && t.category !== "transfer_between_registers" && (t.paymentMethod === "cash" || !t.paymentMethod)).reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
-  const baseCashBalance = cashIncome - cashExpense;
+  const baseCashBalance = baseCashIncome - baseCashExpense;
 
-  const qrIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && !t.isOpening && t.paymentMethod === "qr").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
-  const qrExpense = (transactions as any[])?.filter((t: any) => t.type === "expense" && !t.isClosure && t.paymentMethod === "qr").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
-  const baseQrBalance = qrIncome - qrExpense;
+  const baseQrIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && !t.isOpening && t.paymentMethod === "qr").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const baseQrExpense = (transactions as any[])?.filter((t: any) => t.type === "expense" && !t.isClosure && t.paymentMethod === "qr").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const baseQrBalance = baseQrIncome - baseQrExpense;
 
-  const transferIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && !t.isOpening && t.paymentMethod === "transfer").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
-  const transferExpense = (transactions as any[])?.filter((t: any) => t.type === "expense" && !t.isClosure && t.paymentMethod === "transfer").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
-  const baseTransferBalance = transferIncome - transferExpense;
+  const baseTransferIncome = (transactions as any[])?.filter((t: any) => t.type === "income" && !t.isOpening && t.paymentMethod === "transfer").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const baseTransferExpense = (transactions as any[])?.filter((t: any) => t.type === "expense" && !t.isClosure && t.paymentMethod === "transfer").reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+  const baseTransferBalance = baseTransferIncome - baseTransferExpense;
 
   const today = getLocalDateInputValue();
   const adminId = (currentUser as any)?.id as number | undefined;
@@ -201,9 +202,19 @@ export default function Finance() {
   const totalQrOpenings = ((cashOpenings as any[]) || []).filter((o: any) => o.paymentMethod === "qr").reduce((sum: number, o: any) => sum + o.openingAmount, 0);
   const totalTransferOpenings = ((cashOpenings as any[]) || []).filter((o: any) => o.paymentMethod === "transfer").reduce((sum: number, o: any) => sum + o.openingAmount, 0);
 
-  const cashBalance = baseCashBalance + totalCashOpenings;
-  const qrBalance = baseQrBalance + totalQrOpenings;
-  const transferBalance = baseTransferBalance + totalTransferOpenings;
+  // Saldos y Totales unificados que coinciden exactamente con el Historial de cada caja
+  const cashBalance = globalBalances?.details?.cash?.balance ?? (baseCashBalance + totalCashOpenings);
+  const qrBalance = globalBalances?.details?.qr?.balance ?? (baseQrBalance + totalQrOpenings);
+  const transferBalance = globalBalances?.details?.transfer?.balance ?? (baseTransferBalance + totalTransferOpenings);
+
+  const cashIncome = globalBalances?.details?.cash?.totalIncome ?? (baseCashIncome + totalCashOpenings);
+  const cashExpense = globalBalances?.details?.cash?.totalExpense ?? baseCashExpense;
+
+  const qrIncome = globalBalances?.details?.qr?.totalIncome ?? (baseQrIncome + totalQrOpenings);
+  const qrExpense = globalBalances?.details?.qr?.totalExpense ?? baseQrExpense;
+
+  const transferIncome = globalBalances?.details?.transfer?.totalIncome ?? (baseTransferIncome + totalTransferOpenings);
+  const transferExpense = globalBalances?.details?.transfer?.totalExpense ?? baseTransferExpense;
 
   // Only consider the admin's own opening for enabling/disabling the Arqueo button
   const isAnyBoxOpen = useMemo(() => {
@@ -358,7 +369,7 @@ export default function Finance() {
           <CardContent className="pt-4">
             <div className="flex flex-col">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Saldo Disponible</span>
-              <div className="text-3xl font-black text-emerald-600 tracking-tighter">
+              <div className={`text-3xl font-black tracking-tighter ${cashBalance < 0 ? "text-red-600" : "text-emerald-600"}`}>
                 {formatCurrency(cashBalance)}
               </div>
             </div>
@@ -402,7 +413,7 @@ export default function Finance() {
           <CardContent className="pt-4">
             <div className="flex flex-col">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Saldo Disponible</span>
-              <div className="text-3xl font-black text-blue-600 tracking-tighter">
+              <div className={`text-3xl font-black tracking-tighter ${qrBalance < 0 ? "text-red-600" : "text-blue-600"}`}>
                 {formatCurrency(qrBalance)}
               </div>
             </div>
@@ -446,7 +457,7 @@ export default function Finance() {
           <CardContent className="pt-4">
             <div className="flex flex-col">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Saldo Disponible</span>
-              <div className="text-3xl font-black text-purple-600 tracking-tighter">
+              <div className={`text-3xl font-black tracking-tighter ${transferBalance < 0 ? "text-red-600" : "text-purple-600"}`}>
                 {formatCurrency(transferBalance)}
               </div>
             </div>

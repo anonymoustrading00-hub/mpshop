@@ -56,25 +56,85 @@ export const financeRouter = router({
         isClosure: false,
       }));
 
-    // Construir filas de cierres (sumando todos los métodos de pago para el libro general)
-    const closureRows = (allClosures as any[])
+    // Construir filas de cierres separadas por método de pago
+    const closureRows: any[] = [];
+    (allClosures as any[])
       .filter((c: any) => activeUsersMap.has(c.userId))
-      .map((c: any) => {
-        const totalReported = (c.reportedCash || 0) + (c.reportedQr || 0) + (c.reportedTransfer || 0);
-        return {
-          id: `closure-${c.id}`,
-          type: "expense",
-          category: "cash_closure",
-          amount: totalReported,
-          paymentMethod: "cash", // Se muestra como general
-          notes: `Cierre de caja - ${activeUsersMap.get(c.userId) || `Usuario #${c.userId}`}`,
-          userId: c.userId,
-          userName: activeUsersMap.get(c.userId) || `Usuario #${c.userId}`,
-          createdAt: c.createdAt ? new Date(c.createdAt) : new Date(c.date + "T23:59:59"),
-          runningBalance: 0,
-          isOpening: false,
-          isClosure: true,
-        };
+      .forEach((c: any) => {
+        const uName = activeUsersMap.get(c.userId) || `Usuario #${c.userId}`;
+        const cDate = c.createdAt ? new Date(c.createdAt) : new Date(c.date + "T23:59:59");
+        let hasAny = false;
+
+        if (c.reportedCash && c.reportedCash > 0) {
+          hasAny = true;
+          closureRows.push({
+            id: `closure-${c.id}-cash`,
+            type: "expense",
+            category: "cash_closure",
+            amount: c.reportedCash,
+            paymentMethod: "cash",
+            notes: `Cierre de caja Efectivo - ${uName}`,
+            userId: c.userId,
+            userName: uName,
+            createdAt: cDate,
+            runningBalance: 0,
+            isOpening: false,
+            isClosure: true,
+          });
+        }
+
+        if (c.reportedQr && c.reportedQr > 0) {
+          hasAny = true;
+          closureRows.push({
+            id: `closure-${c.id}-qr`,
+            type: "expense",
+            category: "cash_closure",
+            amount: c.reportedQr,
+            paymentMethod: "qr",
+            notes: `Cierre de caja QR - ${uName}`,
+            userId: c.userId,
+            userName: uName,
+            createdAt: cDate,
+            runningBalance: 0,
+            isOpening: false,
+            isClosure: true,
+          });
+        }
+
+        if (c.reportedTransfer && c.reportedTransfer > 0) {
+          hasAny = true;
+          closureRows.push({
+            id: `closure-${c.id}-transfer`,
+            type: "expense",
+            category: "cash_closure",
+            amount: c.reportedTransfer,
+            paymentMethod: "transfer",
+            notes: `Cierre de caja Banco - ${uName}`,
+            userId: c.userId,
+            userName: uName,
+            createdAt: cDate,
+            runningBalance: 0,
+            isOpening: false,
+            isClosure: true,
+          });
+        }
+
+        if (!hasAny) {
+          closureRows.push({
+            id: `closure-${c.id}-zero`,
+            type: "expense",
+            category: "cash_closure",
+            amount: 0,
+            paymentMethod: "cash",
+            notes: `Cierre de caja - ${uName}`,
+            userId: c.userId,
+            userName: uName,
+            createdAt: cDate,
+            runningBalance: 0,
+            isOpening: false,
+            isClosure: true,
+          });
+        }
       });
 
     // Construir filas de transacciones
@@ -122,29 +182,71 @@ export const financeRouter = router({
     });
   }),
 
-  getGlobalBalances: protectedProcedure.query(async ({ ctx }) => {
-    const transactions = await getFinancialTransactions(undefined, ctx.branchId);
-    const openings = await getAllCashOpenings();
+  getGlobalBalances: protectedProcedure
+    .input(z.object({ branchId: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const branchId = input?.branchId ?? ctx.branchId;
+      const transactions = await getFinancialTransactions(undefined, branchId);
+      const openings = await getAllCashOpenings();
+      const closures = await getAllCashClosures();
+      const allUsers = await getAllUsers();
+      const activeUsersMap = new Map((allUsers as any[]).map((u: any) => [u.id, u.name || u.username]));
 
-    const calc = (method: "cash" | "qr" | "transfer") => {
-      const income = (transactions as any[])
-        .filter((t: any) => t.type === "income" && (t.paymentMethod === method || (method === "cash" && !t.paymentMethod)))
-        .reduce((s: number, t: any) => s + (t.amount || 0), 0);
-      const expense = (transactions as any[])
-        .filter((t: any) => t.type === "expense" && (t.paymentMethod === method || (method === "cash" && !t.paymentMethod)))
-        .reduce((s: number, t: any) => s + (t.amount || 0), 0);
-      const openingTotal = (openings as any[])
-        .filter((o: any) => o.paymentMethod === method || (method === "cash" && !o.paymentMethod))
-        .reduce((s: number, o: any) => s + (o.openingAmount || 0), 0);
-      return income - expense + openingTotal;
-    };
+      const calc = (method: "cash" | "qr" | "transfer") => {
+        // 1. Ingresos operativos (ventas, ingresos extraordinarios, etc.)
+        const txIncome = (transactions as any[])
+          .filter((t: any) => t.type === "income" && (t.paymentMethod === method || (method === "cash" && !t.paymentMethod)))
+          .reduce((s: number, t: any) => s + (t.amount || 0), 0);
 
-    return {
-      cash: calc("cash"),
-      qr: calc("qr"),
-      transfer: calc("transfer"),
-    };
-  }),
+        // 2. Aperturas de caja (fondos iniciales ingresados a la caja)
+        const openingTotal = (openings as any[])
+          .filter((o: any) => (o.paymentMethod === method || (method === "cash" && !o.paymentMethod)) && activeUsersMap.has(o.responsibleUserId))
+          .reduce((s: number, o: any) => s + (o.openingAmount || 0), 0);
+
+        // 3. Egresos operativos (compras de inventario, gastos, etc.)
+        const txExpense = (transactions as any[])
+          .filter((t: any) => t.type === "expense" && (t.paymentMethod === method || (method === "cash" && !t.paymentMethod)))
+          .reduce((s: number, t: any) => s + (t.amount || 0), 0);
+
+        // 4. Cierres de caja (fondos retirados/arqueados al cerrar caja)
+        const closureTotal = (closures as any[])
+          .filter((c: any) => activeUsersMap.has(c.userId))
+          .reduce((s: number, c: any) => {
+            const amt = method === "cash" ? (c.reportedCash || 0) : method === "qr" ? (c.reportedQr || 0) : (c.reportedTransfer || 0);
+            return s + amt;
+          }, 0);
+
+        // Totales consolidados (idénticos a getBoxHistory)
+        const totalIncome = txIncome + openingTotal;
+        const totalExpense = txExpense + closureTotal;
+        const balance = totalIncome - totalExpense;
+
+        return {
+          balance,
+          totalIncome,
+          totalExpense,
+          txIncome,
+          txExpense,
+          openingTotal,
+          closureTotal,
+        };
+      };
+
+      const cashData = calc("cash");
+      const qrData = calc("qr");
+      const transferData = calc("transfer");
+
+      return {
+        cash: cashData.balance,
+        qr: qrData.balance,
+        transfer: transferData.balance,
+        details: {
+          cash: cashData,
+          qr: qrData,
+          transfer: transferData,
+        }
+      };
+    }),
 
 
   getCashOpenings: protectedProcedure.query(async ({ ctx }) => {
