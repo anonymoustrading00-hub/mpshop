@@ -243,14 +243,12 @@ export default function Purchases() {
   }, [purchases, searchQuery, filterPayment, filterDateFrom, filterDateTo]);
 
   const totalSpent = useMemo(() => {
-    if (!purchases) return 0;
-    return (purchases as any[]).reduce((sum, p) => sum + (p.totalAmount || 0), 0);
-  }, [purchases]);
+    return filteredPurchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+  }, [filteredPurchases]);
 
   const creditPurchasesCount = useMemo(() => {
-    if (!purchases) return 0;
-    return (purchases as any[]).filter(p => p.isCredit === 1).length;
-  }, [purchases]);
+    return filteredPurchases.filter(p => p.isCredit === 1).length;
+  }, [filteredPurchases]);
 
   // Bloqueo de seguridad: Si tiene un cierre pendiente
   const { data: closureStatus } = trpc.finance.hasPendingClosure.useQuery();
@@ -334,7 +332,7 @@ export default function Purchases() {
               </div>
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Registros</p>
-                <p className="text-2xl font-black text-slate-900">{purchases?.length || 0}</p>
+                <p className="text-2xl font-black text-slate-900">{filteredPurchases.length}</p>
               </div>
             </div>
           </CardContent>
