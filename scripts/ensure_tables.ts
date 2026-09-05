@@ -377,6 +377,9 @@ export async function ensureTables() {
     await runSQL("accountsPayable.status modify", `
       ALTER TABLE accountsPayable MODIFY COLUMN status enum('unpaid','partially_paid','paid','overdue') NOT NULL DEFAULT 'unpaid'
     `);
+    await runSQL("accountsPayable.amount column nullable", `
+      ALTER TABLE accountsPayable MODIFY COLUMN amount int NULL DEFAULT NULL
+    `);
     try {
       await connection.query("UPDATE accountsPayable SET totalAmount = amount WHERE totalAmount = 0 AND amount IS NOT NULL AND amount > 0");
     } catch (_) {}
