@@ -1,13 +1,13 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle, CheckCircle2, AlertCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, AlertCircle, Info } from "lucide-react";
 
 interface AlertCardProps {
-  type: "success" | "warning" | "error";
+  type: "success" | "warning" | "error" | "info" | string;
   title: string;
   description: string;
 }
 
-const ALERT_CONFIG = {
+const ALERT_CONFIG: Record<string, { bg: string; icon: any; iconColor: string; titleColor: string; descColor: string }> = {
   success: {
     bg: "bg-emerald-50 border-emerald-200",
     icon: CheckCircle2,
@@ -29,11 +29,18 @@ const ALERT_CONFIG = {
     titleColor: "text-red-900",
     descColor: "text-red-700",
   },
+  info: {
+    bg: "bg-blue-50 border-blue-200",
+    icon: Info,
+    iconColor: "text-blue-600",
+    titleColor: "text-blue-900",
+    descColor: "text-blue-700",
+  },
 };
 
 export function AlertCard({ type, title, description }: AlertCardProps) {
-  const config = ALERT_CONFIG[type];
-  const Icon = config.icon;
+  const config = ALERT_CONFIG[type] || ALERT_CONFIG.info || ALERT_CONFIG.warning;
+  const Icon = config?.icon || Info;
 
   return (
     <Card className={`${config.bg} border rounded-xl shadow-sm`}>

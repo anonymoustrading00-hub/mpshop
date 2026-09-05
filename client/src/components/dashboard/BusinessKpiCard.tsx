@@ -30,7 +30,7 @@ export function BusinessKpiCard({
   icon: Icon,
   accent = "blue",
 }: BusinessKpiCardProps) {
-  const colors = ACCENT_COLORS[accent];
+  const colors = ACCENT_COLORS[accent] || ACCENT_COLORS.blue;
 
   const formatValue = () => {
     if (valueType === "currency") return formatCurrency(Number(value));
