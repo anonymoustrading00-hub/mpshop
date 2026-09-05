@@ -55,11 +55,12 @@ import {
   AlertTriangle,
   Phone,
   Info,
-  X
+  X,
+  Download,
 } from "lucide-react";
 import { useBranch } from "@/contexts/BranchContext";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 
 function getUnitTypeBadge(type?: string) {
   const t = (type || "").toLowerCase();
@@ -303,344 +304,383 @@ function numeroALetras(montoCentavos: number): string {
   return `${millones(entero)} ${centavosStr} BOLIVIANOS`;
 }
 
-function printSaleTicket(detail: any, companyConfig?: any) {
+function printSaleTicket(detail: any, companyConfig?: any, action: "print" | "download" = "print") {
   if (!detail?.sale) {
     toast.error("Abre el detalle de la venta antes de imprimir");
     return;
   }
 
-  const sale = detail.sale;
-  const items = detail.items || [];
-  const isCancelled = sale.status === "cancelled";
+  try {
+    const sale = detail.sale;
+    const items = detail.items || [];
+    const isCancelled = sale.status === "cancelled";
 
-  const companyName = companyConfig?.name || "HK EQUIPOS TECNOLÓGICOS";
-  const companyCity = companyConfig?.city || "La Paz - Bolivia";
-  const companyPhone = companyConfig?.phone || companyConfig?.whatsapp || "";
-  const companyAddress = companyConfig?.address || "";
+    const companyName = companyConfig?.name || "HK EQUIPOS TECNOLÓGICOS";
+    const companyCity = companyConfig?.city || "La Paz - Bolivia";
+    const companyPhone = companyConfig?.phone || companyConfig?.whatsapp || "";
+    const companyAddress = companyConfig?.address || "";
 
-  const doc = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: "letter",
-  });
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "letter",
+    });
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
 
-  // Encabezado / Logo
-  let topY = 12;
-  const companyLogo = companyConfig?.logo;
-  if (companyLogo) {
-    try {
-      const format = companyLogo.startsWith("data:image/jpeg") || companyLogo.startsWith("data:image/jpg") ? "JPEG" : "PNG";
-      doc.addImage(companyLogo, format, 14, topY, 26, 26);
-    } catch (e) {
-      console.log("Could not render company logo in PDF", e);
-    }
-  }
-
-  // Títulos empresa
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(15, 23, 42); // slate-900
-  doc.text(companyName.toUpperCase(), 45, topY + 6);
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(71, 85, 105); // slate-600
-  doc.text(companyCity, 45, topY + 11);
-  if (companyPhone) {
-    doc.text(`Tel: ${companyPhone}`, 45, topY + 15);
-  }
-  if (companyAddress) {
-    doc.text(companyAddress, 45, topY + (companyPhone ? 19 : 15));
-  }
-
-  // Cuadro Nota de Venta (Derecha)
-  const boxX = pageWidth - 66;
-  const boxW = 52;
-  const boxH = 22;
-  doc.setDrawColor(51, 65, 85); // slate-700
-  doc.setLineWidth(0.4);
-  doc.roundedRect(boxX, topY, boxW, boxH, 2, 2, "D");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(15, 23, 42);
-  doc.text("NOTA DE VENTA", boxX + boxW / 2, topY + 6, { align: "center" });
-
-  doc.setFontSize(9);
-  doc.setTextColor(220, 38, 38);
-  doc.text(`Nº: ${sale.saleNumber || "S/N"}`, boxX + boxW / 2, topY + 12, { align: "center" });
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
-  doc.setTextColor(71, 85, 105);
-  doc.text(`Almacén: ${sale.branchName || "GENERAL"}`, boxX + boxW / 2, topY + 17, { align: "center" });
-
-  // Cuadro Datos del Cliente
-  const clientY = topY + 26;
-  doc.setFillColor(248, 250, 252); // slate-50
-  doc.setDrawColor(203, 213, 225); // slate-300
-  doc.roundedRect(14, clientY, pageWidth - 28, 18, 1.5, 1.5, "FD");
-
-  const formattedDate = new Date(sale.createdAt).toLocaleDateString("es-BO", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-
-  doc.setFontSize(8);
-  doc.setTextColor(15, 23, 42);
-
-  // Fila 1
-  doc.setFont("helvetica", "bold");
-  doc.text("Fecha:", 18, clientY + 5.5);
-  doc.setFont("helvetica", "normal");
-  doc.text(formattedDate, 32, clientY + 5.5);
-
-  doc.setFont("helvetica", "bold");
-  doc.text("Dirección:", 75, clientY + 5.5);
-  doc.setFont("helvetica", "normal");
-  doc.text((sale.customerAddress || companyAddress || "La Paz - Bolivia").substring(0, 45), 92, clientY + 5.5);
-
-  doc.setFont("helvetica", "bold");
-  doc.text("Vendedor:", 155, clientY + 5.5);
-  doc.setFont("helvetica", "normal");
-  doc.text((sale.sellerName || "—").substring(0, 20), 172, clientY + 5.5);
-
-  // Fila 2
-  doc.setFont("helvetica", "bold");
-  doc.text("Cliente:", 18, clientY + 12);
-  doc.setFont("helvetica", "normal");
-  doc.text((sale.customerDisplayName || "Anónimo").substring(0, 30), 32, clientY + 12);
-
-  doc.setFont("helvetica", "bold");
-  doc.text("NIT/CI:", 75, clientY + 12);
-  doc.setFont("helvetica", "normal");
-  doc.text(sale.customerTaxId || "S/N", 92, clientY + 12);
-
-  doc.setFont("helvetica", "bold");
-  doc.text("Teléfono:", 155, clientY + 12);
-  doc.setFont("helvetica", "normal");
-  doc.text(sale.customerPhone || "S/N", 172, clientY + 12);
-
-  // Tabla de Items
-  const tableData = items.map((item: any, idx: number) => {
-    const pUnit = ((item.finalUnitPrice || item.basePrice || 0) / 100).toFixed(2);
-    const subtotal = ((item.subtotal || 0) / 100).toFixed(2);
-    const code = item.productCode || `0000${idx + 1}`;
-    const unitType = item.unitType || "PZA";
-    const name = item.productName || "PRODUCTO GENERAL";
-    const itemDiscount = item.discountAmount || 0;
-    const descText = itemDiscount > 0
-      ? `\n  ↳ Desc.: -Bs. ${(itemDiscount / 100).toFixed(2)}${item.discountType === "percentage" ? ` (${item.discountValue}%)` : ""}`
-      : "";
-
-    return [
-      idx + 1,
-      code,
-      name + descText,
-      unitType,
-      item.quantity || 1,
-      pUnit,
-      subtotal,
-    ];
-  });
-
-  // Si hay descuento global, agregar filas especiales al final
-  const lineSubtotal = items.reduce((s: number, i: any) => s + (i.subtotal || 0), 0);
-  const globalDiscountAmount = sale.discountAmount || 0;
-  const hasGlobalDiscount = globalDiscountAmount > 0;
-
-  if (hasGlobalDiscount) {
-    tableData.push([
-      "",
-      "",
-      "SUBTOTAL:",
-      "",
-      "",
-      "",
-      (lineSubtotal / 100).toFixed(2),
-    ]);
-    const descLabel = `DESCUENTO${sale.discountType === "percentage" ? ` (${sale.discountValue}%)` : ""}${sale.notes ? ` — ${sale.notes}` : ""}`;
-    tableData.push([
-      "",
-      "",
-      descLabel,
-      "",
-      "",
-      "",
-      `-${(globalDiscountAmount / 100).toFixed(2)}`,
-    ]);
-  }
-
-  (autoTable as any)(doc, {
-    startY: clientY + 22,
-    head: [["Nº", "CÓDIGO", "DESCRIPCIÓN", "UNIDAD", "CANT.", "P. UNIT.", "IMPORTE"]],
-    body: tableData,
-    styles: {
-      fontSize: 8,
-      cellPadding: 2,
-      textColor: [30, 41, 59],
-      valign: "middle",
-    },
-    headStyles: {
-      fillColor: [30, 41, 59], // Slate 800
-      textColor: [255, 255, 255],
-      fontStyle: "bold",
-      halign: "center",
-      fontSize: 7.5,
-    },
-    columnStyles: {
-      0: { halign: "center", cellWidth: 10 },
-      1: { halign: "center", cellWidth: 24, font: "courier" },
-      2: { halign: "left" },
-      3: { halign: "center", cellWidth: 16 },
-      4: { halign: "center", cellWidth: 14, fontStyle: "bold" },
-      5: { halign: "right", cellWidth: 22, font: "courier" },
-      6: { halign: "right", cellWidth: 24, font: "courier", fontStyle: "bold" },
-    },
-    theme: "grid",
-    margin: { left: 14, right: 14 },
-    didDrawCell: (data: any) => {
-      // Resaltar descuento global
-      if (hasGlobalDiscount && data.section === "body" && (data.row.index === tableData.length - 1)) {
-        doc.setTextColor(146, 64, 14);
-      }
-    },
-  });
-
-  const finalY = (doc as any).lastAutoTable?.finalY || 160;
-
-  // Totales y Son
-  const totalAmountStr = `Bs. ${((sale.total || 0) / 100).toFixed(2)}`;
-  const literalTotal = numeroALetras(sale.total || 0);
-  const totalQty = items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
-  const notesText = sale.notes
-    ? sale.notes
-    : `VENTA EN ${paymentMethodLabel(sale.paymentMethod).toUpperCase()} · GARANTÍA ${sale.warrantyDays || 30} DÍAS`;
-
-  let currentY = finalY + 5;
-  if (currentY + 45 > pageHeight) {
-    doc.addPage();
-    currentY = 20;
-  }
-
-  // Cuadro resumen
-  doc.setDrawColor(203, 213, 225);
-  doc.line(14, currentY, pageWidth - 14, currentY);
-  currentY += 4;
-
-  doc.setFontSize(7.5);
-  doc.setFont("helvetica", "bold");
-  doc.text("SON:", 14, currentY);
-  doc.setFont("helvetica", "normal");
-  doc.text(literalTotal, 24, currentY);
-
-  doc.setFont("helvetica", "bold");
-  doc.text("TOTAL CANT:", pageWidth - 70, currentY);
-  doc.setFont("helvetica", "normal");
-  doc.text(`${totalQty} uds.`, pageWidth - 46, currentY);
-
-  currentY += 5;
-  doc.setFont("helvetica", "bold");
-  doc.text("NOTA/REF.:", 14, currentY);
-  doc.setFont("helvetica", "normal");
-  doc.text(notesText, 32, currentY);
-
-  // Total destacado
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(15, 23, 42);
-  doc.text("TOTAL:", pageWidth - 65, currentY + 1);
-  doc.setFontSize(12);
-  doc.setTextColor(22, 101, 52); // green-800
-  doc.text(totalAmountStr, pageWidth - 14, currentY + 1, { align: "right" });
-
-  currentY += 16;
-
-  // Firmas
-  const sigWidth = 45;
-  const col1 = 20;
-  const col2 = (pageWidth - sigWidth) / 2;
-  const col3 = pageWidth - 20 - sigWidth;
-
-  doc.setDrawColor(100, 116, 139);
-  doc.setLineWidth(0.3);
-
-  // Vendedor
-  doc.line(col1, currentY, col1 + sigWidth, currentY);
-  doc.setFontSize(7.5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(30, 41, 59);
-  doc.text("VENDEDOR", col1 + sigWidth / 2, currentY + 4, { align: "center" });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
-  doc.setTextColor(100, 116, 139);
-  doc.text(sale.sellerName || "—", col1 + sigWidth / 2, currentY + 7.5, { align: "center" });
-
-  // Cliente
-  doc.line(col2, currentY, col2 + sigWidth, currentY);
-  doc.setFontSize(7.5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(30, 41, 59);
-  doc.text("CLIENTE", col2 + sigWidth / 2, currentY + 4, { align: "center" });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
-  doc.setTextColor(100, 116, 139);
-  doc.text(sale.customerDisplayName || "—", col2 + sigWidth / 2, currentY + 7.5, { align: "center" });
-
-  // Recepción
-  doc.line(col3, currentY, col3 + sigWidth, currentY);
-  doc.setFontSize(7.5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(30, 41, 59);
-  doc.text("CONFORMIDAD", col3 + sigWidth / 2, currentY + 4, { align: "center" });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
-  doc.setTextColor(100, 116, 139);
-  doc.text("Firma / Sello", col3 + sigWidth / 2, currentY + 7.5, { align: "center" });
-
-  // MARCA DE AGUA VENTA ANULADA SI APLICA
-  if (isCancelled) {
-    const totalPages = (doc as any).internal.getNumberOfPages();
-    for (let p = 1; p <= totalPages; p++) {
-      doc.setPage(p);
-      doc.saveGraphicsState();
+    // Encabezado / Logo
+    let topY = 12;
+    const companyLogo = companyConfig?.logo;
+    if (companyLogo && typeof companyLogo === "string") {
       try {
-        // Configurar opacidad si es soportado por jsPDF
-        if (typeof (doc as any).setGState === "function" && (doc as any).GState) {
-          doc.setGState(new (doc as any).GState({ opacity: 0.22 }));
-        }
-      } catch (e) {}
+        const format = companyLogo.startsWith("data:image/jpeg") || companyLogo.startsWith("data:image/jpg") ? "JPEG" : "PNG";
+        doc.addImage(companyLogo, format, 14, topY, 26, 26);
+      } catch (e) {
+        console.warn("Could not render company logo in PDF", e);
+      }
+    }
 
-      doc.setTextColor(220, 38, 38); // Rojo
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(55);
-      
-      // Dibujar texto inclinado en el centro de la página
-      doc.text("VENTA ANULADA", pageWidth / 2, pageHeight / 2, {
-        align: "center",
-        angle: 45,
+    // Títulos empresa
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(15, 23, 42); // slate-900
+    doc.text(companyName.toUpperCase(), 45, topY + 6);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105); // slate-600
+    doc.text(companyCity, 45, topY + 11);
+    if (companyPhone) {
+      doc.text(`Tel: ${companyPhone}`, 45, topY + 15);
+    }
+    if (companyAddress) {
+      doc.text(companyAddress, 45, topY + (companyPhone ? 19 : 15));
+    }
+
+    // Cuadro Nota de Venta (Derecha)
+    const boxX = pageWidth - 66;
+    const boxW = 52;
+    const boxH = 22;
+    doc.setDrawColor(51, 65, 85); // slate-700
+    doc.setLineWidth(0.4);
+    doc.roundedRect(boxX, topY, boxW, boxH, 2, 2, "D");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text("NOTA DE VENTA", boxX + boxW / 2, topY + 6, { align: "center" });
+
+    doc.setFontSize(9);
+    doc.setTextColor(220, 38, 38);
+    doc.text(`Nº: ${sale.saleNumber || "S/N"}`, boxX + boxW / 2, topY + 12, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Almacén: ${sale.branchName || "GENERAL"}`, boxX + boxW / 2, topY + 17, { align: "center" });
+
+    // Cuadro Datos del Cliente
+    const clientY = topY + 26;
+    doc.setFillColor(248, 250, 252); // slate-50
+    doc.setDrawColor(203, 213, 225); // slate-300
+    doc.roundedRect(14, clientY, pageWidth - 28, 18, 1.5, 1.5, "FD");
+
+    const formattedDate = new Date(sale.createdAt || Date.now()).toLocaleDateString("es-BO", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+
+    // Fila 1
+    doc.setFont("helvetica", "bold");
+    doc.text("Fecha:", 18, clientY + 5.5);
+    doc.setFont("helvetica", "normal");
+    doc.text(formattedDate, 32, clientY + 5.5);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Dirección:", 75, clientY + 5.5);
+    doc.setFont("helvetica", "normal");
+    doc.text((sale.customerAddress || companyAddress || "La Paz - Bolivia").substring(0, 45), 92, clientY + 5.5);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Vendedor:", 155, clientY + 5.5);
+    doc.setFont("helvetica", "normal");
+    doc.text((sale.sellerName || "—").substring(0, 20), 172, clientY + 5.5);
+
+    // Fila 2
+    doc.setFont("helvetica", "bold");
+    doc.text("Cliente:", 18, clientY + 12);
+    doc.setFont("helvetica", "normal");
+    doc.text((sale.customerDisplayName || "Anónimo").substring(0, 30), 32, clientY + 12);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("NIT/CI:", 75, clientY + 12);
+    doc.setFont("helvetica", "normal");
+    doc.text(sale.customerTaxId || "S/N", 92, clientY + 12);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Teléfono:", 155, clientY + 12);
+    doc.setFont("helvetica", "normal");
+    doc.text(sale.customerPhone || "S/N", 172, clientY + 12);
+
+    // Tabla de Items
+    const tableData = items.map((item: any, idx: number) => {
+      const pUnit = ((item.finalUnitPrice || item.basePrice || 0) / 100).toFixed(2);
+      const subtotal = ((item.subtotal || 0) / 100).toFixed(2);
+      const code = item.productCode || `0000${idx + 1}`;
+      const unitType = item.unitType || "PZA";
+      const name = item.productName || "PRODUCTO GENERAL";
+      const itemDiscount = item.discountAmount || 0;
+      const descText = itemDiscount > 0
+        ? `\n  ↳ Desc.: -Bs. ${(itemDiscount / 100).toFixed(2)}${item.discountType === "percentage" ? ` (${item.discountValue}%)` : ""}`
+        : "";
+
+      return [
+        idx + 1,
+        code,
+        name + descText,
+        unitType,
+        item.quantity || 1,
+        pUnit,
+        subtotal,
+      ];
+    });
+
+    // Si hay descuento global, agregar filas especiales al final
+    const lineSubtotal = items.reduce((s: number, i: any) => s + (i.subtotal || 0), 0);
+    const globalDiscountAmount = sale.discountAmount || 0;
+    const hasGlobalDiscount = globalDiscountAmount > 0;
+
+    if (hasGlobalDiscount) {
+      tableData.push([
+        "",
+        "",
+        "SUBTOTAL:",
+        "",
+        "",
+        "",
+        (lineSubtotal / 100).toFixed(2),
+      ]);
+      const descLabel = `DESCUENTO${sale.discountType === "percentage" ? ` (${sale.discountValue}%)` : ""}${sale.notes ? ` — ${sale.notes}` : ""}`;
+      tableData.push([
+        "",
+        "",
+        descLabel,
+        "",
+        "",
+        "",
+        `-${(globalDiscountAmount / 100).toFixed(2)}`,
+      ]);
+    }
+
+    const runAutoTable = (typeof autoTable === "function" ? autoTable : (doc as any).autoTable || (autoTable as any)?.default);
+    if (typeof runAutoTable === "function") {
+      runAutoTable(doc, {
+        startY: clientY + 22,
+        head: [["Nº", "CÓDIGO", "DESCRIPCIÓN", "UNIDAD", "CANT.", "P. UNIT.", "IMPORTE"]],
+        body: tableData,
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+          textColor: [30, 41, 59],
+          valign: "middle",
+        },
+        headStyles: {
+          fillColor: [30, 41, 59], // Slate 800
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          halign: "center",
+          fontSize: 7.5,
+        },
+        columnStyles: {
+          0: { halign: "center", cellWidth: 10 },
+          1: { halign: "center", cellWidth: 24, font: "courier" },
+          2: { halign: "left" },
+          3: { halign: "center", cellWidth: 16 },
+          4: { halign: "center", cellWidth: 14, fontStyle: "bold" },
+          5: { halign: "right", cellWidth: 22, font: "courier" },
+          6: { halign: "right", cellWidth: 24, font: "courier", fontStyle: "bold" },
+        },
+        theme: "grid",
+        margin: { left: 14, right: 14 },
+        didDrawCell: (data: any) => {
+          if (hasGlobalDiscount && data.section === "body" && (data.row.index === tableData.length - 1)) {
+            doc.setTextColor(146, 64, 14);
+          }
+        },
       });
+    }
 
-      if (sale.cancelReason) {
-        doc.setFontSize(16);
-        doc.text(`Motivo: ${sale.cancelReason}`, pageWidth / 2, pageHeight / 2 + 18, {
+    const finalY = (doc as any).lastAutoTable?.finalY || 160;
+
+    // Totales y Son
+    const totalAmountStr = `Bs. ${((sale.total || 0) / 100).toFixed(2)}`;
+    const literalTotal = numeroALetras(sale.total || 0);
+    const totalQty = items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
+    const notesText = sale.notes
+      ? sale.notes
+      : `VENTA EN ${paymentMethodLabel(sale.paymentMethod).toUpperCase()} · GARANTÍA ${sale.warrantyDays || 30} DÍAS`;
+
+    let currentY = finalY + 5;
+    if (currentY + 45 > pageHeight) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    // Cuadro resumen
+    doc.setDrawColor(203, 213, 225);
+    doc.line(14, currentY, pageWidth - 14, currentY);
+    currentY += 4;
+
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.text("SON:", 14, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.text(literalTotal, 24, currentY);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL CANT:", pageWidth - 70, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${totalQty} uds.`, pageWidth - 46, currentY);
+
+    currentY += 5;
+    doc.setFont("helvetica", "bold");
+    doc.text("NOTA/REF.:", 14, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.text(notesText, 32, currentY);
+
+    // Total destacado
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text("TOTAL:", pageWidth - 65, currentY + 1);
+    doc.setFontSize(12);
+    doc.setTextColor(22, 101, 52); // green-800
+    doc.text(totalAmountStr, pageWidth - 14, currentY + 1, { align: "right" });
+
+    currentY += 16;
+
+    // Firmas
+    const sigWidth = 45;
+    const col1 = 20;
+    const col2 = (pageWidth - sigWidth) / 2;
+    const col3 = pageWidth - 20 - sigWidth;
+
+    doc.setDrawColor(100, 116, 139);
+    doc.setLineWidth(0.3);
+
+    // Vendedor
+    doc.line(col1, currentY, col1 + sigWidth, currentY);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 41, 59);
+    doc.text("VENDEDOR", col1 + sigWidth / 2, currentY + 4, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(sale.sellerName || "—", col1 + sigWidth / 2, currentY + 7.5, { align: "center" });
+
+    // Cliente
+    doc.line(col2, currentY, col2 + sigWidth, currentY);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 41, 59);
+    doc.text("CLIENTE", col2 + sigWidth / 2, currentY + 4, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(sale.customerDisplayName || "—", col2 + sigWidth / 2, currentY + 7.5, { align: "center" });
+
+    // Recepción
+    doc.line(col3, currentY, col3 + sigWidth, currentY);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 41, 59);
+    doc.text("CONFORMIDAD", col3 + sigWidth / 2, currentY + 4, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text("Firma / Sello", col3 + sigWidth / 2, currentY + 7.5, { align: "center" });
+
+    // MARCA DE AGUA VENTA ANULADA SI APLICA
+    if (isCancelled) {
+      const totalPages = (doc as any).internal.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        doc.saveGraphicsState();
+        try {
+          if (typeof (doc as any).setGState === "function" && (doc as any).GState) {
+            doc.setGState(new (doc as any).GState({ opacity: 0.22 }));
+          }
+        } catch (e) {}
+
+        doc.setTextColor(220, 38, 38);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(55);
+
+        doc.text("VENTA ANULADA", pageWidth / 2, pageHeight / 2, {
           align: "center",
           angle: 45,
         });
+
+        if (sale.cancelReason) {
+          doc.setFontSize(16);
+          doc.text(`Motivo: ${sale.cancelReason}`, pageWidth / 2, pageHeight / 2 + 18, {
+            align: "center",
+            angle: 45,
+          });
+        }
+
+        doc.restoreGraphicsState();
       }
-
-      doc.restoreGraphicsState();
     }
-  }
 
-  // Guardar PDF directamente
-  const fileName = `NV-${sale.saleNumber || "venta"}.pdf`;
-  doc.save(fileName);
-  toast.success(`Nota de venta descargada como ${fileName}`);
+    const fileName = `NV-${sale.saleNumber || "venta"}.pdf`;
+
+    if (action === "download") {
+      doc.save(fileName);
+      toast.success(`Nota de venta descargada como ${fileName}`);
+      return;
+    }
+
+    // Modo Impresión: abrir diálogo nativo de impresión con PDF
+    try {
+      const blob = doc.output("blob");
+      const blobUrl = URL.createObjectURL(blob);
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.src = blobUrl;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          } catch (e) {
+            console.warn("Iframe print failed, falling back to window.open", e);
+            window.open(blobUrl, "_blank");
+          }
+        }, 400);
+      };
+      toast.success("Abriendo diálogo de impresión...");
+    } catch (printErr) {
+      console.warn("Direct print failed, triggering download", printErr);
+      doc.save(fileName);
+      toast.success(`Nota de venta descargada como ${fileName}`);
+    }
+  } catch (err: any) {
+    console.error("[printSaleTicket Error]", err);
+    toast.error(`Error al procesar la nota de venta: ${err?.message || err}`);
+  }
 }
 
 
@@ -2311,13 +2351,23 @@ export default function Sales() {
               </DialogDescription>
             </div>
             {detail?.sale && (
-              <Button
-                onClick={() => printSaleTicket(detail, companyConfig)}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1.5 shadow-md"
-              >
-                <Printer className="h-4 w-4" />
-                Imprimir Nota de Venta
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  onClick={() => printSaleTicket(detail, companyConfig, "download")}
+                  variant="outline"
+                  className="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 shadow-xs border-slate-300"
+                >
+                  <Download className="h-4 w-4 text-slate-600" />
+                  <span>Descargar PDF</span>
+                </Button>
+                <Button
+                  onClick={() => printSaleTicket(detail, companyConfig, "print")}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1.5 shadow-md"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span>Imprimir Nota de Venta</span>
+                </Button>
+              </div>
             )}
           </DialogHeader>
 
