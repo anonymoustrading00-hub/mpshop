@@ -3649,9 +3649,8 @@ export async function cancelSaleRecord(saleId: number, cancelledByUserId: number
     // Eliminar registros de garantía generados por esta venta anulada
     await tx.delete(schema.warranties).where(eq(schema.warranties.saleId, saleId));
 
-    // Eliminar items de esta venta anulada para evitar items huerfanos
-    // que aparecen como "Articulo #X" si el saleId es reutilizado
-    await tx.delete(saleItems).where(eq(saleItems.saleId, saleId));
+    // NOTA: Los items de la venta se conservan intencionalmente para registro histórico
+    // y para poder reimprimir la nota de venta con los artículos vendidos.
 
     // Cancelar cuenta por cobrar si existía
     await tx.update(schema.accountsReceivable).set({ status: "cancelled" }).where(eq(schema.accountsReceivable.saleId, saleId));
@@ -3764,8 +3763,8 @@ export async function getSaleItemsBySaleId(saleId: number) {
       _orphan: !foundUnit && !!(uId),
     };
   }));
-  // Filtrar items huerfanos (unitId no existe en units) para no mostrar articulos fantasma
-  return resolved.filter((item: any) => !item._orphan);
+  // Se devuelven todos los items (incluyendo huerfanos) para preservar el historial completo de ventas.
+  return resolved;
 }
 
 export async function getOnOrderQuantities() {

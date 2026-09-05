@@ -58,6 +58,8 @@ import {
   X
 } from "lucide-react";
 import { useBranch } from "@/contexts/BranchContext";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
 function getUnitTypeBadge(type?: string) {
   const t = (type || "").toLowerCase();
@@ -309,21 +311,78 @@ function printSaleTicket(detail: any, companyConfig?: any) {
 
   const sale = detail.sale;
   const items = detail.items || [];
-  const totalQty = items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
+  const isCancelled = sale.status === "cancelled";
 
   const companyName = companyConfig?.name || "HK EQUIPOS TECNOLÓGICOS";
   const companyCity = companyConfig?.city || "La Paz - Bolivia";
   const companyPhone = companyConfig?.phone || companyConfig?.whatsapp || "";
   const companyAddress = companyConfig?.address || "";
-  const logoHtml = companyConfig?.logo
-    ? `<img src="${companyConfig.logo}" style="max-height: 52px; max-width: 130px; object-fit: contain;" />`
-    : `<div style="display:inline-flex; align-items:center; gap:6px;">
-        <div style="width:34px; height:34px; border-radius:50%; background:#f59e0b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:bold;">💡</div>
-        <div>
-          <div style="font-size:11px; font-weight:900; color:#1e293b;">${companyName}</div>
-          <div style="font-size:9px; color:#64748b;">Crea tu Logo · tu idea, tu estilo</div>
-        </div>
-       </div>`;
+
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "letter",
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Encabezado / Logo
+  let topY = 12;
+  const companyLogo = companyConfig?.logo;
+  if (companyLogo) {
+    try {
+      const format = companyLogo.startsWith("data:image/jpeg") || companyLogo.startsWith("data:image/jpg") ? "JPEG" : "PNG";
+      doc.addImage(companyLogo, format, 14, topY, 26, 26);
+    } catch (e) {
+      console.log("Could not render company logo in PDF", e);
+    }
+  }
+
+  // Títulos empresa
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(15, 23, 42); // slate-900
+  doc.text(companyName.toUpperCase(), 45, topY + 6);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(71, 85, 105); // slate-600
+  doc.text(companyCity, 45, topY + 11);
+  if (companyPhone) {
+    doc.text(`Tel: ${companyPhone}`, 45, topY + 15);
+  }
+  if (companyAddress) {
+    doc.text(companyAddress, 45, topY + (companyPhone ? 19 : 15));
+  }
+
+  // Cuadro Nota de Venta (Derecha)
+  const boxX = pageWidth - 66;
+  const boxW = 52;
+  const boxH = 22;
+  doc.setDrawColor(51, 65, 85); // slate-700
+  doc.setLineWidth(0.4);
+  doc.roundedRect(boxX, topY, boxW, boxH, 2, 2, "D");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42);
+  doc.text("NOTA DE VENTA", boxX + boxW / 2, topY + 6, { align: "center" });
+
+  doc.setFontSize(9);
+  doc.setTextColor(220, 38, 38);
+  doc.text(`Nº: ${sale.saleNumber || "S/N"}`, boxX + boxW / 2, topY + 12, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Almacén: ${sale.branchName || "GENERAL"}`, boxX + boxW / 2, topY + 17, { align: "center" });
+
+  // Cuadro Datos del Cliente
+  const clientY = topY + 26;
+  doc.setFillColor(248, 250, 252); // slate-50
+  doc.setDrawColor(203, 213, 225); // slate-300
+  doc.roundedRect(14, clientY, pageWidth - 28, 18, 1.5, 1.5, "FD");
 
   const formattedDate = new Date(sale.createdAt).toLocaleDateString("es-BO", {
     day: "2-digit",
@@ -331,370 +390,257 @@ function printSaleTicket(detail: any, companyConfig?: any) {
     year: "numeric",
   });
 
-  // Subtotal antes del descuento global
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+
+  // Fila 1
+  doc.setFont("helvetica", "bold");
+  doc.text("Fecha:", 18, clientY + 5.5);
+  doc.setFont("helvetica", "normal");
+  doc.text(formattedDate, 32, clientY + 5.5);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Dirección:", 75, clientY + 5.5);
+  doc.setFont("helvetica", "normal");
+  doc.text((sale.customerAddress || companyAddress || "La Paz - Bolivia").substring(0, 45), 92, clientY + 5.5);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Vendedor:", 155, clientY + 5.5);
+  doc.setFont("helvetica", "normal");
+  doc.text((sale.sellerName || "—").substring(0, 20), 172, clientY + 5.5);
+
+  // Fila 2
+  doc.setFont("helvetica", "bold");
+  doc.text("Cliente:", 18, clientY + 12);
+  doc.setFont("helvetica", "normal");
+  doc.text((sale.customerDisplayName || "Anónimo").substring(0, 30), 32, clientY + 12);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("NIT/CI:", 75, clientY + 12);
+  doc.setFont("helvetica", "normal");
+  doc.text(sale.customerTaxId || "S/N", 92, clientY + 12);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Teléfono:", 155, clientY + 12);
+  doc.setFont("helvetica", "normal");
+  doc.text(sale.customerPhone || "S/N", 172, clientY + 12);
+
+  // Tabla de Items
+  const tableData = items.map((item: any, idx: number) => {
+    const pUnit = ((item.finalUnitPrice || item.basePrice || 0) / 100).toFixed(2);
+    const subtotal = ((item.subtotal || 0) / 100).toFixed(2);
+    const code = item.productCode || `0000${idx + 1}`;
+    const unitType = item.unitType || "PZA";
+    const name = item.productName || "PRODUCTO GENERAL";
+    const itemDiscount = item.discountAmount || 0;
+    const descText = itemDiscount > 0
+      ? `\n  ↳ Desc.: -Bs. ${(itemDiscount / 100).toFixed(2)}${item.discountType === "percentage" ? ` (${item.discountValue}%)` : ""}`
+      : "";
+
+    return [
+      idx + 1,
+      code,
+      name + descText,
+      unitType,
+      item.quantity || 1,
+      pUnit,
+      subtotal,
+    ];
+  });
+
+  // Si hay descuento global, agregar filas especiales al final
   const lineSubtotal = items.reduce((s: number, i: any) => s + (i.subtotal || 0), 0);
   const globalDiscountAmount = sale.discountAmount || 0;
   const hasGlobalDiscount = globalDiscountAmount > 0;
 
-  const rowsHtml = items
-    .map((item: any, idx: number) => {
-      const pUnit = ((item.finalUnitPrice || item.basePrice || 0) / 100).toFixed(2);
-      const subtotal = ((item.subtotal || 0) / 100).toFixed(2);
-      const code = item.productCode || `0000${idx + 1}`;
-      const unitType = item.unitType || "PZA";
-      // Descuento por línea
-      const itemDiscount = (item.discountAmount || 0);
-      const itemDiscountRow = itemDiscount > 0
-        ? `<tr style="background:#fef9c3;">
-            <td colspan="5" style="padding:2px 6px; font-size:9px; color:#92400e; font-style:italic;">
-              ↳ Desc. sobre artículo: -Bs. ${(itemDiscount / 100).toFixed(2)}
-              ${item.discountType === "percentage" ? ` (${item.discountValue}%)` : ""}
-            </td>
-            <td colspan="2" style="padding:2px 6px; text-align:right; font-size:9px; color:#92400e; font-style:italic;">-${(itemDiscount / 100).toFixed(2)}</td>
-           </tr>`
-        : "";
-      return `
-        <tr>
-          <td style="text-align:center; padding: 4px 2px;">${idx + 1}</td>
-          <td style="padding: 4px 6px; font-family: monospace; font-size: 10px;">${code}</td>
-          <td style="padding: 4px 6px; font-weight: bold; text-transform: uppercase;">${item.productName || "PRODUCTO GENERAL"}</td>
-          <td style="text-align:center; padding: 4px 2px;">${unitType}</td>
-          <td style="text-align:center; padding: 4px 2px; font-weight: bold;">${item.quantity || 1}</td>
-          <td style="text-align:right; padding: 4px 6px; font-family: monospace;">${pUnit}</td>
-          <td style="text-align:right; padding: 4px 6px; font-family: monospace; font-weight: bold;">${subtotal}</td>
-        </tr>
-        ${itemDiscountRow}
-      `;
-    })
-    .join("");
+  if (hasGlobalDiscount) {
+    tableData.push([
+      "",
+      "",
+      "SUBTOTAL:",
+      "",
+      "",
+      "",
+      (lineSubtotal / 100).toFixed(2),
+    ]);
+    const descLabel = `DESCUENTO${sale.discountType === "percentage" ? ` (${sale.discountValue}%)` : ""}${sale.notes ? ` — ${sale.notes}` : ""}`;
+    tableData.push([
+      "",
+      "",
+      descLabel,
+      "",
+      "",
+      "",
+      `-${(globalDiscountAmount / 100).toFixed(2)}`,
+    ]);
+  }
 
-  // Fila de subtotal + descuento global (si aplica)
-  const subtotalRow = hasGlobalDiscount
-    ? `<tr style="border-top: 1px dashed #94a3b8;">
-        <td colspan="5" style="padding:3px 6px; font-size:10px; color:#475569;"></td>
-        <td style="padding:3px 6px; text-align:right; font-size:10px; color:#475569; font-weight:bold;">SUBTOTAL:</td>
-        <td style="padding:3px 6px; text-align:right; font-family:monospace; font-size:10px; color:#475569;">${(lineSubtotal / 100).toFixed(2)}</td>
-       </tr>
-       <tr style="background:#fef9c3;">
-        <td colspan="5" style="padding:3px 6px; font-size:10px; color:#92400e; font-weight:bold; font-style:italic;">
-          DESCUENTO
-          ${sale.discountType === "percentage" ? ` (${sale.discountValue}%)` : sale.discountType === "fixed" ? " (monto fijo)" : ""}
-          ${sale.notes ? ` — Motivo: ${sale.notes}` : ""}
-        </td>
-        <td style="padding:3px 6px; text-align:right; font-size:10px; color:#92400e; font-weight:bold;">DESCUENTO:</td>
-        <td style="padding:3px 6px; text-align:right; font-family:monospace; font-size:10px; color:#92400e; font-weight:bold;">-${(globalDiscountAmount / 100).toFixed(2)}</td>
-       </tr>`
-    : "";
+  (autoTable as any)(doc, {
+    startY: clientY + 22,
+    head: [["Nº", "CÓDIGO", "DESCRIPCIÓN", "UNIDAD", "CANT.", "P. UNIT.", "IMPORTE"]],
+    body: tableData,
+    styles: {
+      fontSize: 8,
+      cellPadding: 2,
+      textColor: [30, 41, 59],
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [30, 41, 59], // Slate 800
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      halign: "center",
+      fontSize: 7.5,
+    },
+    columnStyles: {
+      0: { halign: "center", cellWidth: 10 },
+      1: { halign: "center", cellWidth: 24, font: "courier" },
+      2: { halign: "left" },
+      3: { halign: "center", cellWidth: 16 },
+      4: { halign: "center", cellWidth: 14, fontStyle: "bold" },
+      5: { halign: "right", cellWidth: 22, font: "courier" },
+      6: { halign: "right", cellWidth: 24, font: "courier", fontStyle: "bold" },
+    },
+    theme: "grid",
+    margin: { left: 14, right: 14 },
+    didDrawCell: (data: any) => {
+      // Resaltar descuento global
+      if (hasGlobalDiscount && data.section === "body" && (data.row.index === tableData.length - 1)) {
+        doc.setTextColor(146, 64, 14);
+      }
+    },
+  });
 
-  const totalAmountStr = ((sale.total || 0) / 100).toFixed(2);
+  const finalY = (doc as any).lastAutoTable?.finalY || 160;
+
+  // Totales y Son
+  const totalAmountStr = `Bs. ${((sale.total || 0) / 100).toFixed(2)}`;
   const literalTotal = numeroALetras(sale.total || 0);
-
+  const totalQty = items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
   const notesText = sale.notes
     ? sale.notes
     : `VENTA EN ${paymentMethodLabel(sale.paymentMethod).toUpperCase()} · GARANTÍA ${sale.warrantyDays || 30} DÍAS`;
 
-  const fileName = `NV-${sale.saleNumber || "venta"}.html`;
-
-  const htmlContent = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Nota de Venta - ${sale.saleNumber}</title>
-    <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      body {
-        font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
-        color: #111;
-        background: #fff;
-        padding: 24px;
-        font-size: 11px;
-        line-height: 1.35;
-      }
-      @media print {
-        body { padding: 8px; }
-        @page { margin: 8mm; size: auto; }
-      }
-      .voucher-box {
-        max-width: 780px;
-        margin: 0 auto;
-        border: 1px solid #cbd5e1;
-        padding: 20px;
-        border-radius: 8px;
-      }
-      @media print {
-        .voucher-box { border: none; padding: 0; }
-      }
-      .header-row {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 12px;
-      }
-      .logo-col {
-        flex: 1.2;
-        min-width: 140px;
-      }
-      .company-col {
-        flex: 2;
-        text-align: center;
-        padding-top: 2px;
-      }
-      .company-col h2 {
-        font-size: 14px;
-        font-weight: 900;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
-        color: #0f172a;
-      }
-      .company-col p {
-        font-size: 11px;
-        color: #475569;
-        margin-top: 2px;
-      }
-      .doc-col {
-        flex: 1.3;
-        text-align: right;
-      }
-      .doc-title {
-        font-size: 16px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        color: #0f172a;
-        margin-bottom: 6px;
-      }
-      .dashed-box {
-        display: inline-block;
-        border: 1.5px dashed #334155;
-        border-radius: 12px;
-        padding: 6px 14px;
-        text-align: left;
-        background: #f8fafc;
-      }
-      .dashed-box div {
-        font-size: 11px;
-        font-weight: bold;
-      }
-      .dashed-box span {
-        font-family: monospace;
-        font-weight: 800;
-      }
-      .info-block {
-        border-top: 1.5px dashed #64748b;
-        padding: 8px 2px;
-        margin-top: 8px;
-        font-size: 11px;
-      }
-      .info-line {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 4px;
-        gap: 12px;
-      }
-      .info-line div {
-        flex: 1;
-      }
-      .items-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 8px;
-        font-size: 11px;
-      }
-      .items-table thead tr {
-        border-top: 1.5px dashed #334155;
-        border-bottom: 1.5px dashed #334155;
-      }
-      .items-table th {
-        padding: 6px 4px;
-        font-size: 10px;
-        font-weight: 900;
-        text-transform: uppercase;
-        color: #0f172a;
-      }
-      .items-table tbody tr {
-        border-bottom: 1px dashed #e2e8f0;
-      }
-      .items-table tbody tr:last-child {
-        border-bottom: 1.5px dashed #334155;
-      }
-      .summary-block {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-top: 10px;
-        padding: 6px 2px;
-        font-size: 11px;
-      }
-      .summary-left {
-        flex: 1.6;
-        padding-right: 16px;
-      }
-      .summary-right {
-        flex: 1;
-        text-align: right;
-      }
-      .literal-text {
-        font-size: 11px;
-        font-weight: bold;
-        text-transform: uppercase;
-        margin-bottom: 4px;
-      }
-      .notes-text {
-        font-size: 10px;
-        color: #475569;
-      }
-      .total-box {
-        display: flex;
-        justify-content: flex-end;
-        align-items: baseline;
-        gap: 20px;
-        font-size: 11px;
-      }
-      .total-box .total-num {
-        font-size: 14px;
-        font-weight: 900;
-        font-family: monospace;
-        border-bottom: 1.5px dashed #0f172a;
-        padding: 2px 8px;
-      }
-      .signatures-block {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 48px;
-        padding: 0 16px;
-        text-align: center;
-      }
-      .sig-box {
-        width: 28%;
-      }
-      .sig-line {
-        border-top: 1.5px dashed #475569;
-        margin-bottom: 4px;
-      }
-      .sig-label {
-        font-size: 10px;
-        font-weight: 900;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
-        color: #1e293b;
-      }
-      .sig-name {
-        font-size: 9px;
-        color: #64748b;
-        margin-top: 1px;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="voucher-box">
-      <div class="header-row">
-        <div class="logo-col">
-          ${logoHtml}
-        </div>
-        <div class="company-col">
-          <h2>${companyName}</h2>
-          <p>${companyCity}</p>
-          ${companyPhone ? `<p>Tel: ${companyPhone}</p>` : ""}
-        </div>
-        <div class="doc-col">
-          <div class="doc-title">NOTA DE VENTA</div>
-          <div class="dashed-box">
-            <div>Nro: <span>${sale.saleNumber}</span></div>
-            <div>Almacén: <span>${sale.branchName || "GENERAL"}</span></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="info-block">
-        <div class="info-line">
-          <div><strong>Fecha:</strong> ${formattedDate}</div>
-          <div><strong>Dirección:</strong> ${sale.customerAddress || companyAddress || "La Paz - Bolivia"}</div>
-        </div>
-        <div class="info-line">
-          <div><strong>Cliente:</strong> ${sale.customerDisplayName || "Anónimo"}</div>
-          <div><strong>NIT/CI:</strong> ${sale.customerTaxId || "S/N"}</div>
-          <div><strong>Teléfono:</strong> ${sale.customerPhone || "S/N"}</div>
-        </div>
-      </div>
-
-      <table class="items-table">
-        <thead>
-          <tr>
-            <th style="width: 5%; text-align: center;">Nº</th>
-            <th style="width: 16%;">CODIGO</th>
-            <th style="width: 44%;">DESCRIPCIÓN</th>
-            <th style="width: 8%; text-align: center;">UNIDAD</th>
-            <th style="width: 7%; text-align: center;">CANT.</th>
-            <th style="width: 10%; text-align: right;">P. UNIT.</th>
-            <th style="width: 10%; text-align: right;">IMPORTE</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rowsHtml}
-          ${subtotalRow}
-        </tbody>
-      </table>
-
-      <div class="summary-block">
-        <div class="summary-left">
-          <div class="literal-text"><strong>SON:</strong> ${literalTotal}</div>
-          <div class="notes-text"><strong>Nota/Ref.:</strong> ${notesText}</div>
-        </div>
-        <div class="summary-right">
-          <div class="total-box">
-            <div><strong>TOTAL:</strong> &nbsp; <span style="border-bottom: 1.5px dashed #0f172a; padding: 2px 6px; font-family: monospace; font-weight: bold;">${totalQty}.00</span></div>
-            <div class="total-num">${totalAmountStr}</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="signatures-block">
-        <div class="sig-box">
-          <div class="sig-line"></div>
-          <div class="sig-label">VENDEDOR</div>
-          <div class="sig-name">${sale.sellerName || "—"}</div>
-        </div>
-        <div class="sig-box">
-          <div class="sig-line"></div>
-          <div class="sig-label">CLIENTE</div>
-          <div class="sig-name">${sale.customerDisplayName || "—"}</div>
-        </div>
-        <div class="sig-box">
-          <div class="sig-line"></div>
-          <div class="sig-label">RECEPCIÓN</div>
-          <div class="sig-name">&nbsp;</div>
-        </div>
-      </div>
-    </div>
-
-    <script>
-      window.onload = function() {
-        setTimeout(function() {
-          window.print();
-        }, 300);
-      };
-    </script>
-  </body>
-</html>`;
-
-  // Descargar como archivo HTML con el nombre de la venta
-  const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-
-  // Abrir también para imprimir
-  const win = window.open(url, "_blank", "width=850,height=750");
-  if (!win) {
-    // Si el navegador bloqueó la ventana, al menos el archivo ya se descargó
-    toast.info(`Nota de venta guardada como ${fileName}. Ábrela para imprimir.`);
+  let currentY = finalY + 5;
+  if (currentY + 45 > pageHeight) {
+    doc.addPage();
+    currentY = 20;
   }
+
+  // Cuadro resumen
+  doc.setDrawColor(203, 213, 225);
+  doc.line(14, currentY, pageWidth - 14, currentY);
+  currentY += 4;
+
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "bold");
+  doc.text("SON:", 14, currentY);
+  doc.setFont("helvetica", "normal");
+  doc.text(literalTotal, 24, currentY);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("TOTAL CANT:", pageWidth - 70, currentY);
+  doc.setFont("helvetica", "normal");
+  doc.text(`${totalQty} uds.`, pageWidth - 46, currentY);
+
+  currentY += 5;
+  doc.setFont("helvetica", "bold");
+  doc.text("NOTA/REF.:", 14, currentY);
+  doc.setFont("helvetica", "normal");
+  doc.text(notesText, 32, currentY);
+
+  // Total destacado
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42);
+  doc.text("TOTAL:", pageWidth - 65, currentY + 1);
+  doc.setFontSize(12);
+  doc.setTextColor(22, 101, 52); // green-800
+  doc.text(totalAmountStr, pageWidth - 14, currentY + 1, { align: "right" });
+
+  currentY += 16;
+
+  // Firmas
+  const sigWidth = 45;
+  const col1 = 20;
+  const col2 = (pageWidth - sigWidth) / 2;
+  const col3 = pageWidth - 20 - sigWidth;
+
+  doc.setDrawColor(100, 116, 139);
+  doc.setLineWidth(0.3);
+
+  // Vendedor
+  doc.line(col1, currentY, col1 + sigWidth, currentY);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 41, 59);
+  doc.text("VENDEDOR", col1 + sigWidth / 2, currentY + 4, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(sale.sellerName || "—", col1 + sigWidth / 2, currentY + 7.5, { align: "center" });
+
+  // Cliente
+  doc.line(col2, currentY, col2 + sigWidth, currentY);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 41, 59);
+  doc.text("CLIENTE", col2 + sigWidth / 2, currentY + 4, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(sale.customerDisplayName || "—", col2 + sigWidth / 2, currentY + 7.5, { align: "center" });
+
+  // Recepción
+  doc.line(col3, currentY, col3 + sigWidth, currentY);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 41, 59);
+  doc.text("CONFORMIDAD", col3 + sigWidth / 2, currentY + 4, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text("Firma / Sello", col3 + sigWidth / 2, currentY + 7.5, { align: "center" });
+
+  // MARCA DE AGUA VENTA ANULADA SI APLICA
+  if (isCancelled) {
+    const totalPages = (doc as any).internal.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.saveGraphicsState();
+      try {
+        // Configurar opacidad si es soportado por jsPDF
+        if (typeof (doc as any).setGState === "function" && (doc as any).GState) {
+          doc.setGState(new (doc as any).GState({ opacity: 0.22 }));
+        }
+      } catch (e) {}
+
+      doc.setTextColor(220, 38, 38); // Rojo
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(55);
+      
+      // Dibujar texto inclinado en el centro de la página
+      doc.text("VENTA ANULADA", pageWidth / 2, pageHeight / 2, {
+        align: "center",
+        angle: 45,
+      });
+
+      if (sale.cancelReason) {
+        doc.setFontSize(16);
+        doc.text(`Motivo: ${sale.cancelReason}`, pageWidth / 2, pageHeight / 2 + 18, {
+          align: "center",
+          angle: 45,
+        });
+      }
+
+      doc.restoreGraphicsState();
+    }
+  }
+
+  // Guardar PDF directamente
+  const fileName = `NV-${sale.saleNumber || "venta"}.pdf`;
+  doc.save(fileName);
+  toast.success(`Nota de venta descargada como ${fileName}`);
 }
 
 
@@ -2549,14 +2495,6 @@ export default function Sales() {
               {/* Acciones de Auditoría / Admin */}
               <div className="flex flex-col gap-3 pt-2 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    className="gap-2 bg-white"
-                    onClick={() => printSaleTicket(detail, companyConfig)}
-                  >
-                    <Printer className="h-4 w-4" />
-                    Imprimir Nota de Venta
-                  </Button>
 
                   {user?.role === "admin" && detail.sale.paymentStatus === "pending" && detail.sale.status !== "cancelled" ? (
                     <Button
