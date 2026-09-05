@@ -209,6 +209,7 @@ function UnitStatusSelect({
 
 export default function Units() {
   const { user } = useAuth();
+  const utils = trpc.useContext();
   const { activeBranchId } = useBranch();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -461,6 +462,8 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
       toast.success("✅ Unidad actualizada correctamente");
       setIsEditOpen(false);
       refetch();
+      utils.finance?.invalidate?.();
+      (utils as any).purchases?.invalidate?.();
     },
     onError: (err: any) => toast.error(err.message),
   });

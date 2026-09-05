@@ -229,63 +229,79 @@ export default function Purchases() {
   };
 
   const filteredPurchases = useMemo(() => {
-    console.log('🔍 FILTRO DE COMPRAS - Input:', { 
-      totalPurchases: purchases?.length || 0,
-      filterDateFrom, 
-      filterDateTo,
-      searchQuery,
-      filterPayment
-    });
-    
     if (!purchases) return [];
     
-    const filtered = (purchases as any[]).filter((p: any) => {
+    return (purchases as any[]).filter((p: any) => {
       const matchesSearch = !searchQuery || 
         p.purchaseNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.supplierName?.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesPayment = filterPayment === "all" || p.paymentMethod === filterPayment || (filterPayment === "credit" && p.isCredit === 1);
       
-      const purchaseDate = p.createdAt ? new Date(p.createdAt) : null;
-      const matchesFrom = !filterDateFrom || (purchaseDate && purchaseDate >= new Date(filterDateFrom + "T00:00:00"));
-      const matchesTo = !filterDateTo || (purchaseDate && purchaseDate <= new Date(filterDateTo + "T23:59:59"));
-      
+      const rawDate = p.orderDate || p.createdAt;
+      let matchesDate = true;
       if (filterDateFrom || filterDateTo) {
-        console.log('📅 Verificando fecha:', {
-          compra: p.purchaseNumber,
-          fecha: purchaseDate?.toISOString(),
-          matchesFrom,
-          matchesTo,
-          pasa: matchesFrom && matchesTo
-        });
+        if (!rawDate) {
+          matchesDate = false;
+        } else {
+          const purchaseDate = new Date(rawDate);
+          if (isNaN(purchaseDate.getTime())) {
+            matchesDate = false;
+          } else {
+            if (filterDateFrom && purchaseDate < new Date(filterDateFrom + "T00:00:00")) matchesDate = false;
+            if (filterDateTo && purchaseDate > new Date(filterDateTo + "T23:59:59")) matchesDate = false;
+          }
+        }
       }
       
-      return matchesSearch && matchesPayment && matchesFrom && matchesTo;
+      return matchesSearch && matchesPayment && matchesDate;
     });
-    
-    console.log('✅ FILTRO RESULTADO:', { 
-      filtradas: filtered.length,
-      total: purchases?.length || 0 
-    });
-    
-    return filtered;
   }, [purchases, searchQuery, filterPayment, filterDateFrom, filterDateTo]);
 
   const totalSpent = useMemo(() => {
-    const result = filteredPurchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
-    console.log('🔍 DEBUG totalSpent:', { 
-      totalPurchases: purchases?.length || 0,
-      filteredCount: filteredPurchases.length, 
-      totalSpent: result,
-      filterDateFrom,
-      filterDateTo 
-    });
-    return result;
-  }, [filteredPurchases, purchases, filterDateFrom, filterDateTo]);
+    return filteredPurchases
+      .filter((p: any) => p.status !== "cancelled")
+      .reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+  }, [filteredPurchases]);
 
   const creditPurchasesCount = useMemo(() => {
-    return filteredPurchases.filter(p => p.isCredit === 1).length;
+    return filteredPurchases.filter(p => p.isCredit === 1 && p.status !== "cancelled").length;
   }, [filteredPurchases]);
+
+  const dateRangeDescription = useMemo(() => {
+    if (filterDateFrom && filterDateTo) {
+      if (filterDateFrom === filterDateTo) {
+        return `DEL ${new Date(filterDateFrom + "T12:00:00").toLocaleDateString("es-BO")}`;
+      }
+      return `DEL ${new Date(filterDateFrom + "T12:00:00").toLocaleDateString("es-BO")} AL ${new Date(filterDateTo + "T12:00:00").toLocaleDateString("es-BO")}`;
+    }
+    if (filterDateFrom) {
+      return `DESDE EL ${new Date(filterDateFrom + "T12:00:00").toLocaleDateString("es-BO")}`;
+    }
+    if (filterDateTo) {
+      return `HASTA EL ${new Date(filterDateTo + "T12:00:00").toLocaleDateString("es-BO")}`;
+    }
+    return "TOTAL ACUMULADO";
+  }, [filterDateFrom, filterDateTo]);
+
+  const handleSetToday = () => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    setFilterDateFrom(dateStr);
+    setFilterDateTo(dateStr);
+  };
+
+  const handleSetThisMonth = () => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    setFilterDateFrom(`${yyyy}-${mm}-01`);
+    setFilterDateTo(`${yyyy}-${mm}-${dd}`);
+  };
 
   // Bloqueo de seguridad: Si tiene un cierre pendiente
   const { data: closureStatus } = trpc.finance.hasPendingClosure.useQuery();
@@ -361,57 +377,69 @@ export default function Purchases() {
 
       {/* Tarjetas KPI de Resumen */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-md rounded-2xl bg-white">
+        <Card className="border-0 shadow-md rounded-2xl bg-white hover:shadow-lg transition-all">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-blue-50 rounded-2xl text-blue-600">
                 <Receipt className="h-5 w-5" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Registros</p>
                 <p className="text-2xl font-black text-slate-900">{filteredPurchases.length}</p>
+                <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-tight truncate" title={dateRangeDescription}>
+                  {dateRangeDescription}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-md rounded-2xl bg-white">
+        <Card className="border-0 shadow-md rounded-2xl bg-white hover:shadow-lg transition-all">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600">
                 <TrendingUp className="h-5 w-5" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Invertido</p>
                 <p className="text-2xl font-black text-emerald-600">{formatCurrency(totalSpent)}</p>
+                <p className="text-[10px] text-emerald-600/80 font-bold mt-1 uppercase tracking-tight truncate" title={dateRangeDescription}>
+                  {dateRangeDescription === "TOTAL ACUMULADO" ? "INVERSIÓN TOTAL" : dateRangeDescription}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-md rounded-2xl bg-white">
+        <Card className="border-0 shadow-md rounded-2xl bg-white hover:shadow-lg transition-all">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-amber-50 rounded-2xl text-amber-600">
                 <CreditCard className="h-5 w-5" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Compras a Crédito</p>
                 <p className="text-2xl font-black text-slate-900">{creditPurchasesCount}</p>
+                <p className="text-[10px] text-amber-600/80 font-bold mt-1 uppercase tracking-tight truncate" title={dateRangeDescription}>
+                  {dateRangeDescription === "TOTAL ACUMULADO" ? "POR REGULARIZAR" : dateRangeDescription}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-md rounded-2xl bg-white">
+        <Card className="border-0 shadow-md rounded-2xl bg-white hover:shadow-lg transition-all">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-violet-50 rounded-2xl text-violet-600">
                 <Building2 className="h-5 w-5" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Proveedores</p>
                 <p className="text-2xl font-black text-slate-900">{suppliers?.length || 0}</p>
+                <p className="text-[10px] text-violet-600/80 font-bold mt-1 uppercase tracking-tight truncate">
+                  PROVEEDORES ACTIVOS
+                </p>
               </div>
             </div>
           </CardContent>
@@ -481,16 +509,35 @@ export default function Purchases() {
                   className="h-10 rounded-xl border-slate-200 bg-slate-50/50 text-sm w-40"
                 />
               </div>
-              {(filterDateFrom || filterDateTo) && (
+              {/* Botones rápidos */}
+              <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
-                  className="text-xs font-semibold text-slate-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
+                  type="button"
+                  onClick={handleSetToday}
+                  className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 transition-colors"
                 >
-                  ✕ Limpiar fechas
+                  Hoy
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={handleSetThisMonth}
+                  className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 transition-colors"
+                >
+                  Este Mes
+                </button>
+                {(filterDateFrom || filterDateTo) && (
+                  <button
+                    type="button"
+                    onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
+                    className="text-xs font-semibold text-slate-400 hover:text-red-500 transition-colors px-2 py-1.5 rounded-lg hover:bg-red-50"
+                  >
+                    ✕ Limpiar
+                  </button>
+                )}
+              </div>
+
               {(filterDateFrom || filterDateTo) && (
-                <span className="text-xs text-slate-400 font-medium">
+                <span className="text-xs text-slate-400 font-medium ml-auto">
                   {filteredPurchases.length} resultado{filteredPurchases.length !== 1 ? "s" : ""}
                 </span>
               )}

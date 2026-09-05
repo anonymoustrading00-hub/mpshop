@@ -891,6 +891,39 @@ export const unitsRouter = router({
           }
         }
 
+        // Si la unidad no tenía compra asociada y se le asignó un precio de compra > 0
+        if (!targetUnit.purchaseId && input.purchasePrice && input.purchasePrice > 0) {
+          const purchaseId = MOCK_PURCHASES.length + 1;
+          const pNumber = genPurchaseNumber(purchaseId);
+          updateData.purchaseId = purchaseId;
+          targetUnit.purchaseId = purchaseId;
+          MOCK_PURCHASES.push({
+            id: purchaseId,
+            supplierId: input.supplierId || targetUnit.supplierId || null,
+            purchaseNumber: pNumber,
+            orderDate: input.purchaseDate ? new Date(input.purchaseDate) : new Date(),
+            totalAmount: input.purchasePrice,
+            status: "received",
+            paymentStatus: "paid",
+            paymentMethod: input.addPaymentMethod || "cash",
+            isCredit: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+          MOCK_FINANCIAL_TRANSACTIONS.push({
+            id: MOCK_FINANCIAL_TRANSACTIONS.length + 1,
+            branchId: input.branchId || targetUnit.branchId || 1,
+            type: "expense",
+            category: "purchase",
+            amount: input.purchasePrice,
+            paymentMethod: input.addPaymentMethod || "cash",
+            referenceId: purchaseId,
+            userId: ctx.user.id,
+            notes: `Compra de unidad ${input.brand || targetUnit.brand} ${input.model || targetUnit.model} (${targetUnit.code}) · ${pNumber}`,
+            createdAt: new Date(),
+          });
+        }
+
         // Si se agregó stock adicional (+N unidades) -> Crear unidades y transacción financiera de Egreso
         if (addQty > 0) {
           const effectivePurchasePrice = input.purchasePrice !== undefined ? input.purchasePrice : (targetUnit.purchasePrice || 0);
@@ -1000,6 +1033,69 @@ export const unitsRouter = router({
       if (input.status !== undefined && input.status !== oldStatus) {
         updateData.status = input.status;
         statusChanged = true;
+      }
+
+      // Si la unidad no tenía compra asociada y se le asigna un precio de compra > 0
+      if (!unit.purchaseId && input.purchasePrice !== undefined && input.purchasePrice > 0) {
+        let supplierId = input.supplierId || unit.supplierId;
+        if (!supplierId) {
+          const [genericSup] = await db.select({ id: suppliers.id }).from(suppliers).where(eq(suppliers.name, "Proveedor Genérico (Compra Directa)")).limit(1);
+          if (genericSup) {
+            supplierId = genericSup.id;
+          } else {
+            const created = await db.insert(suppliers).values({ name: "Proveedor Genérico (Compra Directa)" });
+            supplierId = (created as any)[0]?.insertId || (created as any)?.insertId || 1;
+          }
+        }
+
+        const purchaseNumber = genPurchaseNumber(Date.now());
+        const purchaseDate = input.purchaseDate ? new Date(input.purchaseDate + "T00:00:00") : new Date();
+
+        const purchaseRes: any = await db.insert(purchases).values({
+          supplierId: supplierId!,
+          purchaseNumber,
+          orderDate: purchaseDate,
+          totalAmount: input.purchasePrice,
+          status: "received",
+          paymentStatus: "paid",
+          paymentMethod: input.addPaymentMethod || "cash",
+          isCredit: 0,
+          branchId: input.branchId || unit.branchId || 1,
+        });
+
+        const newPurchaseId = purchaseRes?.insertId || purchaseRes?.[0]?.insertId;
+        if (newPurchaseId) {
+          updateData.purchaseId = newPurchaseId;
+
+          // Registrar egreso en Caja / Finanzas
+          await db.insert(financialTransactions).values({
+            branchId: input.branchId || unit.branchId || 1,
+            type: "expense",
+            category: "purchase",
+            amount: input.purchasePrice,
+            paymentMethod: input.addPaymentMethod || "cash",
+            referenceId: newPurchaseId,
+            userId: ctx.user.id,
+            notes: `Compra de unidad ${input.brand || unit.brand} ${input.model || unit.model} (${unit.code}) · ${purchaseNumber}`,
+          });
+
+          // Registrar item de compra
+          await db.insert(purchaseItems).values({
+            purchaseId: newPurchaseId,
+            unitId: unit.id,
+            quantity: 1,
+            price: input.purchasePrice,
+          });
+        }
+      } else if (unit.purchaseId && input.purchasePrice !== undefined && input.purchasePrice !== unit.purchasePrice) {
+        // Si ya tenía compra y se actualizó el precio de compra, sincronizar monto en la compra y en la caja
+        await db.update(purchases).set({ totalAmount: input.purchasePrice }).where(eq(purchases.id, unit.purchaseId));
+        await db.update(financialTransactions)
+          .set({ amount: input.purchasePrice })
+          .where(and(
+            eq(financialTransactions.category, "purchase"),
+            eq(financialTransactions.referenceId, unit.purchaseId)
+          ));
       }
 
       await db
