@@ -664,7 +664,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
     }
 
     setAddStockQty(0);
-    setAddStockPaymentMethod("cash");
+    setAddStockPaymentMethod((unit.purchasePaymentMethod as any) || "cash");
     setUpdateAllMatchingUnits(true);
     setEditSupplierId(unit.supplierId || undefined);
     setEditPurchaseDate(unit.purchaseDate || "");

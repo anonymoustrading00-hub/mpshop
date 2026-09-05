@@ -78,8 +78,10 @@ export const unitsRouter = router({
         const sanitized = paginated.map((unit: any) => {
           const specsParsed = typeof unit.specs === "string" ? JSON.parse(unit.specs) : (unit.specs || {});
           const damageChecklistParsed = typeof unit.damageChecklist === "string" ? JSON.parse(unit.damageChecklist) : (unit.damageChecklist || {});
+          const mockP = unit.purchaseId ? MOCK_PURCHASES.find((p: any) => p.id === unit.purchaseId) : null;
           return {
             ...unit,
+            purchasePaymentMethod: mockP?.paymentMethod || "cash",
             specs: specsParsed,
             damageChecklist: damageChecklistParsed,
           };
@@ -150,10 +152,12 @@ export const unitsRouter = router({
           supplierName: suppliers.name,
           branchName: branches.name,
           branchAddress: branches.address,
+          purchasePaymentMethod: purchases.paymentMethod,
         })
         .from(units)
         .leftJoin(suppliers, eq(units.supplierId, suppliers.id))
         .leftJoin(branches, eq(units.branchId, branches.id))
+        .leftJoin(purchases, eq(units.purchaseId, purchases.id))
         .where(whereClause)
         .orderBy(desc(units.id))
         .limit(input?.limit || 2000)
@@ -891,37 +895,60 @@ export const unitsRouter = router({
           }
         }
 
-        // Si la unidad no tenía compra asociada y se le asignó un precio de compra > 0
-        if (!targetUnit.purchaseId && input.purchasePrice && input.purchasePrice > 0) {
-          const purchaseId = MOCK_PURCHASES.length + 1;
-          const pNumber = genPurchaseNumber(purchaseId);
-          updateData.purchaseId = purchaseId;
-          targetUnit.purchaseId = purchaseId;
-          MOCK_PURCHASES.push({
-            id: purchaseId,
-            supplierId: input.supplierId || targetUnit.supplierId || null,
-            purchaseNumber: pNumber,
-            orderDate: input.purchaseDate ? new Date(input.purchaseDate) : new Date(),
-            totalAmount: input.purchasePrice,
-            status: "received",
-            paymentStatus: "paid",
-            paymentMethod: input.addPaymentMethod || "cash",
-            isCredit: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-          MOCK_FINANCIAL_TRANSACTIONS.push({
-            id: MOCK_FINANCIAL_TRANSACTIONS.length + 1,
-            branchId: input.branchId || targetUnit.branchId || 1,
-            type: "expense",
-            category: "purchase",
-            amount: input.purchasePrice,
-            paymentMethod: input.addPaymentMethod || "cash",
-            referenceId: purchaseId,
-            userId: ctx.user.id,
-            notes: `Compra de unidad ${input.brand || targetUnit.brand} ${input.model || targetUnit.model} (${targetUnit.code}) · ${pNumber}`,
-            createdAt: new Date(),
-          });
+        // Si la unidad tiene o se le asigna un precio de compra > 0 -> sincronizar compra y caja
+        const effectivePriceMock = input.purchasePrice !== undefined ? input.purchasePrice : (targetUnit.purchasePrice || 0);
+        const effectivePaymentMethodMock = input.addPaymentMethod || "cash";
+
+        if (effectivePriceMock > 0) {
+          let pId = targetUnit.purchaseId;
+          const existingMockP = pId ? MOCK_PURCHASES.find((p: any) => p.id === pId) : null;
+
+          if (existingMockP) {
+            existingMockP.totalAmount = effectivePriceMock;
+            existingMockP.paymentMethod = effectivePaymentMethodMock;
+            if (input.supplierId) existingMockP.supplierId = input.supplierId;
+            if (input.purchaseDate) existingMockP.orderDate = new Date(input.purchaseDate);
+          } else {
+            pId = MOCK_PURCHASES.length + 1;
+            const pNumber = genPurchaseNumber(pId);
+            updateData.purchaseId = pId;
+            targetUnit.purchaseId = pId;
+            MOCK_PURCHASES.push({
+              id: pId,
+              supplierId: input.supplierId || targetUnit.supplierId || null,
+              purchaseNumber: pNumber,
+              orderDate: input.purchaseDate ? new Date(input.purchaseDate) : new Date(),
+              totalAmount: effectivePriceMock,
+              status: "received",
+              paymentStatus: "paid",
+              paymentMethod: effectivePaymentMethodMock,
+              isCredit: 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          }
+
+          const existingMockTx = MOCK_FINANCIAL_TRANSACTIONS.find(
+            (t: any) => t.category === "purchase" && t.referenceId === pId
+          );
+          if (existingMockTx) {
+            existingMockTx.amount = effectivePriceMock;
+            existingMockTx.paymentMethod = effectivePaymentMethodMock;
+            existingMockTx.branchId = input.branchId || targetUnit.branchId || existingMockTx.branchId || 1;
+          } else {
+            MOCK_FINANCIAL_TRANSACTIONS.push({
+              id: MOCK_FINANCIAL_TRANSACTIONS.length + 1,
+              branchId: input.branchId || targetUnit.branchId || 1,
+              type: "expense",
+              category: "purchase",
+              amount: effectivePriceMock,
+              paymentMethod: effectivePaymentMethodMock,
+              referenceId: pId,
+              userId: ctx.user.id,
+              notes: `Compra de unidad ${input.brand || targetUnit.brand} ${input.model || targetUnit.model} (${targetUnit.code})`,
+              createdAt: new Date(),
+            });
+          }
         }
 
         // Si se agregó stock adicional (+N unidades) -> Crear unidades y transacción financiera de Egreso
@@ -1035,67 +1062,115 @@ export const unitsRouter = router({
         statusChanged = true;
       }
 
-      // Si la unidad no tenía compra asociada y se le asigna un precio de compra > 0
-      if (!unit.purchaseId && input.purchasePrice !== undefined && input.purchasePrice > 0) {
-        let supplierId = input.supplierId || unit.supplierId;
-        if (!supplierId) {
-          const [genericSup] = await db.select({ id: suppliers.id }).from(suppliers).where(eq(suppliers.name, "Proveedor Genérico (Compra Directa)")).limit(1);
-          if (genericSup) {
-            supplierId = genericSup.id;
+      // Si la unidad tiene o se le asigna un precio de compra > 0 -> sincronizar compra y caja
+      const effectivePrice = input.purchasePrice !== undefined ? input.purchasePrice : (unit.purchasePrice || 0);
+      const effectivePaymentMethod = input.addPaymentMethod || "cash";
+
+      if (effectivePrice > 0) {
+        let purchaseId = unit.purchaseId;
+
+        if (purchaseId) {
+          // 1. Verificar si la compra existe en purchases
+          const [existingPurchase] = await db
+            .select()
+            .from(purchases)
+            .where(eq(purchases.id, purchaseId))
+            .limit(1);
+
+          if (existingPurchase) {
+            // Actualizar la compra existente con el nuevo precio y nuevo método de pago
+            const purchaseUpdate: Record<string, any> = {
+              totalAmount: effectivePrice,
+              paymentMethod: effectivePaymentMethod,
+            };
+            if (input.supplierId) purchaseUpdate.supplierId = input.supplierId;
+            if (input.purchaseDate) purchaseUpdate.orderDate = new Date(input.purchaseDate + "T00:00:00");
+            await db.update(purchases).set(purchaseUpdate).where(eq(purchases.id, purchaseId));
           } else {
-            const created = await db.insert(suppliers).values({ name: "Proveedor Genérico (Compra Directa)" });
-            supplierId = (created as any)[0]?.insertId || (created as any)?.insertId || 1;
+            purchaseId = null; // No existía en tabla compras
           }
         }
 
-        const purchaseNumber = genPurchaseNumber(Date.now());
-        const purchaseDate = input.purchaseDate ? new Date(input.purchaseDate + "T00:00:00") : new Date();
+        if (!purchaseId) {
+          // Crear la compra si no existía
+          let supplierId = input.supplierId || unit.supplierId;
+          if (!supplierId) {
+            const [genericSup] = await db.select({ id: suppliers.id }).from(suppliers).where(eq(suppliers.name, "Proveedor Genérico (Compra Directa)")).limit(1);
+            if (genericSup) {
+              supplierId = genericSup.id;
+            } else {
+              const created = await db.insert(suppliers).values({ name: "Proveedor Genérico (Compra Directa)" });
+              supplierId = (created as any)[0]?.insertId || (created as any)?.insertId || 1;
+            }
+          }
 
-        const purchaseRes: any = await db.insert(purchases).values({
-          supplierId: supplierId!,
-          purchaseNumber,
-          orderDate: purchaseDate,
-          totalAmount: input.purchasePrice,
-          status: "received",
-          paymentStatus: "paid",
-          paymentMethod: input.addPaymentMethod || "cash",
-          isCredit: 0,
-          branchId: input.branchId || unit.branchId || 1,
-        });
+          const purchaseNumber = genPurchaseNumber(Date.now());
+          const purchaseDate = input.purchaseDate ? new Date(input.purchaseDate + "T00:00:00") : new Date();
 
-        const newPurchaseId = purchaseRes?.insertId || purchaseRes?.[0]?.insertId;
-        if (newPurchaseId) {
-          updateData.purchaseId = newPurchaseId;
-
-          // Registrar egreso en Caja / Finanzas
-          await db.insert(financialTransactions).values({
+          const purchaseRes: any = await db.insert(purchases).values({
+            supplierId: supplierId!,
+            purchaseNumber,
+            orderDate: purchaseDate,
+            totalAmount: effectivePrice,
+            status: "received",
+            paymentStatus: "paid",
+            paymentMethod: effectivePaymentMethod,
+            isCredit: 0,
             branchId: input.branchId || unit.branchId || 1,
-            type: "expense",
-            category: "purchase",
-            amount: input.purchasePrice,
-            paymentMethod: input.addPaymentMethod || "cash",
-            referenceId: newPurchaseId,
-            userId: ctx.user.id,
-            notes: `Compra de unidad ${input.brand || unit.brand} ${input.model || unit.model} (${unit.code}) · ${purchaseNumber}`,
           });
 
-          // Registrar item de compra
-          await db.insert(purchaseItems).values({
-            purchaseId: newPurchaseId,
-            unitId: unit.id,
-            quantity: 1,
-            price: input.purchasePrice,
-          });
+          purchaseId = purchaseRes?.insertId || purchaseRes?.[0]?.insertId;
+          if (purchaseId) {
+            updateData.purchaseId = purchaseId;
+
+            // Registrar item de compra
+            await db.insert(purchaseItems).values({
+              purchaseId,
+              unitId: unit.id,
+              quantity: 1,
+              price: effectivePrice,
+            });
+          }
         }
-      } else if (unit.purchaseId && input.purchasePrice !== undefined && input.purchasePrice !== unit.purchasePrice) {
-        // Si ya tenía compra y se actualizó el precio de compra, sincronizar monto en la compra y en la caja
-        await db.update(purchases).set({ totalAmount: input.purchasePrice }).where(eq(purchases.id, unit.purchaseId));
-        await db.update(financialTransactions)
-          .set({ amount: input.purchasePrice })
-          .where(and(
-            eq(financialTransactions.category, "purchase"),
-            eq(financialTransactions.referenceId, unit.purchaseId)
-          ));
+
+        // Sincronizar o insertar en financialTransactions (Caja / Finanzas)
+        if (purchaseId) {
+          const [existingTx] = await db
+            .select()
+            .from(financialTransactions)
+            .where(
+              and(
+                eq(financialTransactions.category, "purchase"),
+                eq(financialTransactions.referenceId, purchaseId)
+              )
+            )
+            .limit(1);
+
+          if (existingTx) {
+            // Actualizar transacción existente: monto, método de pago, sucursal
+            await db
+              .update(financialTransactions)
+              .set({
+                amount: effectivePrice,
+                paymentMethod: effectivePaymentMethod,
+                branchId: input.branchId || unit.branchId || existingTx.branchId || 1,
+                notes: `Compra de unidad ${input.brand || unit.brand} ${input.model || unit.model} (${unit.code})`,
+              })
+              .where(eq(financialTransactions.id, existingTx.id));
+          } else {
+            // Insertar egreso en Caja / Finanzas si no existía
+            await db.insert(financialTransactions).values({
+              branchId: input.branchId || unit.branchId || 1,
+              type: "expense",
+              category: "purchase",
+              amount: effectivePrice,
+              paymentMethod: effectivePaymentMethod,
+              referenceId: purchaseId,
+              userId: ctx.user.id,
+              notes: `Compra de unidad ${input.brand || unit.brand} ${input.model || unit.model} (${unit.code})`,
+            });
+          }
+        }
       }
 
       await db
