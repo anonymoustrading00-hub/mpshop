@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { QrCode, Search, CheckCircle, AlertTriangle, Plus, Minus, Laptop, Trash2, Camera, ImagePlus, X, Smartphone, Tablet, Monitor, Plug, Package, MoreHorizontal, Wallet, Landmark, Video, ExternalLink, Play, Boxes, Layers, Calculator, Printer } from "lucide-react";
+import { QrCode, Search, CheckCircle, AlertTriangle, Plus, Minus, Laptop, Trash2, Camera, ImagePlus, X, Smartphone, Tablet, Monitor, Plug, Package, MoreHorizontal, Wallet, Landmark, Video, ExternalLink, Play, Boxes, Layers, Calculator, Printer, Clock } from "lucide-react";
 import { useLocation } from "wouter";
 import { formatCurrency } from "@/lib/currency";
 import { useBranch } from "@/contexts/BranchContext";
@@ -164,7 +164,7 @@ export default function RegisterUnit() {
   const [quantity, setQuantity] = useState<number>(1);
   const [supplierId, setSupplierId] = useState<number | undefined>();
   const [purchaseDate, setPurchaseDate] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "qr" | "transfer">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "qr" | "transfer" | "credit">("cash");
   const [damageNotes, setDamageNotes] = useState("");
   const [tiktokUrl, setTiktokUrl] = useState("");
 
@@ -1371,13 +1371,13 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
             <div className="border-t pt-4 space-y-3">
               <label className="text-xs font-semibold block">Información de Compra:</label>
 
-              {/* Saldos disponibles por caja */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {/* Saldos disponibles por caja o Compra a Crédito */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {/* Caja Efectivo */}
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("cash")}
-                  className={`flex flex-col items-center gap-1 p-3 rounded-2xl border-2 transition-all text-left ${
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-2xl border-2 transition-all text-left ${
                     paymentMethod === "cash"
                       ? "border-emerald-500 bg-emerald-50"
                       : "border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40"
@@ -1408,7 +1408,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("qr")}
-                  className={`flex flex-col items-center gap-1 p-3 rounded-2xl border-2 transition-all text-left ${
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-2xl border-2 transition-all text-left ${
                     paymentMethod === "qr"
                       ? "border-blue-500 bg-blue-50"
                       : "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/40"
@@ -1439,7 +1439,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("transfer")}
-                  className={`flex flex-col items-center gap-1 p-3 rounded-2xl border-2 transition-all text-left ${
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-2xl border-2 transition-all text-left ${
                     paymentMethod === "transfer"
                       ? "border-purple-500 bg-purple-50"
                       : "border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/40"
@@ -1465,10 +1465,45 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                     <p className="text-[9px] text-slate-400 font-medium">Saldo disp.</p>
                   </div>
                 </button>
+
+                {/* A Crédito (CXP) */}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("credit")}
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-2xl border-2 transition-all text-left ${
+                    paymentMethod === "credit"
+                      ? "border-amber-500 bg-amber-50"
+                      : "border-slate-200 bg-white hover:border-amber-300 hover:bg-amber-50/40"
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 w-full">
+                    <Clock className={`h-4 w-4 shrink-0 ${paymentMethod === "credit" ? "text-amber-600" : "text-slate-400"}`} />
+                    <span className={`text-[10px] font-black uppercase tracking-wider ${paymentMethod === "credit" ? "text-amber-700" : "text-slate-500"}`}>
+                      A Crédito
+                    </span>
+                    {paymentMethod === "credit" && (
+                      <span className="ml-auto h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+                    )}
+                  </div>
+                  <div className="w-full">
+                    <p className="text-xs font-black text-amber-700 leading-tight">Deuda CXP</p>
+                    <p className="text-[9px] text-slate-400 font-medium">Cuentas x pagar</p>
+                  </div>
+                </button>
               </div>
 
-              {/* Aviso de saldo insuficiente */}
-              {purchasePrice && (() => {
+              {/* Confirmación cuando es a crédito */}
+              {paymentMethod === "credit" && (
+                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900 font-medium">
+                  <Clock className="h-4 w-4 shrink-0 text-amber-600" />
+                  <span>
+                    <strong>Compra A Crédito:</strong> No descuenta dinero de caja. Se registrará automáticamente como <strong>Cuenta por Pagar (CXP)</strong> al proveedor.
+                  </span>
+                </div>
+              )}
+
+              {/* Aviso de saldo insuficiente cuando se paga con caja */}
+              {paymentMethod !== "credit" && purchasePrice && (() => {
                 const priceCents = Math.round(parseFloat(purchasePrice) * 100);
                 const selectedBalance = paymentMethod === "cash"
                   ? (globalBalances?.cash ?? 0)
@@ -1478,9 +1513,20 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                 const methodLabel = paymentMethod === "cash" ? "Efectivo" : paymentMethod === "qr" ? "QR" : "Cuenta Bancaria";
                 if (!isNaN(priceCents) && priceCents > 0 && selectedBalance < priceCents) {
                   return (
-                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 font-semibold">
-                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                      Saldo insuficiente en {methodLabel} ({formatCurrency(selectedBalance)}). Considera usar otra caja.
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-red-50 border-2 border-red-200 text-xs text-red-900">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                        <span>
+                          <strong>Saldo insuficiente en {methodLabel}</strong> ({formatCurrency(selectedBalance)} disponibles, requiere {formatCurrency(priceCents)}).
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("credit")}
+                        className="text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-3 py-1 rounded-lg border border-amber-300 self-start sm:self-auto cursor-pointer"
+                      >
+                        Cambiar a "A Crédito (CXP)"
+                      </button>
                     </div>
                   );
                 }

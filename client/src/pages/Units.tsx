@@ -14,7 +14,7 @@ import {
   Activity, ShoppingBag, ShoppingCart, CheckCircle, Package, Printer, Pencil, Trash2, X, BookOpen, Video,
   ExternalLink, Play, FileText, Sparkles, Camera, ImagePlus,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Boxes, Layers, Table, Grid, List,
-  Wallet, Landmark, Smartphone, Tablet, Monitor, Plug, MoreHorizontal, AlertTriangle, TrendingUp, DollarSign, Minus, Check
+  Wallet, Landmark, Smartphone, Tablet, Monitor, Plug, MoreHorizontal, AlertTriangle, TrendingUp, DollarSign, Minus, Check, Clock
 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -251,7 +251,7 @@ export default function Units() {
   const [editPurchasePrice, setEditPurchasePrice] = useState("");
   const [editCurrentStock, setEditCurrentStock] = useState<number>(1);
   const [addStockQty, setAddStockQty] = useState<number>(0);
-  const [addStockPaymentMethod, setAddStockPaymentMethod] = useState<"cash" | "qr" | "transfer">("cash");
+  const [addStockPaymentMethod, setAddStockPaymentMethod] = useState<"cash" | "qr" | "transfer" | "credit">("cash");
   const [updateAllMatchingUnits, setUpdateAllMatchingUnits] = useState<boolean>(true);
   const [editSupplierId, setEditSupplierId] = useState<number | undefined>();
   const [editPurchaseDate, setEditPurchaseDate] = useState("");
@@ -2147,19 +2147,19 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                         {/* Efectivo */}
                         <button
                           type="button"
                           onClick={() => setAddStockPaymentMethod("cash")}
-                          className={`flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all cursor-pointer text-left ${
+                          className={`flex items-center justify-between p-3 rounded-2xl border-2 transition-all cursor-pointer text-left ${
                             addStockPaymentMethod === "cash"
                               ? "border-emerald-500 bg-emerald-50/70 shadow-sm ring-2 ring-emerald-200/50"
                               : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
                           }`}
                         >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${
                               addStockPaymentMethod === "cash" ? "bg-emerald-600 text-white" : "bg-emerald-100/80 text-emerald-700"
                             }`}>
                               <Wallet className="h-4 w-4" />
@@ -2170,17 +2170,17 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                               }`}>
                                 Efectivo
                               </p>
-                              <p className="text-[11px] font-bold text-slate-500 truncate">
+                              <p className="text-[10px] font-bold text-slate-500 truncate">
                                 Saldo: <span className="text-emerald-700 font-black">{formatCurrency(globalBalances?.cash ?? 0)}</span>
                               </p>
                             </div>
                           </div>
-                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                          <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
                             addStockPaymentMethod === "cash"
                               ? "border-emerald-600 bg-emerald-600 text-white"
                               : "border-slate-300 bg-white"
                           }`}>
-                            {addStockPaymentMethod === "cash" && <Check className="h-3 w-3 stroke-[3]" />}
+                            {addStockPaymentMethod === "cash" && <Check className="h-2.5 w-2.5 stroke-[3]" />}
                           </div>
                         </button>
 
@@ -2188,14 +2188,14 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         <button
                           type="button"
                           onClick={() => setAddStockPaymentMethod("qr")}
-                          className={`flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all cursor-pointer text-left ${
+                          className={`flex items-center justify-between p-3 rounded-2xl border-2 transition-all cursor-pointer text-left ${
                             addStockPaymentMethod === "qr"
                               ? "border-blue-500 bg-blue-50/70 shadow-sm ring-2 ring-blue-200/50"
                               : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
                           }`}
                         >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${
                               addStockPaymentMethod === "qr" ? "bg-blue-600 text-white" : "bg-blue-100/80 text-blue-700"
                             }`}>
                               <QrCode className="h-4 w-4" />
@@ -2206,17 +2206,17 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                               }`}>
                                 QR
                               </p>
-                              <p className="text-[11px] font-bold text-slate-500 truncate">
+                              <p className="text-[10px] font-bold text-slate-500 truncate">
                                 Saldo: <span className="text-blue-700 font-black">{formatCurrency(globalBalances?.qr ?? 0)}</span>
                               </p>
                             </div>
                           </div>
-                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                          <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
                             addStockPaymentMethod === "qr"
                               ? "border-blue-600 bg-blue-600 text-white"
                               : "border-slate-300 bg-white"
                           }`}>
-                            {addStockPaymentMethod === "qr" && <Check className="h-3 w-3 stroke-[3]" />}
+                            {addStockPaymentMethod === "qr" && <Check className="h-2.5 w-2.5 stroke-[3]" />}
                           </div>
                         </button>
 
@@ -2224,14 +2224,14 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         <button
                           type="button"
                           onClick={() => setAddStockPaymentMethod("transfer")}
-                          className={`flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all cursor-pointer text-left ${
+                          className={`flex items-center justify-between p-3 rounded-2xl border-2 transition-all cursor-pointer text-left ${
                             addStockPaymentMethod === "transfer"
                               ? "border-purple-500 bg-purple-50/70 shadow-sm ring-2 ring-purple-200/50"
                               : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
                           }`}
                         >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${
                               addStockPaymentMethod === "transfer" ? "bg-purple-600 text-white" : "bg-purple-100/80 text-purple-700"
                             }`}>
                               <Landmark className="h-4 w-4" />
@@ -2242,20 +2242,87 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                               }`}>
                                 Banco
                               </p>
-                              <p className="text-[11px] font-bold text-slate-500 truncate">
+                              <p className="text-[10px] font-bold text-slate-500 truncate">
                                 Saldo: <span className="text-purple-700 font-black">{formatCurrency(globalBalances?.transfer ?? 0)}</span>
                               </p>
                             </div>
                           </div>
-                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                          <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
                             addStockPaymentMethod === "transfer"
                               ? "border-purple-600 bg-purple-600 text-white"
                               : "border-slate-300 bg-white"
                           }`}>
-                            {addStockPaymentMethod === "transfer" && <Check className="h-3 w-3 stroke-[3]" />}
+                            {addStockPaymentMethod === "transfer" && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+                          </div>
+                        </button>
+
+                        {/* A Crédito (CXP) */}
+                        <button
+                          type="button"
+                          onClick={() => setAddStockPaymentMethod("credit")}
+                          className={`flex items-center justify-between p-3 rounded-2xl border-2 transition-all cursor-pointer text-left ${
+                            addStockPaymentMethod === "credit"
+                              ? "border-amber-500 bg-amber-50/70 shadow-sm ring-2 ring-amber-200/50"
+                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${
+                              addStockPaymentMethod === "credit" ? "bg-amber-600 text-white" : "bg-amber-100/80 text-amber-700"
+                            }`}>
+                              <Clock className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`text-xs font-black uppercase tracking-wider truncate ${
+                                addStockPaymentMethod === "credit" ? "text-amber-950" : "text-slate-800"
+                              }`}>
+                                A Crédito
+                              </p>
+                              <p className="text-[10px] font-bold text-amber-700 truncate">
+                                Deuda Proveedor (CXP)
+                              </p>
+                            </div>
+                          </div>
+                          <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                            addStockPaymentMethod === "credit"
+                              ? "border-amber-600 bg-amber-600 text-white"
+                              : "border-slate-300 bg-white"
+                          }`}>
+                            {addStockPaymentMethod === "credit" && <Check className="h-2.5 w-2.5 stroke-[3]" />}
                           </div>
                         </button>
                       </div>
+
+                      {/* Alerta de saldo insuficiente en la caja seleccionada */}
+                      {addStockPaymentMethod !== "credit" && (() => {
+                        const costCents = Math.round((parseFloat(editPurchasePrice) || 0) * 100) * (addStockQty > 0 ? addStockQty : 1);
+                        const selectedBal = addStockPaymentMethod === "cash"
+                          ? (globalBalances?.cash ?? 0)
+                          : addStockPaymentMethod === "qr"
+                          ? (globalBalances?.qr ?? 0)
+                          : (globalBalances?.transfer ?? 0);
+                        const label = addStockPaymentMethod === "cash" ? "Efectivo" : addStockPaymentMethod === "qr" ? "QR" : "Banco";
+                        if (costCents > 0 && selectedBal < costCents) {
+                          return (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-2xl bg-red-50 border-2 border-red-200 text-xs text-red-900 mt-2">
+                              <div className="flex items-center gap-2">
+                                <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                                <span>
+                                  <strong>Saldo insuficiente en {label}:</strong> Disponible {formatCurrency(selectedBal)}, requerido {formatCurrency(costCents)}.
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setAddStockPaymentMethod("credit")}
+                                className="text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-3 py-1 rounded-lg border border-amber-300 self-start sm:self-auto cursor-pointer"
+                              >
+                                Usar "A Crédito (CXP)"
+                              </button>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
 
                     {/* Fila 3: Alerta y Desglose de Impacto Financiero en Caja */}
@@ -2264,10 +2331,13 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <span className="text-xs font-black flex items-center gap-1.5 uppercase tracking-wide text-amber-900">
                             <DollarSign className="h-4 w-4 text-amber-600" />
-                            Egreso Automático en Caja / Finanzas:
+                            {addStockPaymentMethod === "credit" ? "Registro en Cuentas por Pagar:" : "Egreso Automático en Caja / Finanzas:"}
                           </span>
-                          <span className="text-base font-black text-red-700 tabular-nums bg-white px-3 py-0.5 rounded-xl border border-red-200 shadow-xs">
-                            −Bs. {(addStockQty * (parseFloat(editPurchasePrice) || 0)).toFixed(2)}
+                          <span className={`text-base font-black tabular-nums bg-white px-3 py-0.5 rounded-xl border shadow-xs ${
+                            addStockPaymentMethod === "credit" ? "text-amber-700 border-amber-200" : "text-red-700 border-red-200"
+                          }`}>
+                            {addStockPaymentMethod === "credit" ? "+Bs. " : "−Bs. "}
+                            {(addStockQty * (parseFloat(editPurchasePrice) || 0)).toFixed(2)}
                           </span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-amber-200/80 text-xs">
@@ -2280,14 +2350,22 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                             <span className="font-black text-slate-800 text-sm">Bs. {(parseFloat(editPurchasePrice) || 0).toFixed(2)}</span>
                           </div>
                           <div className="bg-white/80 p-2.5 rounded-xl border border-amber-200/60">
-                            <span className="text-slate-500 block text-[11px]">Caja Afectada:</span>
+                            <span className="text-slate-500 block text-[11px]">Método / Destino:</span>
                             <span className="font-black text-blue-700 text-sm capitalize">
-                              {addStockPaymentMethod === "cash" ? "Efectivo" : addStockPaymentMethod === "qr" ? "QR" : "Banco / Transferencia"}
+                              {addStockPaymentMethod === "cash"
+                                ? "Caja Efectivo"
+                                : addStockPaymentMethod === "qr"
+                                ? "Caja QR"
+                                : addStockPaymentMethod === "transfer"
+                                ? "Banco / Transferencia"
+                                : "Deuda Proveedor (CXP)"}
                             </span>
                           </div>
                         </div>
                         <p className="text-[11px] text-amber-900/90 leading-relaxed">
-                          ℹ️ Al guardar se generarán los códigos secuenciales en inventario y se descontará el dinero de la caja seleccionada.
+                          {addStockPaymentMethod === "credit"
+                            ? "ℹ️ Al guardar se generarán los códigos secuenciales y se creará una Cuenta por Pagar (CXP) pendiente con el proveedor."
+                            : "ℹ️ Al guardar se generarán los códigos secuenciales en inventario y se descontará el dinero de la caja seleccionada."}
                         </p>
                       </div>
                     )}

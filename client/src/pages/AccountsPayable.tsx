@@ -275,6 +275,16 @@ export default function AccountsPayable() {
     },
   });
 
+  const reconcileMutation = (trpc.credit as any).reconcilePurchases.useMutation({
+    onSuccess: (data: any) => {
+      toast.success(data.message || "Conciliación completada exitosamente.");
+      refetch();
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Error al conciliar compras.");
+    },
+  });
+
   const filtered = (apList as any[]).filter((ap) => {
     const matchSearch = !search ||
       ap.supplierName?.toLowerCase().includes(search.toLowerCase()) ||
@@ -291,11 +301,21 @@ export default function AccountsPayable() {
   return (
     <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
-          Cuentas por <span className="text-orange-600">Pagar</span>
-        </h1>
-        <p className="text-sm text-slate-500 mt-1.5">Gestión de obligaciones con proveedores a crédito</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+            Cuentas por <span className="text-orange-600">Pagar</span>
+          </h1>
+          <p className="text-sm text-slate-500 mt-1.5">Gestión de obligaciones y compras a crédito con proveedores</p>
+        </div>
+        <Button
+          onClick={() => reconcileMutation.mutate()}
+          disabled={reconcileMutation.isPending}
+          className="rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-sm gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${reconcileMutation.isPending ? "animate-spin" : ""}`} />
+          {reconcileMutation.isPending ? "Conciliando..." : "Auditar y Conciliar Deudas"}
+        </Button>
       </div>
 
       {/* KPIs */}
@@ -510,6 +530,19 @@ export default function AccountsPayable() {
                     </button>
                   ))}
                 </div>
+                {payMethod === "cash" && payAmount && (() => {
+                  const amtCents = Math.round(parseFloat(payAmount) * 100);
+                  const cashBal = globalBalances?.cash ?? 0;
+                  if (amtCents > 0 && cashBal < amtCents) {
+                    return (
+                      <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 font-semibold flex items-center gap-2 mt-2">
+                        <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
+                        <span>Saldo insuficiente en Caja Efectivo ({formatCurrency(cashBal)}). Considera pagar con Banco o QR.</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Notas (Opcional)</Label>

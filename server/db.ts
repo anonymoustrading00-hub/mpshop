@@ -92,6 +92,8 @@ import {
   purchases,
   purchaseItems,
   accountsPayable,
+  accountsReceivable,
+  creditPayments,
   deliveryExpenses,
   operationalExpenses,
   InsertOperationalExpense,
@@ -1823,10 +1825,28 @@ export async function createPurchase(purchaseData: any, items: any[], userId?: n
       await tx.insert(purchaseItems).values({ ...cleanItem, purchaseId: id });
     }
 
-    // 4. Registrar transacción financiera en Caja (Gasto)
-    // Se registra siempre que NO sea a crédito (isCredit=0) y haya un método de pago
-    const shouldRegisterTransaction = purchaseData.isCredit === 0 && purchaseData.paymentMethod;
-    if (shouldRegisterTransaction) {
+    // 4. Si es a crédito, registrar automáticamente en Cuentas por Pagar (accountsPayable)
+    if (purchaseData.isCredit === 1) {
+      let dueDateStr: string;
+      if (purchaseData.dueDate) {
+        dueDateStr = typeof purchaseData.dueDate === "string" ? purchaseData.dueDate.split("T")[0] : (getLocalDateKey(new Date(purchaseData.dueDate)) || new Date(purchaseData.dueDate).toISOString().split("T")[0]);
+      } else {
+        const d = new Date();
+        d.setDate(d.getDate() + 30);
+        dueDateStr = getLocalDateKey(d) || d.toISOString().split("T")[0];
+      }
+
+      await tx.insert(accountsPayable).values({
+        purchaseId: id,
+        supplierId: finalSupplierId,
+        totalAmount: purchaseData.totalAmount,
+        paidAmount: 0,
+        balance: purchaseData.totalAmount,
+        dueDate: dueDateStr,
+        status: "unpaid",
+      });
+    } else if (purchaseData.paymentMethod) {
+      // Registrar transacción financiera en Caja (Gasto) sólo cuando NO es a crédito
       await tx.insert(financialTransactions).values({
         type: "expense",
         category: "purchase",
@@ -3509,7 +3529,24 @@ export async function createSaleWithItems(payload: SaleCreatePayload) {
       }).where(eq(orders.id, payload.orderId));
     }
 
-    if (payload.paymentStatus === "completed") {
+    if (payload.paymentMethod === "credit") {
+      const creditDays = payload.creditDays || 30;
+      const dueDateObj = new Date();
+      dueDateObj.setDate(dueDateObj.getDate() + creditDays);
+      const dueDateStr = getLocalDateKey(dueDateObj) || dueDateObj.toISOString().split("T")[0];
+
+      await tx.insert(accountsReceivable).values({
+        saleId,
+        customerId: payload.customerId || null,
+        totalAmount: payload.total,
+        paidAmount: 0,
+        balance: payload.total,
+        dueDate: dueDateStr,
+        status: "unpaid",
+        adminOverrideUserId: payload.adminOverrideUserId || null,
+        adminOverrideReason: payload.adminOverrideReason || null,
+      });
+    } else if (payload.paymentStatus === "completed") {
       await tx.insert(financialTransactions).values({
         type: "income",
         category: payload.saleChannel === "delivery" ? "sale_delivery" : "sale_local",
@@ -4138,12 +4175,45 @@ export async function deleteBranch(id: number) {
 // ----------------------------------------------------
 
 export async function getCustomerCreditStatus(customerId: number) {
-  const customer = MOCK_CUSTOMERS.find((c: any) => c.id === customerId);
+  const db = await getDb();
+  if (!db) {
+    const customer = MOCK_CUSTOMERS.find((c: any) => c.id === customerId);
+    if (!customer) return null;
+
+    const customerARs = MOCK_ACCOUNTS_RECEIVABLE.filter((ar: any) => ar.customerId === customerId && ar.status !== "paid");
+    const currentDebt = customerARs.reduce((sum: number, ar: any) => sum + (ar.balance || 0), 0);
+    
+    const todayStr = getLocalDateKey(new Date()) || new Date().toISOString().split("T")[0];
+    const overdueARs = customerARs.filter((ar: any) => ar.dueDate && ar.dueDate < todayStr);
+    const overdueAmount = overdueARs.reduce((sum: number, ar: any) => sum + (ar.balance || 0), 0);
+
+    const creditLimit = customer.creditLimit || 0;
+    const availableCredit = Math.max(0, creditLimit - currentDebt);
+    const hasOverdue = overdueAmount > 0;
+    const allowCredit = customer.allowCredit !== 0;
+
+    return {
+      customer,
+      creditLimit,
+      creditDays: customer.creditDays || 30,
+      currentDebt,
+      availableCredit,
+      overdueAmount,
+      hasOverdue,
+      allowCredit,
+    };
+  }
+
+  // Modo DB
+  const [customer] = await db.select().from(customers).where(eq(customers.id, customerId)).limit(1);
   if (!customer) return null;
 
-  const customerARs = MOCK_ACCOUNTS_RECEIVABLE.filter((ar: any) => ar.customerId === customerId && ar.status !== "paid");
+  const customerARs = await db
+    .select()
+    .from(accountsReceivable)
+    .where(and(eq(accountsReceivable.customerId, customerId), ne(accountsReceivable.status, "paid")));
+
   const currentDebt = customerARs.reduce((sum: number, ar: any) => sum + (ar.balance || 0), 0);
-  
   const todayStr = getLocalDateKey(new Date()) || new Date().toISOString().split("T")[0];
   const overdueARs = customerARs.filter((ar: any) => ar.dueDate && ar.dueDate < todayStr);
   const overdueAmount = overdueARs.reduce((sum: number, ar: any) => sum + (ar.balance || 0), 0);
@@ -4167,11 +4237,55 @@ export async function getCustomerCreditStatus(customerId: number) {
 
 export async function getAllAccountsReceivable() {
   const todayStr = getLocalDateKey(new Date()) || new Date().toISOString().split("T")[0];
+  const db = await getDb();
   
-  return MOCK_ACCOUNTS_RECEIVABLE.map((ar: any) => {
-    const customer = MOCK_CUSTOMERS.find((c: any) => c.id === ar.customerId);
-    const sale = MOCK_SALES.find((s: any) => s.id === ar.saleId);
-    
+  if (!db) {
+    return MOCK_ACCOUNTS_RECEIVABLE.map((ar: any) => {
+      const customer = MOCK_CUSTOMERS.find((c: any) => c.id === ar.customerId);
+      const sale = MOCK_SALES.find((s: any) => s.id === ar.saleId);
+      
+      let status = ar.status;
+      if (status !== "paid" && ar.dueDate && ar.dueDate < todayStr) {
+        status = "overdue";
+      }
+
+      return {
+        ...ar,
+        status,
+        customerName: customer?.name || sale?.customerName || "Anónimo",
+        customerPhone: customer?.phone || null,
+        customerTaxId: customer?.taxId || null,
+        saleNumber: sale?.saleNumber || `VTA-${ar.saleId}`,
+      };
+    });
+  }
+
+  // Modo DB
+  const rows = await db
+    .select({
+      id: accountsReceivable.id,
+      saleId: accountsReceivable.saleId,
+      customerId: accountsReceivable.customerId,
+      totalAmount: accountsReceivable.totalAmount,
+      paidAmount: accountsReceivable.paidAmount,
+      balance: accountsReceivable.balance,
+      dueDate: accountsReceivable.dueDate,
+      status: accountsReceivable.status,
+      adminOverrideUserId: accountsReceivable.adminOverrideUserId,
+      adminOverrideReason: accountsReceivable.adminOverrideReason,
+      createdAt: accountsReceivable.createdAt,
+      updatedAt: accountsReceivable.updatedAt,
+      customerName: customers.name,
+      customerPhone: customers.phone,
+      customerTaxId: customers.taxId,
+      saleNumber: sales.saleNumber,
+    })
+    .from(accountsReceivable)
+    .leftJoin(customers, eq(accountsReceivable.customerId, customers.id))
+    .leftJoin(sales, eq(accountsReceivable.saleId, sales.id))
+    .orderBy(desc(accountsReceivable.id));
+
+  return rows.map((ar: any) => {
     let status = ar.status;
     if (status !== "paid" && ar.dueDate && ar.dueDate < todayStr) {
       status = "overdue";
@@ -4180,25 +4294,66 @@ export async function getAllAccountsReceivable() {
     return {
       ...ar,
       status,
-      customerName: customer?.name || sale?.customerName || "Anónimo",
-      customerPhone: customer?.phone || null,
-      customerTaxId: customer?.taxId || null,
-      saleNumber: sale?.saleNumber || `VTA-${ar.saleId}`,
+      customerName: ar.customerName || "Anónimo",
+      saleNumber: ar.saleNumber || `VTA-${ar.saleId}`,
     };
   });
 }
 
 export async function getAllAccountsPayable() {
   const todayStr = getLocalDateKey(new Date()) || new Date().toISOString().split("T")[0];
+  const db = await getDb();
 
-  return MOCK_ACCOUNTS_PAYABLE.map((ap: any) => {
-    const supplier = MOCK_SUPPLIERS.find((s: any) => s.id === ap.supplierId);
-    const purchase = MOCK_PURCHASES.find((p: any) => p.id === ap.purchaseId);
+  if (!db) {
+    return MOCK_ACCOUNTS_PAYABLE.map((ap: any) => {
+      const supplier = MOCK_SUPPLIERS.find((s: any) => s.id === ap.supplierId);
+      const purchase = MOCK_PURCHASES.find((p: any) => p.id === ap.purchaseId);
 
-    const totalAmount = ap.totalAmount !== undefined ? ap.totalAmount : (ap.amount || 0);
-    const paidAmount = ap.paidAmount !== undefined ? ap.paidAmount : 0;
-    const balance = ap.balance !== undefined ? ap.balance : (totalAmount - paidAmount);
+      const totalAmount = ap.totalAmount !== undefined ? ap.totalAmount : (ap.amount || 0);
+      const paidAmount = ap.paidAmount !== undefined ? ap.paidAmount : 0;
+      const balance = ap.balance !== undefined ? ap.balance : (totalAmount - paidAmount);
 
+      let status = ap.status;
+      if (status !== "paid" && ap.dueDate && ap.dueDate < todayStr) {
+        status = "overdue";
+      }
+
+      return {
+        ...ap,
+        totalAmount,
+        paidAmount,
+        balance,
+        status,
+        supplierName: supplier?.name || "Proveedor Sistema",
+        supplierPhone: supplier?.phone || null,
+        purchaseNumber: purchase?.purchaseNumber || ap.purchaseNumber || `CMP-${ap.purchaseId}`,
+      };
+    });
+  }
+
+  // Modo DB
+  const rows = await db
+    .select({
+      id: accountsPayable.id,
+      purchaseId: accountsPayable.purchaseId,
+      supplierId: accountsPayable.supplierId,
+      totalAmount: accountsPayable.totalAmount,
+      paidAmount: accountsPayable.paidAmount,
+      balance: accountsPayable.balance,
+      dueDate: accountsPayable.dueDate,
+      status: accountsPayable.status,
+      createdAt: accountsPayable.createdAt,
+      updatedAt: accountsPayable.updatedAt,
+      supplierName: suppliers.name,
+      supplierPhone: suppliers.phone,
+      purchaseNumber: purchases.purchaseNumber,
+    })
+    .from(accountsPayable)
+    .leftJoin(suppliers, eq(accountsPayable.supplierId, suppliers.id))
+    .leftJoin(purchases, eq(accountsPayable.purchaseId, purchases.id))
+    .orderBy(desc(accountsPayable.id));
+
+  return rows.map((ap: any) => {
     let status = ap.status;
     if (status !== "paid" && ap.dueDate && ap.dueDate < todayStr) {
       status = "overdue";
@@ -4206,13 +4361,9 @@ export async function getAllAccountsPayable() {
 
     return {
       ...ap,
-      totalAmount,
-      paidAmount,
-      balance,
       status,
-      supplierName: supplier?.name || "Proveedor Sistema",
-      supplierPhone: supplier?.phone || null,
-      purchaseNumber: purchase?.purchaseNumber || ap.purchaseNumber || `CMP-${ap.purchaseId}`,
+      supplierName: ap.supplierName || "Proveedor Sistema",
+      purchaseNumber: ap.purchaseNumber || `CMP-${ap.purchaseId}`,
     };
   });
 }
@@ -4226,104 +4377,271 @@ export async function createCreditPayment(data: {
   notes?: string;
   userId: number;
 }) {
-  const receiptNumber = `REC-${String(MOCK_CREDIT_PAYMENTS.length + 1).padStart(4, "0")}`;
-  
-  if (data.type === "receivable") {
-    const ar = MOCK_ACCOUNTS_RECEIVABLE.find((item: any) => item.id === data.accountsReceivableId);
-    if (!ar) throw new Error("Cuenta por cobrar no encontrada");
-    if (ar.balance <= 0) throw new Error("Esta cuenta por cobrar ya se encuentra totalmente saldada");
+  const db = await getDb();
 
-    const paymentAmount = Math.min(data.amount, ar.balance);
-    ar.paidAmount += paymentAmount;
-    ar.balance -= paymentAmount;
-    ar.status = ar.balance <= 0 ? "paid" : "partially_paid";
-    ar.updatedAt = new Date();
+  if (!db) {
+    const receiptNumber = `REC-${String(MOCK_CREDIT_PAYMENTS.length + 1).padStart(4, "0")}`;
+    
+    if (data.type === "receivable") {
+      const ar = MOCK_ACCOUNTS_RECEIVABLE.find((item: any) => item.id === data.accountsReceivableId);
+      if (!ar) throw new Error("Cuenta por cobrar no encontrada");
+      if (ar.balance <= 0) throw new Error("Esta cuenta por cobrar ya se encuentra totalmente saldada");
 
-    const paymentId = MOCK_CREDIT_PAYMENTS.length + 1;
-    const payment = {
-      id: paymentId,
-      type: "receivable",
-      accountsReceivableId: ar.id,
-      customerId: ar.customerId,
-      amount: paymentAmount,
-      paymentMethod: data.paymentMethod,
-      notes: data.notes || null,
-      userId: data.userId,
-      receiptNumber,
-      createdAt: new Date(),
-    };
-    MOCK_CREDIT_PAYMENTS.push(payment);
+      const paymentAmount = Math.min(data.amount, ar.balance);
+      ar.paidAmount += paymentAmount;
+      ar.balance -= paymentAmount;
+      ar.status = ar.balance <= 0 ? "paid" : "partially_paid";
+      ar.updatedAt = new Date();
 
-    await createFinancialTransaction({
-      type: "income",
-      category: "ar_payment",
-      amount: paymentAmount,
-      referenceId: ar.id,
-      notes: `Cobro de CXC (${receiptNumber}) - Venta #${ar.saleId}`,
-      paymentMethod: data.paymentMethod,
-      userId: data.userId,
-    });
+      const paymentId = MOCK_CREDIT_PAYMENTS.length + 1;
+      const payment = {
+        id: paymentId,
+        type: "receivable",
+        accountsReceivableId: ar.id,
+        customerId: ar.customerId,
+        amount: paymentAmount,
+        paymentMethod: data.paymentMethod,
+        notes: data.notes || null,
+        userId: data.userId,
+        receiptNumber,
+        createdAt: new Date(),
+      };
+      MOCK_CREDIT_PAYMENTS.push(payment);
 
-    syncMocksToDisk();
-    return payment;
-  } else {
-    const ap = MOCK_ACCOUNTS_PAYABLE.find((item: any) => item.id === data.accountsPayableId);
-    if (!ap) throw new Error("Cuenta por pagar no encontrada");
+      await createFinancialTransaction({
+        type: "income",
+        category: "ar_payment",
+        amount: paymentAmount,
+        referenceId: ar.id,
+        notes: `Cobro de CXC (${receiptNumber}) - Venta #${ar.saleId}`,
+        paymentMethod: data.paymentMethod,
+        userId: data.userId,
+      });
 
-    // Normalizar campos si el registro es antiguo
-    if (ap.totalAmount === undefined) ap.totalAmount = ap.amount || 0;
-    if (ap.paidAmount === undefined) ap.paidAmount = 0;
-    if (ap.balance === undefined) ap.balance = ap.totalAmount - ap.paidAmount;
+      syncMocksToDisk();
+      return payment;
+    } else {
+      const ap = MOCK_ACCOUNTS_PAYABLE.find((item: any) => item.id === data.accountsPayableId);
+      if (!ap) throw new Error("Cuenta por pagar no encontrada");
 
-    if (ap.balance <= 0) throw new Error("Esta cuenta por pagar ya se encuentra totalmente saldada");
+      if (ap.totalAmount === undefined) ap.totalAmount = ap.amount || 0;
+      if (ap.paidAmount === undefined) ap.paidAmount = 0;
+      if (ap.balance === undefined) ap.balance = ap.totalAmount - ap.paidAmount;
 
-    const paymentAmount = Math.min(data.amount, ap.balance);
-    ap.paidAmount += paymentAmount;
-    ap.balance -= paymentAmount;
-    ap.status = ap.balance <= 0 ? "paid" : "partially_paid";
-    ap.updatedAt = new Date();
+      if (ap.balance <= 0) throw new Error("Esta cuenta por pagar ya se encuentra totalmente saldada");
 
-    const paymentId = MOCK_CREDIT_PAYMENTS.length + 1;
-    const payment = {
-      id: paymentId,
-      type: "payable",
-      accountsPayableId: ap.id,
-      supplierId: ap.supplierId,
-      amount: paymentAmount,
-      paymentMethod: data.paymentMethod,
-      notes: data.notes || null,
-      userId: data.userId,
-      receiptNumber,
-      createdAt: new Date(),
-    };
-    MOCK_CREDIT_PAYMENTS.push(payment);
+      const paymentAmount = Math.min(data.amount, ap.balance);
+      ap.paidAmount += paymentAmount;
+      ap.balance -= paymentAmount;
+      ap.status = ap.balance <= 0 ? "paid" : "partially_paid";
+      ap.updatedAt = new Date();
 
-    await createFinancialTransaction({
-      type: "expense",
-      category: "ap_payment",
-      amount: paymentAmount,
-      referenceId: ap.id,
-      notes: `Pago de CXP (${receiptNumber}) - Compra #${ap.purchaseId}`,
-      paymentMethod: data.paymentMethod,
-      userId: data.userId,
-    });
+      const paymentId = MOCK_CREDIT_PAYMENTS.length + 1;
+      const payment = {
+        id: paymentId,
+        type: "payable",
+        accountsPayableId: ap.id,
+        supplierId: ap.supplierId,
+        amount: paymentAmount,
+        paymentMethod: data.paymentMethod,
+        notes: data.notes || null,
+        userId: data.userId,
+        receiptNumber,
+        createdAt: new Date(),
+      };
+      MOCK_CREDIT_PAYMENTS.push(payment);
 
-    syncMocksToDisk();
-    return payment;
+      await createFinancialTransaction({
+        type: "expense",
+        category: "ap_payment",
+        amount: paymentAmount,
+        referenceId: ap.id,
+        notes: `Pago de CXP (${receiptNumber}) - Compra #${ap.purchaseId}`,
+        paymentMethod: data.paymentMethod,
+        userId: data.userId,
+      });
+
+      syncMocksToDisk();
+      return payment;
+    }
   }
+
+  // Modo DB real en MySQL con transacción atómica
+  return await db.transaction(async (tx: any) => {
+    const [countResult] = await tx.select({ count: sql<number>`count(*)` }).from(creditPayments);
+    const totalCount = Number(countResult?.count || 0);
+    const receiptNumber = `REC-${String(totalCount + 1).padStart(4, "0")}`;
+
+    if (data.type === "receivable") {
+      const [ar] = await tx
+        .select()
+        .from(accountsReceivable)
+        .where(eq(accountsReceivable.id, data.accountsReceivableId!))
+        .limit(1);
+
+      if (!ar) throw new Error("Cuenta por cobrar no encontrada");
+      if (ar.balance <= 0) throw new Error("Esta cuenta por cobrar ya se encuentra totalmente saldada");
+
+      const paymentAmount = Math.min(data.amount, ar.balance);
+      const newPaidAmount = (ar.paidAmount || 0) + paymentAmount;
+      const newBalance = Math.max(0, ar.balance - paymentAmount);
+      const newStatus = newBalance <= 0 ? "paid" : "partially_paid";
+
+      await tx
+        .update(accountsReceivable)
+        .set({
+          paidAmount: newPaidAmount,
+          balance: newBalance,
+          status: newStatus,
+          updatedAt: new Date(),
+        })
+        .where(eq(accountsReceivable.id, ar.id));
+
+      const paymentInsertResult = await tx.insert(creditPayments).values({
+        type: "receivable",
+        accountsReceivableId: ar.id,
+        customerId: ar.customerId,
+        amount: paymentAmount,
+        paymentMethod: data.paymentMethod,
+        notes: data.notes || null,
+        userId: data.userId,
+        receiptNumber,
+      });
+      const paymentId = getInsertId(paymentInsertResult);
+
+      await tx.insert(financialTransactions).values({
+        branchId: 1,
+        type: "income",
+        category: "ar_payment",
+        amount: paymentAmount,
+        referenceId: ar.id,
+        notes: `Cobro de CXC (${receiptNumber}) - Venta #${ar.saleId}`,
+        paymentMethod: data.paymentMethod,
+        userId: data.userId,
+      });
+
+      return {
+        id: paymentId,
+        type: "receivable",
+        accountsReceivableId: ar.id,
+        customerId: ar.customerId,
+        amount: paymentAmount,
+        paymentMethod: data.paymentMethod,
+        notes: data.notes || null,
+        userId: data.userId,
+        receiptNumber,
+        createdAt: new Date(),
+      };
+    } else {
+      const [ap] = await tx
+        .select()
+        .from(accountsPayable)
+        .where(eq(accountsPayable.id, data.accountsPayableId!))
+        .limit(1);
+
+      if (!ap) throw new Error("Cuenta por pagar no encontrada");
+      if (ap.balance <= 0) throw new Error("Esta cuenta por pagar ya se encuentra totalmente saldada");
+
+      const paymentAmount = Math.min(data.amount, ap.balance);
+      const newPaidAmount = (ap.paidAmount || 0) + paymentAmount;
+      const newBalance = Math.max(0, ap.balance - paymentAmount);
+      const newStatus = newBalance <= 0 ? "paid" : "partially_paid";
+
+      await tx
+        .update(accountsPayable)
+        .set({
+          paidAmount: newPaidAmount,
+          balance: newBalance,
+          status: newStatus,
+          updatedAt: new Date(),
+        })
+        .where(eq(accountsPayable.id, ap.id));
+
+      const paymentInsertResult = await tx.insert(creditPayments).values({
+        type: "payable",
+        accountsPayableId: ap.id,
+        supplierId: ap.supplierId,
+        amount: paymentAmount,
+        paymentMethod: data.paymentMethod,
+        notes: data.notes || null,
+        userId: data.userId,
+        receiptNumber,
+      });
+      const paymentId = getInsertId(paymentInsertResult);
+
+      await tx.insert(financialTransactions).values({
+        branchId: 1,
+        type: "expense",
+        category: "ap_payment",
+        amount: paymentAmount,
+        referenceId: ap.id,
+        notes: `Pago de CXP (${receiptNumber}) - Compra #${ap.purchaseId}`,
+        paymentMethod: data.paymentMethod,
+        userId: data.userId,
+      });
+
+      return {
+        id: paymentId,
+        type: "payable",
+        accountsPayableId: ap.id,
+        supplierId: ap.supplierId,
+        amount: paymentAmount,
+        paymentMethod: data.paymentMethod,
+        notes: data.notes || null,
+        userId: data.userId,
+        receiptNumber,
+        createdAt: new Date(),
+      };
+    }
+  });
 }
 
 export async function getAllCreditPayments() {
-  return MOCK_CREDIT_PAYMENTS.map((p: any) => {
-    const user = MOCK_USERS.find((u: any) => u.id === p.userId);
-    const customer = p.customerId ? MOCK_CUSTOMERS.find((c: any) => c.id === p.customerId) : null;
-    const supplier = p.supplierId ? MOCK_SUPPLIERS.find((s: any) => s.id === p.supplierId) : null;
-    return {
-      ...p,
-      userName: user?.name || "Desconocido",
-      entityName: customer?.name || supplier?.name || "N/A",
-    };
-  });
+  const db = await getDb();
+  if (!db) {
+    return MOCK_CREDIT_PAYMENTS.map((p: any) => {
+      const user = MOCK_USERS.find((u: any) => u.id === p.userId);
+      const customer = p.customerId ? MOCK_CUSTOMERS.find((c: any) => c.id === p.customerId) : null;
+      const supplier = p.supplierId ? MOCK_SUPPLIERS.find((s: any) => s.id === p.supplierId) : null;
+      return {
+        ...p,
+        userName: user?.name || "Desconocido",
+        entityName: customer?.name || supplier?.name || "N/A",
+      };
+    });
+  }
+
+  // Modo DB
+  const rows = await db
+    .select({
+      id: creditPayments.id,
+      type: creditPayments.type,
+      accountsReceivableId: creditPayments.accountsReceivableId,
+      accountsPayableId: creditPayments.accountsPayableId,
+      customerId: creditPayments.customerId,
+      supplierId: creditPayments.supplierId,
+      amount: creditPayments.amount,
+      paymentMethod: creditPayments.paymentMethod,
+      reference: creditPayments.reference,
+      notes: creditPayments.notes,
+      userId: creditPayments.userId,
+      receiptNumber: creditPayments.receiptNumber,
+      createdAt: creditPayments.createdAt,
+      userName: users.name,
+      customerName: customers.name,
+      supplierName: suppliers.name,
+    })
+    .from(creditPayments)
+    .leftJoin(users, eq(creditPayments.userId, users.id))
+    .leftJoin(customers, eq(creditPayments.customerId, customers.id))
+    .leftJoin(suppliers, eq(creditPayments.supplierId, suppliers.id))
+    .orderBy(desc(creditPayments.id));
+
+  return rows.map((p: any) => ({
+    ...p,
+    userName: p.userName || "Desconocido",
+    entityName: p.customerName || p.supplierName || "N/A",
+  }));
 }
 
 

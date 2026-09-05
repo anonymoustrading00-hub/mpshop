@@ -22,7 +22,7 @@ import {
   syncMocksToDisk,
   createAutomaticOperationalExpense,
 } from "../db";
-import { generatedCodes, units, unitEvents, purchases, purchaseItems, suppliers, financialTransactions, operationalExpenses, users, repairs, warranties, returns, saleItems, sales, systemSettings, branches } from "../../drizzle/schema";
+import { generatedCodes, units, unitEvents, purchases, purchaseItems, suppliers, financialTransactions, operationalExpenses, users, repairs, warranties, returns, saleItems, sales, systemSettings, branches, accountsPayable } from "../../drizzle/schema";
 import * as schema from "../../drizzle/schema";
 import { eq, ne, like, or, and, desc, sql, asc, inArray } from "drizzle-orm";
 import { DEFAULT_COMPANY_CONFIG, readCompanyConfig } from "./settings";
@@ -510,8 +510,8 @@ export const unitsRouter = router({
         supplierId: z.number().optional(),
         purchaseDate: z.string().optional(),
         quantity: z.number().int().min(1).max(500).default(1),
-        // Método de pago con que se compró el equipo (afecta la caja)
-        paymentMethod: z.enum(["cash", "qr", "transfer"]).default("cash"),
+        // Método de pago con que se compró el equipo (afecta la caja o genera cuenta por pagar)
+        paymentMethod: z.enum(["cash", "qr", "transfer", "credit"]).default("cash"),
         branchId: z.number().default(1),
         photos: z.string().optional(), // JSON array of base64 strings
         tiktokUrl: z.string().optional(), // Enlace a video de TikTok
@@ -537,9 +537,10 @@ export const unitsRouter = router({
         const createdUnitIds: number[] = [];
         const createdCodes: string[] = [];
 
-        // 1. Crear registro de compra maestro y egreso consolidado si hay precio
+        // 1. Crear registro de compra maestro y egreso consolidado o deuda si hay precio
         let purchaseId: number | null = null;
         const totalPurchaseAmount = (input.purchasePrice || 0) * qty;
+        const isCredit = input.paymentMethod === "credit" ? 1 : 0;
 
         if (totalPurchaseAmount > 0) {
           purchaseId = MOCK_PURCHASES.length + 1;
@@ -552,26 +553,43 @@ export const unitsRouter = router({
             orderDate: input.purchaseDate ? new Date(input.purchaseDate) : new Date(),
             totalAmount: totalPurchaseAmount,
             status: "received",
-            paymentStatus: "paid",
+            paymentStatus: isCredit ? "pending" : "paid",
             paymentMethod: input.paymentMethod,
-            isCredit: 0,
+            isCredit,
             createdAt: new Date(),
             updatedAt: new Date(),
           });
 
-          // Egreso de caja consolidado
-          MOCK_FINANCIAL_TRANSACTIONS.push({
-            id: MOCK_FINANCIAL_TRANSACTIONS.length + 1,
-            branchId: input.branchId || 1,
-            type: "expense",
-            category: "purchase",
-            amount: totalPurchaseAmount,
-            paymentMethod: input.paymentMethod,
-            referenceId: purchaseId,
-            userId: ctx.user.id,
-            notes: `Compra (${qty} uds.) ${input.brand} ${input.model} (${baseCodeClean}) · ${purchaseNumber}`,
-            createdAt: new Date(),
-          });
+          if (isCredit) {
+            const dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + 30);
+            MOCK_ACCOUNTS_PAYABLE.push({
+              id: MOCK_ACCOUNTS_PAYABLE.length + 1,
+              purchaseId,
+              supplierId: input.supplierId || null,
+              totalAmount: totalPurchaseAmount,
+              paidAmount: 0,
+              balance: totalPurchaseAmount,
+              dueDate: dueDate.toISOString().split("T")[0],
+              status: "unpaid",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          } else {
+            // Egreso de caja consolidado
+            MOCK_FINANCIAL_TRANSACTIONS.push({
+              id: MOCK_FINANCIAL_TRANSACTIONS.length + 1,
+              branchId: input.branchId || 1,
+              type: "expense",
+              category: "purchase",
+              amount: totalPurchaseAmount,
+              paymentMethod: input.paymentMethod,
+              referenceId: purchaseId,
+              userId: ctx.user.id,
+              notes: `Compra (${qty} uds.) ${input.brand} ${input.model} (${baseCodeClean}) · ${purchaseNumber}`,
+              createdAt: new Date(),
+            });
+          }
         }
 
         // 2. Crear las N unidades
@@ -704,7 +722,9 @@ export const unitsRouter = router({
         let newPurchaseId: number | null = null;
         const purchaseNumber = genPurchaseNumber(Date.now());
 
-        // 1. Si tiene precio de compra → crear registro maestro en purchases + egreso consolidado en caja
+        // 1. Si tiene precio de compra → crear registro maestro en purchases + egreso consolidado en caja o deuda CXP
+        const isCredit = input.paymentMethod === "credit" ? 1 : 0;
+
         if (totalPurchaseAmount > 0) {
           const purchaseResult: any = await tx.insert(purchases).values({
             supplierId: finalSupplierId!,
@@ -712,9 +732,9 @@ export const unitsRouter = router({
             orderDate: input.purchaseDate ? new Date(input.purchaseDate + "T00:00:00") : new Date(),
             totalAmount: totalPurchaseAmount,
             status: "received",
-            paymentStatus: "paid",
+            paymentStatus: isCredit ? "pending" : "paid",
             paymentMethod: input.paymentMethod,
-            isCredit: 0,
+            isCredit,
           });
 
           newPurchaseId = purchaseResult?.insertId || purchaseResult?.[0]?.insertId;
@@ -723,17 +743,40 @@ export const unitsRouter = router({
             throw new Error("No se pudo obtener el ID de la compra recién creada. insertId vacío.");
           }
 
-          // Egreso de caja consolidado (transacción financiera real del lote)
-          await tx.insert(financialTransactions).values({
-            branchId: input.branchId || 1,
-            type: "expense",
-            category: "purchase",
-            amount: totalPurchaseAmount,
-            paymentMethod: input.paymentMethod,
-            referenceId: newPurchaseId,
-            userId: ctx.user.id,
-            notes: `Compra (${qty} uds.) ${input.brand} ${input.model} (${baseCodeClean}) · ${purchaseNumber}`,
-          });
+          if (isCredit) {
+            let dueDateStr: string;
+            if (input.purchaseDate) {
+              const d = new Date(input.purchaseDate + "T00:00:00");
+              d.setDate(d.getDate() + 30);
+              dueDateStr = getLocalDateKey(d) || d.toISOString().split("T")[0];
+            } else {
+              const d = new Date();
+              d.setDate(d.getDate() + 30);
+              dueDateStr = getLocalDateKey(d) || d.toISOString().split("T")[0];
+            }
+
+            await tx.insert(accountsPayable).values({
+              purchaseId: newPurchaseId,
+              supplierId: finalSupplierId!,
+              totalAmount: totalPurchaseAmount,
+              paidAmount: 0,
+              balance: totalPurchaseAmount,
+              dueDate: dueDateStr,
+              status: "unpaid",
+            });
+          } else {
+            // Egreso de caja consolidado (transacción financiera real del lote)
+            await tx.insert(financialTransactions).values({
+              branchId: input.branchId || 1,
+              type: "expense",
+              category: "purchase",
+              amount: totalPurchaseAmount,
+              paymentMethod: input.paymentMethod,
+              referenceId: newPurchaseId,
+              userId: ctx.user.id,
+              notes: `Compra (${qty} uds.) ${input.brand} ${input.model} (${baseCodeClean}) · ${purchaseNumber}`,
+            });
+          }
         }
 
         const createdUnitIds: number[] = [];
@@ -845,7 +888,7 @@ export const unitsRouter = router({
         photos: z.string().optional(),
         tiktokUrl: z.string().optional(),
         addQuantity: z.number().int().min(0).max(500).optional(),
-        addPaymentMethod: z.enum(["cash", "qr", "transfer"]).default("cash"),
+        addPaymentMethod: z.enum(["cash", "qr", "transfer", "credit"]).default("cash"),
         updateAllMatching: z.boolean().default(false),
       })
     )
@@ -1077,11 +1120,14 @@ export const unitsRouter = router({
             .where(eq(purchases.id, purchaseId))
             .limit(1);
 
+          const isCredit = effectivePaymentMethod === "credit" ? 1 : 0;
           if (existingPurchase) {
             // Actualizar la compra existente con el nuevo precio y nuevo método de pago
             const purchaseUpdate: Record<string, any> = {
               totalAmount: effectivePrice,
               paymentMethod: effectivePaymentMethod,
+              isCredit,
+              paymentStatus: isCredit ? "pending" : "paid",
             };
             if (input.supplierId) purchaseUpdate.supplierId = input.supplierId;
             if (input.purchaseDate) purchaseUpdate.orderDate = new Date(input.purchaseDate + "T00:00:00");
@@ -1106,6 +1152,7 @@ export const unitsRouter = router({
 
           const purchaseNumber = genPurchaseNumber(Date.now());
           const purchaseDate = input.purchaseDate ? new Date(input.purchaseDate + "T00:00:00") : new Date();
+          const isCredit = effectivePaymentMethod === "credit" ? 1 : 0;
 
           const purchaseRes: any = await db.insert(purchases).values({
             supplierId: supplierId!,
@@ -1113,9 +1160,9 @@ export const unitsRouter = router({
             orderDate: purchaseDate,
             totalAmount: effectivePrice,
             status: "received",
-            paymentStatus: "paid",
+            paymentStatus: isCredit ? "pending" : "paid",
             paymentMethod: effectivePaymentMethod,
-            isCredit: 0,
+            isCredit,
             branchId: input.branchId || unit.branchId || 1,
           });
 
@@ -1133,42 +1180,110 @@ export const unitsRouter = router({
           }
         }
 
-        // Sincronizar o insertar en financialTransactions (Caja / Finanzas)
+        // Sincronizar Caja / Finanzas o Cuentas por Pagar (CXP)
         if (purchaseId) {
-          const [existingTx] = await db
-            .select()
-            .from(financialTransactions)
-            .where(
-              and(
-                eq(financialTransactions.category, "purchase"),
-                eq(financialTransactions.referenceId, purchaseId)
-              )
-            )
-            .limit(1);
+          const isCredit = effectivePaymentMethod === "credit";
 
-          if (existingTx) {
-            // Actualizar transacción existente: monto, método de pago, sucursal
+          if (isCredit) {
+            // 1. Si era crédito, eliminar cualquier egreso de caja previo de esta compra
             await db
-              .update(financialTransactions)
-              .set({
+              .delete(financialTransactions)
+              .where(
+                and(
+                  eq(financialTransactions.category, "purchase"),
+                  eq(financialTransactions.referenceId, purchaseId)
+                )
+              );
+
+            // 2. Sincronizar o insertar en accountsPayable
+            const [existingAP] = await db
+              .select()
+              .from(accountsPayable)
+              .where(eq(accountsPayable.purchaseId, purchaseId))
+              .limit(1);
+
+            let dueDateStr: string;
+            if (input.purchaseDate) {
+              const d = new Date(input.purchaseDate + "T00:00:00");
+              d.setDate(d.getDate() + 30);
+              dueDateStr = getLocalDateKey(d) || d.toISOString().split("T")[0];
+            } else {
+              const d = new Date();
+              d.setDate(d.getDate() + 30);
+              dueDateStr = getLocalDateKey(d) || d.toISOString().split("T")[0];
+            }
+
+            if (existingAP) {
+              const paidAmount = existingAP.paidAmount || 0;
+              const newBalance = Math.max(0, effectivePrice - paidAmount);
+              await db
+                .update(accountsPayable)
+                .set({
+                  totalAmount: effectivePrice,
+                  balance: newBalance,
+                  status: newBalance <= 0 ? "paid" : (paidAmount > 0 ? "partially_paid" : "unpaid"),
+                  supplierId: input.supplierId || unit.supplierId || existingAP.supplierId,
+                  updatedAt: new Date(),
+                })
+                .where(eq(accountsPayable.id, existingAP.id));
+            } else {
+              await db.insert(accountsPayable).values({
+                purchaseId,
+                supplierId: input.supplierId || unit.supplierId || 1,
+                totalAmount: effectivePrice,
+                paidAmount: 0,
+                balance: effectivePrice,
+                dueDate: dueDateStr,
+                status: "unpaid",
+              });
+            }
+          } else {
+            // No es a crédito (Efectivo / QR / Transferencia)
+            // 1. Si existía cuenta por pagar sin abonos, eliminarla
+            const [existingAP] = await db
+              .select()
+              .from(accountsPayable)
+              .where(eq(accountsPayable.purchaseId, purchaseId))
+              .limit(1);
+
+            if (existingAP && (existingAP.paidAmount || 0) === 0) {
+              await db.delete(accountsPayable).where(eq(accountsPayable.id, existingAP.id));
+            }
+
+            // 2. Sincronizar o insertar en financialTransactions
+            const [existingTx] = await db
+              .select()
+              .from(financialTransactions)
+              .where(
+                and(
+                  eq(financialTransactions.category, "purchase"),
+                  eq(financialTransactions.referenceId, purchaseId)
+                )
+              )
+              .limit(1);
+
+            if (existingTx) {
+              await db
+                .update(financialTransactions)
+                .set({
+                  amount: effectivePrice,
+                  paymentMethod: effectivePaymentMethod,
+                  branchId: input.branchId || unit.branchId || existingTx.branchId || 1,
+                  notes: `Compra de unidad ${input.brand || unit.brand} ${input.model || unit.model} (${unit.code})`,
+                })
+                .where(eq(financialTransactions.id, existingTx.id));
+            } else {
+              await db.insert(financialTransactions).values({
+                branchId: input.branchId || unit.branchId || 1,
+                type: "expense",
+                category: "purchase",
                 amount: effectivePrice,
                 paymentMethod: effectivePaymentMethod,
-                branchId: input.branchId || unit.branchId || existingTx.branchId || 1,
+                referenceId: purchaseId,
+                userId: ctx.user.id,
                 notes: `Compra de unidad ${input.brand || unit.brand} ${input.model || unit.model} (${unit.code})`,
-              })
-              .where(eq(financialTransactions.id, existingTx.id));
-          } else {
-            // Insertar egreso en Caja / Finanzas si no existía
-            await db.insert(financialTransactions).values({
-              branchId: input.branchId || unit.branchId || 1,
-              type: "expense",
-              category: "purchase",
-              amount: effectivePrice,
-              paymentMethod: effectivePaymentMethod,
-              referenceId: purchaseId,
-              userId: ctx.user.id,
-              notes: `Compra de unidad ${input.brand || unit.brand} ${input.model || unit.model} (${unit.code})`,
-            });
+              });
+            }
           }
         }
       }
