@@ -1681,7 +1681,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
         {/* ══════════ MODAL: EDITAR UNIDAD ══════════ */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto p-0 rounded-3xl border-0 shadow-2xl bg-white">
+          <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto p-0 rounded-3xl border-0 shadow-2xl bg-white">
             {/* Header */}
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -1909,12 +1909,12 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                     </label>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     {/* Precio Compra */}
-                    <div className="p-3 rounded-xl border-2 border-emerald-200 bg-emerald-50/40 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-emerald-900 uppercase">🛒 Precio Compra:</label>
-                        <Badge variant="outline" className="text-[9px] font-black bg-white text-emerald-800 border-emerald-300">
+                    <div className="p-3 rounded-xl border-2 border-emerald-200 bg-emerald-50/40 space-y-1.5 flex flex-col justify-between">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[11px] font-bold text-emerald-900 leading-tight">🛒 Compra:</span>
+                        <Badge variant="outline" className="text-[9px] font-black bg-white text-emerald-800 border-emerald-300 px-1.5 py-0">
                           Costo
                         </Badge>
                       </div>
@@ -1924,15 +1924,15 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         value={editPurchasePrice}
                         onChange={(e) => setEditPurchasePrice(e.target.value)}
                         placeholder="0.00"
-                        className="h-9 font-black text-emerald-950 bg-white border-emerald-300 rounded-lg text-base"
+                        className="h-10 font-black text-emerald-950 bg-white border-emerald-300 rounded-lg text-base text-center"
                       />
                     </div>
 
                     {/* Precio Venta */}
-                    <div className="p-3 rounded-xl border-2 border-blue-200 bg-blue-50/40 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-blue-900 uppercase">💰 Precio Unitario:</label>
-                        <Badge variant="outline" className="text-[9px] font-black bg-white text-blue-800 border-blue-300">
+                    <div className="p-3 rounded-xl border-2 border-blue-200 bg-blue-50/40 space-y-1.5 flex flex-col justify-between">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[11px] font-bold text-blue-900 leading-tight">💰 Unitario:</span>
+                        <Badge variant="outline" className="text-[9px] font-black bg-white text-blue-800 border-blue-300 px-1.5 py-0">
                           Público
                         </Badge>
                       </div>
@@ -1942,15 +1942,15 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         value={editSalePrice}
                         onChange={(e) => setEditSalePrice(e.target.value)}
                         placeholder="0.00"
-                        className="h-9 font-black text-blue-950 bg-white border-blue-300 rounded-lg text-base"
+                        className="h-10 font-black text-blue-950 bg-white border-blue-300 rounded-lg text-base text-center"
                       />
                     </div>
 
                     {/* Precio Descuento */}
-                    <div className="p-3 rounded-xl border-2 border-amber-200 bg-amber-50/40 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-amber-900 uppercase">🏷️ Precio Descuento:</label>
-                        <Badge variant="outline" className="text-[9px] font-black bg-white text-amber-800 border-amber-300">
+                    <div className="p-3 rounded-xl border-2 border-amber-200 bg-amber-50/40 space-y-1.5 flex flex-col justify-between">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[11px] font-bold text-amber-900 leading-tight">🏷️ Descuento:</span>
+                        <Badge variant="outline" className="text-[9px] font-black bg-white text-amber-800 border-amber-300 px-1.5 py-0">
                           Oferta
                         </Badge>
                       </div>
@@ -1960,15 +1960,15 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         value={editDiscountPrice}
                         onChange={(e) => setEditDiscountPrice(e.target.value)}
                         placeholder="0.00"
-                        className="h-9 font-black text-amber-950 bg-white border-amber-300 rounded-lg text-base"
+                        className="h-10 font-black text-amber-950 bg-white border-amber-300 rounded-lg text-base text-center"
                       />
                     </div>
 
                     {/* Precio por Mayor */}
-                    <div className="p-3 rounded-xl border-2 border-teal-200 bg-teal-50/40 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-teal-900 uppercase">📦 Precio por Mayor:</label>
-                        <Badge variant="outline" className="text-[9px] font-black bg-white text-teal-800 border-teal-300">
+                    <div className="p-3 rounded-xl border-2 border-teal-200 bg-teal-50/40 space-y-1.5 flex flex-col justify-between">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[11px] font-bold text-teal-900 leading-tight">📦 Por Mayor:</span>
+                        <Badge variant="outline" className="text-[9px] font-black bg-white text-teal-800 border-teal-300 px-1.5 py-0">
                           Mayorista
                         </Badge>
                       </div>
@@ -1978,7 +1978,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         value={editWholesalePrice}
                         onChange={(e) => setEditWholesalePrice(e.target.value)}
                         placeholder="0.00"
-                        className="h-9 font-black text-teal-950 bg-white border-teal-300 rounded-lg text-base"
+                        className="h-10 font-black text-teal-950 bg-white border-teal-300 rounded-lg text-base text-center"
                       />
                     </div>
                   </div>
@@ -2036,7 +2036,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                       {/* Cantidad Stepper */}
                       <div>
                         <label className="text-[11px] font-bold text-slate-700 block mb-1.5">
@@ -2047,7 +2047,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-10 w-10 p-0 text-slate-700 border-slate-300 rounded-xl"
+                            className="h-10 w-10 p-0 text-slate-700 border-slate-300 rounded-xl shrink-0"
                             onClick={() => setAddStockQty((prev) => Math.max(0, prev - 1))}
                             disabled={addStockQty <= 0}
                           >
@@ -2060,25 +2060,25 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                             value={addStockQty === 0 ? "" : addStockQty}
                             onChange={(e) => setAddStockQty(Math.max(0, parseInt(e.target.value) || 0))}
                             placeholder="0"
-                            className="h-10 font-black text-center text-lg border-blue-300 rounded-xl max-w-[100px]"
+                            className="h-10 font-black text-center text-lg border-blue-300 rounded-xl w-16 shrink-0"
                           />
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-10 w-10 p-0 text-blue-700 border-blue-300 rounded-xl"
+                            className="h-10 w-10 p-0 text-blue-700 border-blue-300 rounded-xl shrink-0"
                             onClick={() => setAddStockQty((prev) => prev + 1)}
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
-                          <div className="flex gap-1 ml-auto">
+                          <div className="flex gap-1">
                             {[1, 5, 10].map((n) => (
                               <Button
                                 key={n}
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                className="h-10 px-2.5 text-xs font-black text-blue-700 border-blue-200 hover:bg-blue-50 rounded-xl"
+                                className="h-10 px-2 text-xs font-black text-blue-700 border-blue-200 hover:bg-blue-50 rounded-xl"
                                 onClick={() => setAddStockQty((prev) => prev + n)}
                               >
                                 +{n}
@@ -2110,19 +2110,19 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                           <button
                             type="button"
                             onClick={() => setAddStockPaymentMethod("cash")}
-                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all text-center ${
+                            className={`flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all text-center min-h-[52px] ${
                               addStockPaymentMethod === "cash"
                                 ? "border-emerald-500 bg-emerald-50/80 shadow-sm"
                                 : "border-slate-200 bg-white hover:border-emerald-300"
                             }`}
                           >
                             <div className="flex items-center gap-1">
-                              <Wallet className={`h-3.5 w-3.5 ${addStockPaymentMethod === "cash" ? "text-emerald-600" : "text-slate-400"}`} />
-                              <span className={`text-[10px] font-black uppercase ${addStockPaymentMethod === "cash" ? "text-emerald-800" : "text-slate-600"}`}>
+                              <Wallet className={`h-3.5 w-3.5 shrink-0 ${addStockPaymentMethod === "cash" ? "text-emerald-600" : "text-slate-400"}`} />
+                              <span className={`text-[10px] font-black uppercase truncate ${addStockPaymentMethod === "cash" ? "text-emerald-800" : "text-slate-600"}`}>
                                 Efectivo
                               </span>
                             </div>
-                            <p className="text-[10px] font-black text-emerald-700 tabular-nums">
+                            <p className="text-[10px] font-black text-emerald-700 tabular-nums mt-0.5">
                               {formatCurrency(globalBalances?.cash ?? 0)}
                             </p>
                           </button>
@@ -2131,19 +2131,19 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                           <button
                             type="button"
                             onClick={() => setAddStockPaymentMethod("qr")}
-                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all text-center ${
+                            className={`flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all text-center min-h-[52px] ${
                               addStockPaymentMethod === "qr"
                                 ? "border-blue-500 bg-blue-50/80 shadow-sm"
                                 : "border-slate-200 bg-white hover:border-blue-300"
                             }`}
                           >
                             <div className="flex items-center gap-1">
-                              <QrCode className={`h-3.5 w-3.5 ${addStockPaymentMethod === "qr" ? "text-blue-600" : "text-slate-400"}`} />
-                              <span className={`text-[10px] font-black uppercase ${addStockPaymentMethod === "qr" ? "text-blue-800" : "text-slate-600"}`}>
+                              <QrCode className={`h-3.5 w-3.5 shrink-0 ${addStockPaymentMethod === "qr" ? "text-blue-600" : "text-slate-400"}`} />
+                              <span className={`text-[10px] font-black uppercase truncate ${addStockPaymentMethod === "qr" ? "text-blue-800" : "text-slate-600"}`}>
                                 QR
                               </span>
                             </div>
-                            <p className="text-[10px] font-black text-blue-700 tabular-nums">
+                            <p className="text-[10px] font-black text-blue-700 tabular-nums mt-0.5">
                               {formatCurrency(globalBalances?.qr ?? 0)}
                             </p>
                           </button>
@@ -2152,19 +2152,19 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                           <button
                             type="button"
                             onClick={() => setAddStockPaymentMethod("transfer")}
-                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all text-center ${
+                            className={`flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all text-center min-h-[52px] ${
                               addStockPaymentMethod === "transfer"
                                 ? "border-purple-500 bg-purple-50/80 shadow-sm"
                                 : "border-slate-200 bg-white hover:border-purple-300"
                             }`}
                           >
                             <div className="flex items-center gap-1">
-                              <Landmark className={`h-3.5 w-3.5 ${addStockPaymentMethod === "transfer" ? "text-purple-600" : "text-slate-400"}`} />
-                              <span className={`text-[10px] font-black uppercase ${addStockPaymentMethod === "transfer" ? "text-purple-800" : "text-slate-600"}`}>
+                              <Landmark className={`h-3.5 w-3.5 shrink-0 ${addStockPaymentMethod === "transfer" ? "text-purple-600" : "text-slate-400"}`} />
+                              <span className={`text-[10px] font-black uppercase truncate ${addStockPaymentMethod === "transfer" ? "text-purple-800" : "text-slate-600"}`}>
                                 Banco
                               </span>
                             </div>
-                            <p className="text-[10px] font-black text-purple-700 tabular-nums">
+                            <p className="text-[10px] font-black text-purple-700 tabular-nums mt-0.5">
                               {formatCurrency(globalBalances?.transfer ?? 0)}
                             </p>
                           </button>
