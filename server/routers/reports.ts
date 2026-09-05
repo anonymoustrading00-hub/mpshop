@@ -7,6 +7,8 @@ import {
   MOCK_ORDERS,
   MOCK_ORDER_ITEMS,
   MOCK_PURCHASES,
+  MOCK_PURCHASE_ITEMS,
+  MOCK_SUPPLIERS,
   MOCK_SALES,
   MOCK_SALE_ITEMS,
 } from "../db.js";
@@ -19,6 +21,8 @@ import {
   users,
   operationalExpenses,
   purchases,
+  purchaseItems,
+  suppliers,
   orderItems,
   saleItems,
   units,
@@ -106,6 +110,110 @@ export const reportsRouter = router({
       });
 
       return result;
+    }),
+
+  // Reporte de Compras
+  purchasesReport: protectedProcedure
+    .input(z.object({
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      supplierId: z.number().optional(),
+      status: z.string().optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) {
+        let list = MOCK_PURCHASES || [];
+        if (input?.startDate) {
+          list = list.filter((p: any) => new Date(p.orderDate || p.createdAt) >= new Date(input.startDate!));
+        }
+        if (input?.endDate) {
+          list = list.filter((p: any) => new Date(p.orderDate || p.createdAt) <= new Date(input.endDate! + " 23:59:59"));
+        }
+        if (input?.supplierId) {
+          list = list.filter((p: any) => p.supplierId === input.supplierId);
+        }
+        if (input?.status) {
+          list = list.filter((p: any) => p.status === input.status);
+        }
+        return list.map((p: any) => {
+          const supplier = (MOCK_SUPPLIERS || []).find((s: any) => s.id === p.supplierId);
+          return {
+            ...p,
+            supplier: supplier || { name: "Proveedor General" },
+            items: [],
+          };
+        });
+      }
+
+      let conditions: any[] = [];
+      if (input?.startDate) {
+        conditions.push(gte(purchases.orderDate, new Date(input.startDate)));
+      }
+      if (input?.endDate) {
+        conditions.push(lte(purchases.orderDate, new Date(input.endDate + " 23:59:59")));
+      }
+      if (input?.supplierId) {
+        conditions.push(eq(purchases.supplierId, input.supplierId));
+      }
+      if (input?.status) {
+        conditions.push(eq(purchases.status, input.status as any));
+      }
+
+      const purchaseList = await db
+        .select({
+          id: purchases.id,
+          purchaseNumber: purchases.purchaseNumber,
+          orderDate: purchases.orderDate,
+          totalAmount: purchases.totalAmount,
+          status: purchases.status,
+          paymentStatus: purchases.paymentStatus,
+          paymentMethod: purchases.paymentMethod,
+          isCredit: purchases.isCredit,
+          branchId: purchases.branchId,
+          createdAt: purchases.createdAt,
+          supplierId: purchases.supplierId,
+          supplierName: suppliers.name,
+          supplierPhone: suppliers.phone,
+        })
+        .from(purchases)
+        .leftJoin(suppliers, eq(purchases.supplierId, suppliers.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(purchases.orderDate));
+
+      const purchaseIds = purchaseList.map((p: any) => p.id);
+      let itemsByPurchase = new Map<number, any[]>();
+
+      if (purchaseIds.length > 0) {
+        const rawItems = await db
+          .select({
+            id: purchaseItems.id,
+            purchaseId: purchaseItems.purchaseId,
+            quantity: purchaseItems.quantity,
+            price: purchaseItems.price,
+            unitCode: units.code,
+            unitBrand: units.brand,
+            unitModel: units.model,
+          })
+          .from(purchaseItems)
+          .leftJoin(units, eq(purchaseItems.unitId, units.id))
+          .where(sql`${purchaseItems.purchaseId} IN (${sql.join(purchaseIds, sql`, `)})`);
+
+        rawItems.forEach((item: any) => {
+          const list = itemsByPurchase.get(item.purchaseId) || [];
+          list.push(item);
+          itemsByPurchase.set(item.purchaseId, list);
+        });
+      }
+
+      return purchaseList.map((p: any) => ({
+        ...p,
+        supplier: {
+          name: p.supplierName || "Proveedor General",
+          phone: p.supplierPhone || "-",
+        },
+        items: itemsByPurchase.get(p.id) || [],
+      }));
     }),
 
   // KPIs específicos para Electrónica Reacondicionada y Reparaciones

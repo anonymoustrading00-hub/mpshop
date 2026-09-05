@@ -230,6 +230,72 @@ export const generateSalesPDF = (sales: any[], filters: any, companyConfig?: any
   return doc;
 };
 
+// 2.1 REPORTE DE COMPRAS
+export const generatePurchasesPDF = (purchases: any[], filters: any, companyConfig?: any) => {
+  const doc = createPDF("Reporte de Compras a Proveedores", companyConfig);
+
+  let y = 45;
+
+  // Filtros
+  doc.setFontSize(11);
+  doc.setTextColor(60, 60, 60);
+  if (filters.startDate || filters.endDate) {
+    doc.text(
+      `Período: ${filters.startDate || "Inicio"} - ${filters.endDate || "Fin"}`,
+      20,
+      y
+    );
+    y += 7;
+  }
+
+  // Tabla de compras
+  const tableData = purchases.map((purchase) => [
+    purchase.purchaseNumber,
+    purchase.supplier?.name || purchase.supplierName || "Proveedor General",
+    format(new Date(purchase.orderDate || purchase.createdAt), "dd/MM/yyyy HH:mm", { locale: es }),
+    purchase.status === "received" ? "Recibido" : purchase.status === "cancelled" ? "Cancelado" : "Pendiente",
+    purchase.paymentMethod === "cash" ? "Efectivo"
+      : purchase.paymentMethod === "qr" ? "QR"
+      : purchase.paymentMethod === "transfer" ? "Transferencia"
+      : purchase.paymentMethod === "credit" ? "Crédito"
+      : "Efectivo",
+    purchase.paymentStatus === "paid" ? "Pagado" : "Pendiente",
+    formatBs(purchase.totalAmount),
+  ]);
+
+  (autoTable as any)(doc, {
+    ...getTableOptions(y),
+    head: [["Nº Compra", "Proveedor", "Fecha", "Estado", "Método", "Pago", "Total"]],
+    body: tableData,
+    styles: { fontSize: 8 },
+  });
+
+  const finalY = (doc as any).lastAutoTable.finalY + 10;
+
+  // Resumen
+  const totalCompras = purchases.length;
+  const montoTotal = purchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+  const pagadas = purchases
+    .filter((p) => p.paymentStatus === "paid")
+    .reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+  const pendientes = purchases
+    .filter((p) => p.paymentStatus !== "paid")
+    .reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("RESUMEN DE COMPRAS", 20, finalY);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`Total de Órdenes: ${totalCompras}`, 20, finalY + 7);
+  doc.text(`Total Pagado: ${formatBs(pagadas)}`, 20, finalY + 14);
+  doc.text(`Saldo a Crédito / Pendiente: ${formatBs(pendientes)}`, 20, finalY + 21);
+  doc.setFont("helvetica", "bold");
+  doc.text(`Monto Total Compras: ${formatBs(montoTotal)}`, 20, finalY + 28);
+
+  return doc;
+};
+
 // 3. REPORTE DE INVENTARIO Y VALUACIÓN (UNIDADES, TALLER Y ROTACIÓN) - MEJORADO
 export const generateInventoryPDF = (data: any, companyConfig?: any) => {
   const units = data?.units || [];

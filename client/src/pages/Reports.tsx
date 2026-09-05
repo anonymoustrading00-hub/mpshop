@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { trpc } from "../utils/trpc";
 import { format } from "date-fns";
+import * as XLSX from "xlsx";
 import {
   generateOrdersPDF,
   generateSalesPDF,
+  generatePurchasesPDF,
   generateInventoryPDF,
   generateFinancePDF,
   generateCustomersPDF,
   generateInventoryMovementsPDF,
   generateAuditPDF,
 } from "../utils/pdfReports";
-import { Download, FileText, Calendar, DollarSign, Package, Users, Activity, History } from "lucide-react";
+import { Download, FileText, Calendar, DollarSign, Package, Users, Activity, History, ShoppingCart, FileSpreadsheet } from "lucide-react";
 
 export default function Reports() {
   const [dateRange, setDateRange] = useState({
@@ -25,6 +27,10 @@ export default function Reports() {
     endDate: dateRange.endDate,
   });
   const salesQuery = trpc.reports.salesReport.useQuery({
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+  });
+  const purchasesQuery = (trpc.reports as any).purchasesReport.useQuery({
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
   });
@@ -47,13 +53,14 @@ export default function Reports() {
 
   const isLoading = ordersQuery.isLoading ||
     salesQuery.isLoading ||
+    purchasesQuery.isLoading ||
     inventoryQuery.isLoading ||
     movementsQuery.isLoading ||
     financeQuery.isLoading ||
     customersQuery.isLoading ||
     auditQuery.isLoading;
 
-  // Funciones de descarga
+  // Funciones de descarga PDF
   const downloadOrdersReport = () => {
     if (ordersQuery.data) {
       const doc = generateOrdersPDF(ordersQuery.data, dateRange, companyConfig);
@@ -65,6 +72,13 @@ export default function Reports() {
     if (salesQuery.data) {
       const doc = generateSalesPDF(salesQuery.data, dateRange, companyConfig);
       doc.save(`reporte-ventas-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+    }
+  };
+
+  const downloadPurchasesReport = () => {
+    if (purchasesQuery.data) {
+      const doc = generatePurchasesPDF(purchasesQuery.data, dateRange, companyConfig);
+      doc.save(`reporte-compras-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     }
   };
 
@@ -111,13 +125,207 @@ export default function Reports() {
     }
   };
 
+  // Funciones de descarga EXCEL (.xlsx)
+  const downloadOrdersExcel = () => {
+    if (!ordersQuery.data || ordersQuery.data.length === 0) return;
+    const rows = ordersQuery.data.map((o: any) => ({
+      "Nº Pedido": o.orderNumber,
+      "Cliente": o.customer?.name || o.customerName || "N/A",
+      "Celular": o.customer?.phone || o.customer?.whatsapp || o.customer?.clientNumber || "-",
+      "Fecha": o.createdAt ? format(new Date(o.createdAt), "dd/MM/yyyy HH:mm") : "-",
+      "Estado": o.status === "pending" ? "Pendiente"
+        : o.status === "assigned" ? "Asignado"
+        : o.status === "in_transit" ? "En camino"
+        : o.status === "delivered" ? "Entregado"
+        : o.status === "cancelled" ? "Cancelado"
+        : o.status || "-",
+      "Total (Bs.)": (o.totalPrice || 0) / 100,
+      "Estado de Pago": o.paymentStatus || "pendiente",
+      "Método de Pago": o.paymentMethod || "-",
+      "Repartidor": o.deliveryPerson?.name || "-",
+      "Dirección": o.shippingAddress || o.customer?.address || "-",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
+    XLSX.writeFile(wb, `reporte-pedidos-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  };
+
+  const downloadSalesExcel = () => {
+    if (!salesQuery.data || salesQuery.data.length === 0) return;
+    const rows = salesQuery.data.map((s: any) => ({
+      "Nº Venta": s.saleNumber,
+      "Cliente": s.customerName || s.customer?.name || "Venta anónima",
+      "Fecha": s.createdAt ? format(new Date(s.createdAt), "dd/MM/yyyy HH:mm") : "-",
+      "Canal": s.saleChannel === "delivery" ? "Delivery" : "Local",
+      "Método Pago": s.paymentMethod === "cash" ? "Efectivo"
+        : s.paymentMethod === "qr" ? "QR"
+        : s.paymentMethod === "transfer" ? "Transferencia"
+        : s.paymentMethod === "credit" ? "Crédito"
+        : s.paymentMethod || "-",
+      "Subtotal (Bs.)": (s.subtotal || 0) / 100,
+      "Descuento (Bs.)": (s.discountAmount || 0) / 100,
+      "Total (Bs.)": (s.total || 0) / 100,
+      "Estado Pago": s.paymentStatus === "completed" ? "Pagado" : "Pendiente",
+      "Vendedor": s.seller?.name || "-",
+      "Garantía (Días)": s.warrantyDays || 30,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ventas");
+    XLSX.writeFile(wb, `reporte-ventas-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  };
+
+  const downloadPurchasesExcel = () => {
+    if (!purchasesQuery.data || purchasesQuery.data.length === 0) return;
+    const rows = purchasesQuery.data.map((p: any) => ({
+      "Nº Compra": p.purchaseNumber,
+      "Proveedor": p.supplier?.name || p.supplierName || "Proveedor General",
+      "Teléfono Proveedor": p.supplier?.phone || "-",
+      "Fecha Orden": p.orderDate ? format(new Date(p.orderDate), "dd/MM/yyyy HH:mm") : "-",
+      "Estado": p.status === "received" ? "Recibido" : p.status === "cancelled" ? "Cancelado" : "Pendiente",
+      "Método Pago": p.paymentMethod === "cash" ? "Efectivo"
+        : p.paymentMethod === "qr" ? "QR"
+        : p.paymentMethod === "transfer" ? "Transferencia"
+        : p.paymentMethod === "credit" ? "Crédito"
+        : p.paymentMethod || "Efectivo",
+      "Estado Pago": p.paymentStatus === "paid" ? "Pagado" : "Pendiente",
+      "A Crédito": p.isCredit ? "Sí" : "No",
+      "Total Compra (Bs.)": (p.totalAmount || 0) / 100,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Compras");
+    XLSX.writeFile(wb, `reporte-compras-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  };
+
+  const downloadInventoryExcel = () => {
+    const units = inventoryQuery.data?.units || [];
+    if (units.length === 0) return;
+    const rows = units.map((u: any) => {
+      const pCost = (u.purchasePrice || 0) / 100;
+      const sPrice = (u.salePrice || 0) / 100;
+      const margin = sPrice - pCost;
+      const marginPct = pCost > 0 ? ((margin / pCost) * 100).toFixed(1) + "%" : "0%";
+      const purchaseDate = u.purchaseDate ? new Date(u.purchaseDate) : (u.createdAt ? new Date(u.createdAt) : null);
+      const days = purchaseDate ? Math.max(0, Math.floor((Date.now() - purchaseDate.getTime()) / 86400000)) : 0;
+      return {
+        "Código": u.code || `UNI-${u.id}`,
+        "Tipo": u.type || "-",
+        "Marca": u.brand || "-",
+        "Modelo": u.model || "-",
+        "Nº Serie / IMEI": u.serialNumber || "-",
+        "Condición (1-10)": u.condition ?? "-",
+        "Estado": u.status === "available" ? "Disponible"
+          : u.status === "in_repair" ? "En Taller"
+          : u.status === "in_diagnosis" ? "Diagnóstico"
+          : u.status === "sold" ? "Vendido"
+          : u.status === "reserved" ? "Reservado"
+          : u.status === "returned" ? "Garantía"
+          : u.status || "-",
+        "Días en Stock": days,
+        "Precio Compra (Bs.)": pCost,
+        "Precio Venta (Bs.)": sPrice,
+        "Margen Estimado (Bs.)": margin,
+        "% Margen": marginPct,
+        "Fecha Registro": u.createdAt ? format(new Date(u.createdAt), "dd/MM/yyyy") : "-",
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Inventario_Unidades");
+    XLSX.writeFile(wb, `reporte-inventario-unidades-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  };
+
+  const downloadMovementsExcel = () => {
+    const movements = movementsQuery.data?.movements || (Array.isArray(movementsQuery.data) ? movementsQuery.data : []);
+    if (movements.length === 0) return;
+    const products = movementsQuery.data?.products || [];
+    const rows = movements.map((m: any) => {
+      const product = products.find((p: any) => p.id === m.productId);
+      return {
+        "Fecha": m.createdAt ? format(new Date(m.createdAt), "dd/MM/yyyy HH:mm") : "-",
+        "ID Unidad": m.unitId || "-",
+        "Producto / Detalle": product?.name || m.unitCode || "Movimiento",
+        "Tipo Movimiento": m.type === "entry" ? "ENTRADA" : m.type === "exit" ? "SALIDA" : m.type || "AJUSTE",
+        "Estado Anterior": m.fromStatus || "-",
+        "Estado Nuevo": m.toStatus || "-",
+        "Cantidad": m.quantity ?? 1,
+        "Razón / Motivo": m.reason || m.notes || "-",
+        "Usuario ID": m.userId || "-",
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Movimientos");
+    XLSX.writeFile(wb, `reporte-movimientos-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  };
+
+  const downloadFinanceExcel = () => {
+    const transactions = financeQuery.data?.transactions || (Array.isArray(financeQuery.data) ? financeQuery.data : []);
+    if (transactions.length === 0) return;
+    const rows = transactions.map((t: any) => ({
+      "Fecha": t.createdAt ? format(new Date(t.createdAt), "dd/MM/yyyy HH:mm") : "-",
+      "Tipo": t.type === "income" ? "Ingreso" : "Egreso / Gasto",
+      "Categoría": t.category || "General",
+      "Método Pago": t.paymentMethod === "cash" ? "Efectivo"
+        : t.paymentMethod === "qr" ? "QR"
+        : t.paymentMethod === "transfer" ? "Transferencia"
+        : t.paymentMethod || "Efectivo",
+      "Monto (Bs.)": (t.amount || 0) / 100,
+      "Notas / Referencia": t.notes || "-",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Transacciones");
+    XLSX.writeFile(wb, `reporte-finanzas-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  };
+
+  const downloadCustomersExcel = () => {
+    if (!customersQuery.data || customersQuery.data.length === 0) return;
+    const rows = customersQuery.data.map((c: any) => ({
+      "Código": c.clientNumber || `CLI-${c.id}`,
+      "Nombre": c.name || "-",
+      "Teléfono / Celular": c.phone || "-",
+      "WhatsApp": c.whatsapp || "-",
+      "Zona": c.zona || "Sin zona",
+      "Dirección": c.address || "-",
+      "Email": c.email || "-",
+      "Límite Crédito (Bs.)": (c.creditLimit || 0) / 100,
+      "Saldo Pendiente (Bs.)": (c.currentBalance || 0) / 100,
+      "Fecha Registro": c.createdAt ? format(new Date(c.createdAt), "dd/MM/yyyy") : "-",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Clientes");
+    XLSX.writeFile(wb, `reporte-clientes-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  };
+
+  const downloadAuditExcel = () => {
+    if (!auditQuery.data || auditQuery.data.length === 0) return;
+    const rows = auditQuery.data.map((l: any) => ({
+      "Fecha": l.createdAt ? format(new Date(l.createdAt), "dd/MM/yyyy HH:mm") : "-",
+      "Entidad": l.entityType || "-",
+      "ID Registro": l.entityId || "-",
+      "Acción": l.action || "-",
+      "Usuario": l.user?.name || l.userName || (l.userId ? `ID #${l.userId}` : "Sistema"),
+      "Descripción": l.description || "-",
+      "Dirección IP": l.ipAddress || "-",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Auditoría");
+    XLSX.writeFile(wb, `reporte-auditoria-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  };
+
   const reportTypes = [
     {
       id: "orders",
       name: "Pedidos",
       icon: FileText,
       description: "Reporte de todos los pedidos",
-      onDownload: downloadOrdersReport,
+      onDownloadPDF: downloadOrdersReport,
+      onDownloadExcel: downloadOrdersExcel,
       dataCount: ordersQuery.data?.length || 0,
     },
     {
@@ -125,15 +333,26 @@ export default function Reports() {
       name: "Ventas",
       icon: DollarSign,
       description: "Reporte de ventas y cobranzas",
-      onDownload: downloadSalesReport,
+      onDownloadPDF: downloadSalesReport,
+      onDownloadExcel: downloadSalesExcel,
       dataCount: salesQuery.data?.length || 0,
+    },
+    {
+      id: "purchases",
+      name: "Compras",
+      icon: ShoppingCart,
+      description: "Reporte de compras a proveedores",
+      onDownloadPDF: downloadPurchasesReport,
+      onDownloadExcel: downloadPurchasesExcel,
+      dataCount: purchasesQuery.data?.length || 0,
     },
     {
       id: "inventory",
       name: "Inventario (Unidades)",
       icon: Package,
       description: "Valoración y análisis del inventario",
-      onDownload: downloadInventoryReport,
+      onDownloadPDF: downloadInventoryReport,
+      onDownloadExcel: downloadInventoryExcel,
       dataCount: inventoryQuery.data?.units?.length || 0,
     },
     {
@@ -141,7 +360,8 @@ export default function Reports() {
       name: "Movimientos",
       icon: Activity,
       description: "Historial de movimientos",
-      onDownload: downloadMovementsReport,
+      onDownloadPDF: downloadMovementsReport,
+      onDownloadExcel: downloadMovementsExcel,
       dataCount: movementsQuery.data?.movements?.length || 0,
     },
     {
@@ -149,7 +369,8 @@ export default function Reports() {
       name: "Finanzas",
       icon: Calendar,
       description: "Transacciones y cierres de caja",
-      onDownload: downloadFinanceReport,
+      onDownloadPDF: downloadFinanceReport,
+      onDownloadExcel: downloadFinanceExcel,
       dataCount: financeQuery.data?.transactions?.length || 0,
     },
     {
@@ -157,7 +378,8 @@ export default function Reports() {
       name: "Clientes",
       icon: Users,
       description: "Lista de clientes registrados",
-      onDownload: downloadCustomersReport,
+      onDownloadPDF: downloadCustomersReport,
+      onDownloadExcel: downloadCustomersExcel,
       dataCount: customersQuery.data?.length || 0,
     },
     {
@@ -165,7 +387,8 @@ export default function Reports() {
       name: "Auditoría",
       icon: History,
       description: "Historial de cambios del sistema",
-      onDownload: downloadAuditReport,
+      onDownloadPDF: downloadAuditReport,
+      onDownloadExcel: downloadAuditExcel,
       dataCount: auditQuery.data?.length || 0,
     },
   ];
@@ -174,7 +397,7 @@ export default function Reports() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight"><span className="text-teal-600">Reportes</span></h1>
-        <p className="text-sm text-slate-500 mt-1.5">Genera y descarga reportes del sistema</p>
+        <p className="text-sm text-slate-500 mt-1.5">Genera y descarga reportes en PDF y Excel del sistema</p>
       </div>
 
       {/* Filtros */}
@@ -206,45 +429,65 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Reportes */}
+      {/* Reportes con Botones Uno al Lado de Otro (PDF y Excel) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {reportTypes.map((report) => (
           <div
             key={report.id}
-            className={`bg-white rounded-lg border p-5 transition-all cursor-pointer ${
+            className={`bg-white rounded-xl border p-5 transition-all cursor-pointer flex flex-col justify-between ${
               selectedReport === report.id
-                ? "border-green-500 shadow-md"
-                : "border-gray-200 hover:border-green-300"
+                ? "border-green-500 shadow-md ring-1 ring-green-500/20"
+                : "border-gray-200 hover:border-green-300 shadow-sm"
             }`}
             onClick={() => setSelectedReport(report.id)}
           >
-            <div className="flex items-start justify-between mb-3">
-              <div
-                className={`p-2 rounded-lg ${
-                  selectedReport === report.id
-                    ? "bg-green-100 text-green-600"
-                    : "bg-gray-100 text-gray-600"
-                }`}
-              >
-                <report.icon size={24} />
+            <div>
+              <div className="flex items-start justify-between mb-3">
+                <div
+                  className={`p-2 rounded-lg ${
+                    selectedReport === report.id
+                      ? "bg-green-100 text-green-600"
+                      : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  <report.icon size={24} />
+                </div>
+                <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                  {report.dataCount} registros
+                </span>
               </div>
-              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">
-                {report.dataCount} registros
-              </span>
+              <h3 className="font-bold text-gray-800 text-base mb-1">{report.name}</h3>
+              <p className="text-sm text-gray-500 mb-4">{report.description}</p>
             </div>
-            <h3 className="font-semibold text-gray-800 mb-1">{report.name}</h3>
-            <p className="text-sm text-gray-500 mb-4">{report.description}</p>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                report.onDownload();
-              }}
-              disabled={isLoading || report.dataCount === 0}
-              className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg transition-colors"
-            >
-              <Download size={16} />
-              Descargar PDF
-            </button>
+
+            {/* BOTONES UNO AL LADO DE OTRO */}
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  report.onDownloadPDF();
+                }}
+                disabled={isLoading || report.dataCount === 0}
+                className="flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 disabled:pointer-events-none"
+                title="Descargar reporte en formato PDF"
+              >
+                <Download size={14} />
+                <span>PDF</span>
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  report.onDownloadExcel();
+                }}
+                disabled={isLoading || report.dataCount === 0}
+                className="flex items-center justify-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-gray-300 text-white py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 disabled:pointer-events-none"
+                title="Descargar reporte en formato Excel .xlsx"
+              >
+                <FileSpreadsheet size={14} />
+                <span>Excel</span>
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -272,6 +515,9 @@ export default function Reports() {
             {selectedReport === "sales" &&
               salesQuery.data?.length === 0 &&
               "No hay ventas en el período seleccionado"}
+            {selectedReport === "purchases" &&
+              purchasesQuery.data?.length === 0 &&
+              "No hay compras en el período seleccionado"}
             {selectedReport === "inventory" &&
               inventoryQuery.data?.units?.length === 0 &&
               "No hay unidades registradas"}
