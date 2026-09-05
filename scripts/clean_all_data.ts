@@ -26,7 +26,7 @@ async function cleanAllData() {
     `);
 
     const [flag]: any = await connection.query(
-      "SELECT `value` FROM systemSettings WHERE `key` = 'initial_clean_wipe_v1' LIMIT 1"
+      "SELECT `value` FROM systemSettings WHERE `key` = 'initial_clean_wipe_v2' LIMIT 1"
     );
 
     if (flag && flag[0]?.value === "true") {
@@ -34,50 +34,71 @@ async function cleanAllData() {
       return;
     }
 
-    console.log("[Clean] Wiping all test and demo data to start fresh...");
+    console.log("[Clean] Wiping ALL test data (Finanzas, Compras, Ventas, Unidades, Pedidos)...");
 
     await connection.query("SET FOREIGN_KEY_CHECKS = 0");
 
     const tablesToClean = [
+      // Ventas & Comprobantes
+      "creditPayments",
+      "accountsReceivable",
       "saleItems",
       "sales",
-      "orderItems",
-      "orders",
-      "repairs",
-      "warranties",
-      "returns",
+      // Finanzas & Caja
+      "deliveryExpenses",
+      "operationalExpenses",
       "financialTransactions",
-      "cashOpenings",
-      "cashClosures",
-      "accountsReceivable",
+      "cash_closures",
+      "cash_openings",
+      "payments",
+      // Compras & Proveedores
       "accountsPayable",
-      "unitEvents",
-      "units",
-      "auditLogs",
-      "generatedCodes",
-      "generatedCodeBatches",
-      "quotationItems",
-      "quotations",
-      "deliveryLoadItems",
-      "deliveryLoads",
       "purchaseItems",
       "purchases",
-      "customers",
       "suppliers",
+      // Equipos & Inventario Unidades
+      "warranties",
+      "returns",
+      "repairs",
+      "unitEvents",
+      "generatedCodes",
+      "generatedCodeBatches",
+      "units",
+      // Pedidos & Logística
       "gpsTracking",
+      "deliveryLoadItems",
+      "deliveryLoads",
+      "delivery_extra_load",
+      "orderItems",
+      "orders",
+      // Cotizaciones
+      "quotationItems",
+      "quotations",
+      // Traspasos & Producción
+      "inventory_transfer_items",
+      "inventory_transfers",
+      "production_inputs",
+      "production_outputs",
+      "production_inventory",
+      "production_batches",
+      // Inventario General & Productos
+      "inventoryMovements",
+      "inventory",
+      "products",
+      // Clientes & Logs
+      "customers",
+      "auditLog",
     ];
 
     for (const table of tablesToClean) {
       try {
-        await connection.query(`TRUNCATE TABLE \`${table}\``);
-        console.log(`[Clean] Truncated table: ${table}`);
-      } catch (err: any) {
+        await connection.query(`DELETE FROM \`${table}\``);
         try {
-          await connection.query(`DELETE FROM \`${table}\``);
-          console.log(`[Clean] Deleted from table: ${table}`);
-        } catch (e: any) {
-          // Table might not exist yet, safe to ignore
-        }
+          await connection.query(`ALTER TABLE \`${table}\` AUTO_INCREMENT = 1`);
+        } catch {}
+        console.log(`[Clean] Wiped table: ${table}`);
+      } catch (err: any) {
+        // Table might not exist yet, safe to ignore
       }
     }
 
@@ -92,16 +113,16 @@ async function cleanAllData() {
       console.log("[Clean] Branch check note:", branchErr);
     }
 
-    // Mark that clean wipe has completed
+    // Mark that clean wipe v2 has completed
     await connection.query(`
       INSERT INTO systemSettings (\`key\`, \`value\`, updatedAt)
-      VALUES ('initial_clean_wipe_v1', 'true', NOW())
+      VALUES ('initial_clean_wipe_v2', 'true', NOW())
       ON DUPLICATE KEY UPDATE \`value\` = 'true', updatedAt = NOW()
     `);
 
     await connection.query("SET FOREIGN_KEY_CHECKS = 1");
 
-    console.log("[Clean] Successfully wiped all test and demo data! The system is now 100% clean for testing.");
+    console.log("[Clean] Successfully wiped all test and demo data! All finances, sales, purchases, and units are 100% clean.");
   } catch (error) {
     console.error("[Clean] Error during data wipe:", error);
     throw error;

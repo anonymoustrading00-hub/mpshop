@@ -171,22 +171,25 @@ export const settingsRouter = router({
       try {
         await conn.query("SET FOREIGN_KEY_CHECKS = 0");
         const tables = [
-          "saleItems", "sales", "orderItems", "orders", "repairs",
-          "warranties", "returns", "financialTransactions", "cashOpenings",
-          "cashClosures", "accountsReceivable", "accountsPayable",
-          "unitEvents", "units", "auditLogs", "generatedCodes",
-          "generatedCodeBatches", "quotationItems", "quotations",
-          "deliveryLoadItems", "deliveryLoads", "purchaseItems",
-          "purchases", "customers", "suppliers", "gpsTracking"
+          "creditPayments", "accountsReceivable", "saleItems", "sales",
+          "deliveryExpenses", "operationalExpenses", "financialTransactions",
+          "cash_closures", "cash_openings", "payments",
+          "accountsPayable", "purchaseItems", "purchases", "suppliers",
+          "warranties", "returns", "repairs", "unitEvents", "generatedCodes",
+          "generatedCodeBatches", "units",
+          "gpsTracking", "deliveryLoadItems", "deliveryLoads", "delivery_extra_load",
+          "orderItems", "orders", "quotationItems", "quotations",
+          "inventory_transfer_items", "inventory_transfers", "production_inputs",
+          "production_outputs", "production_inventory", "production_batches",
+          "inventoryMovements", "inventory", "products", "customers", "auditLog",
         ];
         for (const t of tables) {
           try {
-            await conn.query(`TRUNCATE TABLE \`${t}\``);
-          } catch {
+            await conn.query(`DELETE FROM \`${t}\``);
             try {
-              await conn.query(`DELETE FROM \`${t}\``);
+              await conn.query(`ALTER TABLE \`${t}\` AUTO_INCREMENT = 1`);
             } catch {}
-          }
+          } catch {}
         }
         await conn.query("SET FOREIGN_KEY_CHECKS = 1");
       } finally {
@@ -201,6 +204,10 @@ export const settingsRouter = router({
       if (Array.isArray(db.MOCK_ORDERS)) (db.MOCK_ORDERS as any[]).length = 0;
       if (Array.isArray(db.MOCK_RETURNS)) (db.MOCK_RETURNS as any[]).length = 0;
       if (Array.isArray(db.MOCK_FINANCIAL_TRANSACTIONS)) (db.MOCK_FINANCIAL_TRANSACTIONS as any[]).length = 0;
+      if (Array.isArray(db.MOCK_PURCHASES)) (db.MOCK_PURCHASES as any[]).length = 0;
+      if (Array.isArray(db.MOCK_OPERATIONAL_EXPENSES)) (db.MOCK_OPERATIONAL_EXPENSES as any[]).length = 0;
+      if (Array.isArray(db.MOCK_CASH_OPENINGS)) (db.MOCK_CASH_OPENINGS as any[]).length = 0;
+      if (Array.isArray(db.MOCK_CASH_CLOSURES)) (db.MOCK_CASH_CLOSURES as any[]).length = 0;
     }
 
     return { success: true, message: "Todos los datos de prueba han sido eliminados correctamente." };
