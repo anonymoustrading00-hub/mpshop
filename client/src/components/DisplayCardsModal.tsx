@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
+import bwipjs from "bwip-js";
 
 export interface DisplayCardUnit {
   id: number;
@@ -240,18 +241,23 @@ export function DisplayCardsModal({
     toast.info("Generando archivo PDF de fichas de exhibición...");
 
     try {
-      // Pre-generar QRs en data URLs
-      const qrDataUrls: Record<number, string> = {};
+      // Pre-generar Códigos de Barras (Code 128) en data URLs
+      const barcodeDataUrls: Record<number, string> = {};
       for (const u of unitsToPrint) {
-        const qrContent = u.tiktokUrl || `https://wa.me/${companyPhone.replace(/\D/g, "")}?text=Consulta%20equipo%20${encodeURIComponent(u.code)}%20${encodeURIComponent(u.brand + " " + u.model)}`;
+        const rawCode = (u.code || `EQ-${u.id}`).trim();
         try {
-          qrDataUrls[u.id] = await QRCode.toDataURL(qrContent, {
-            width: 120,
-            margin: 1,
-            color: { dark: "#0f172a", light: "#ffffff" },
+          const canvas = document.createElement("canvas");
+          bwipjs.toCanvas(canvas, {
+            bcid: "code128",
+            text: rawCode,
+            scale: 3,
+            height: 12,
+            includetext: false,
           });
-        } catch {
-          qrDataUrls[u.id] = "";
+          barcodeDataUrls[u.id] = canvas.toDataURL("image/png");
+        } catch (e) {
+          console.error(`Error generando código de barras para ${u.code}`, e);
+          barcodeDataUrls[u.id] = "";
         }
       }
 
@@ -280,74 +286,80 @@ export function DisplayCardsModal({
 
           // Cabecera: Nombre de empresa y Código
           doc.setFillColor(15, 23, 42); // Slate 900
-          doc.roundedRect(2, 2, cardW - 4, 7, 1.5, 1.5, "F");
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(7);
-          doc.setTextColor(255, 255, 255);
-          doc.text(companyName.toUpperCase().slice(0, 26), 4, 6.2);
-
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(7);
-          doc.setTextColor(250, 204, 21); // Amber 400
-          doc.text(unit.code, cardW - 4, 6.2, { align: "right" });
-
-          // Nombre del Equipo (Marca + Modelo)
+          doc.roundedRect(2, 2, cardW - 4, 7.5, 1.5, 1.5, "F");
           doc.setFont("helvetica", "bold");
           doc.setFontSize(8);
+          doc.setTextColor(255, 255, 255);
+          doc.text(companyName.toUpperCase().slice(0, 28), 4, 6.6);
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(8.5);
+          doc.setTextColor(250, 204, 21); // Amber 400
+          doc.text(unit.code, cardW - 4, 6.6, { align: "right" });
+
+          // Nombre del Equipo (Marca + Modelo) - Fuente aumentada
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9.5);
           doc.setTextColor(15, 23, 42);
           const fullName = `${unit.brand} ${unit.model}`;
-          doc.text(fullName.slice(0, 42), 4, 12.5);
+          doc.text(fullName.slice(0, 38), 4, 13.8);
 
           // Línea divisoria
           doc.setDrawColor(226, 232, 240);
           doc.setLineWidth(0.2);
-          doc.line(4, 14.5, cardW - 4, 14.5);
+          doc.line(4, 15.8, cardW - 4, 15.8);
 
-          // Especificaciones Técnicas (renderiza hasta 7 características en 1 o 2 columnas)
+          // Especificaciones Técnicas (fuente aumentada y mejor espaciado)
           const specsList = getSpecsList(unit);
-          let ySpec = 18;
-          doc.setFontSize(6.2);
+          let ySpec = 19.8;
+          doc.setFontSize(7.2);
 
-          specsList.slice(0, 7).forEach((spec) => {
+          specsList.slice(0, 6).forEach((spec) => {
             doc.setFont("helvetica", "bold");
             doc.setTextColor(71, 85, 105); // Slate 600
             doc.text(`${spec.label}:`, 4, ySpec);
 
             doc.setFont("helvetica", "bold");
             doc.setTextColor(15, 23, 42); // Slate 900
-            const maxValLen = 34;
-            doc.text(spec.val.slice(0, maxValLen), 23, ySpec);
+            const maxValLen = 32;
+            doc.text(spec.val.slice(0, maxValLen), 26, ySpec);
 
-            ySpec += 3.8;
+            ySpec += 4.5;
           });
 
-          // Franja Inferior: Precio + Garantía + QR
-          const botY = 49;
+          // Franja Inferior: Precio + Garantía + Código de Barras
+          const botY = 48.5;
+          const botH = 18;
           doc.setFillColor(248, 250, 252); // Slate 50
-          doc.roundedRect(2.5, botY, cardW - 5, 17.5, 1.5, 1.5, "F");
+          doc.roundedRect(2.5, botY, cardW - 5, botH, 1.5, 1.5, "F");
           doc.setDrawColor(226, 232, 240);
-          doc.roundedRect(2.5, botY, cardW - 5, 17.5, 1.5, 1.5, "S");
+          doc.roundedRect(2.5, botY, cardW - 5, botH, 1.5, 1.5, "S");
 
           // Precio
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(5.5);
+          doc.setFontSize(6.5);
           doc.setTextColor(100, 116, 139);
-          doc.text("PRECIO DE OFERTA:", 5, botY + 4.2);
+          doc.text("PRECIO DE OFERTA:", 5, botY + 4.5);
 
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(11.5);
+          doc.setFontSize(13);
           doc.setTextColor(5, 150, 105); // Emerald 600
-          doc.text(`Bs. ${(unit.salePrice / 100).toFixed(2)}`, 5, botY + 10.5);
+          doc.text(`Bs. ${(unit.salePrice / 100).toFixed(2)}`, 5, botY + 11.2);
 
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(5.5);
+          doc.setFontSize(6.5);
           doc.setTextColor(71, 85, 105);
-          doc.text(`Garantía Real: ${unit.warrantyDays || 90} Días`, 5, botY + 15);
+          doc.text(`Garantía Real: ${unit.warrantyDays || 90} Días`, 5, botY + 15.8);
 
-          // QR Code a la derecha
-          const qrImg = qrDataUrls[unit.id];
-          if (qrImg) {
-            doc.addImage(qrImg, "PNG", cardW - 18.5, botY + 1, 15, 15);
+          // Código de barras a la derecha
+          const barcodeImg = barcodeDataUrls[unit.id];
+          if (barcodeImg) {
+            doc.addImage(barcodeImg, "PNG", cardW - 32, botY + 2.2, 28, 9.8);
+            // Texto del código bajo la barra
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(6.2);
+            doc.setTextColor(30, 41, 59);
+            doc.text(unit.code, cardW - 18, botY + 15.5, { align: "center" });
           }
         });
 
@@ -400,74 +412,80 @@ export function DisplayCardsModal({
 
           // Cabecera
           doc.setFillColor(15, 23, 42); // Slate 900
-          doc.roundedRect(x + 1.5, y + 1.5, cardW - 3, 7, 1.5, 1.5, "F");
+          doc.roundedRect(x + 1.5, y + 1.5, cardW - 3, 7.5, 1.5, 1.5, "F");
 
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(7);
+          doc.setFontSize(8);
           doc.setTextColor(255, 255, 255);
-          doc.text(companyName.toUpperCase().slice(0, 32), x + 3.5, y + 5.8);
+          doc.text(companyName.toUpperCase().slice(0, 32), x + 4, y + 6.2);
 
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(7.5);
-          doc.setTextColor(250, 204, 21); // Amber 400
-          doc.text(unit.code, x + cardW - 3.5, y + 5.8, { align: "right" });
-
-          // Nombre de la Laptop / Equipo
           doc.setFont("helvetica", "bold");
           doc.setFontSize(8.5);
+          doc.setTextColor(250, 204, 21); // Amber 400
+          doc.text(unit.code, x + cardW - 4, y + 6.2, { align: "right" });
+
+          // Nombre de la Laptop / Equipo (aumentado a 10pt)
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10);
           doc.setTextColor(15, 23, 42);
           const fullName = `${unit.brand} ${unit.model}`;
-          doc.text(fullName.slice(0, 46), x + 3.5, y + 12.5);
+          doc.text(fullName.slice(0, 42), x + 4, y + 13.5);
 
           // Línea separadora
           doc.setDrawColor(226, 232, 240);
           doc.setLineWidth(0.2);
-          doc.line(x + 3.5, y + 14.5, x + cardW - 3.5, y + 14.5);
+          doc.line(x + 4, y + 15.5, x + cardW - 4, y + 15.5);
 
-          // Especificaciones
+          // Especificaciones (fuente aumentada a 7.5pt y espaciado de 4.3mm)
           const specsList = getSpecsList(unit);
-          let ySpec = y + 18;
-          doc.setFontSize(6.5);
+          let ySpec = y + 19.8;
+          doc.setFontSize(7.5);
 
           specsList.slice(0, 6).forEach((spec) => {
             doc.setFont("helvetica", "bold");
             doc.setTextColor(100, 116, 139);
-            doc.text(`${spec.label}:`, x + 3.5, ySpec);
+            doc.text(`${spec.label}:`, x + 4, ySpec);
 
             doc.setFont("helvetica", "bold");
             doc.setTextColor(15, 23, 42);
-            doc.text(spec.val.slice(0, 42), x + 26, ySpec);
+            doc.text(spec.val.slice(0, 40), x + 29, ySpec);
 
-            ySpec += 3.7;
+            ySpec += 4.3;
           });
 
-          // Franja inferior: Precio + Garantía + QR
-          const botY = y + cardH - 17.5;
+          // Franja inferior: Precio + Garantía + Código de Barras
+          const botH = 16.5;
+          const botY = y + cardH - botH - 2;
           doc.setFillColor(248, 250, 252);
-          doc.roundedRect(x + 2, botY, cardW - 4, 15.5, 1.5, 1.5, "F");
+          doc.roundedRect(x + 2, botY, cardW - 4, botH, 1.5, 1.5, "F");
           doc.setDrawColor(226, 232, 240);
-          doc.roundedRect(x + 2, botY, cardW - 4, 15.5, 1.5, 1.5, "S");
+          doc.roundedRect(x + 2, botY, cardW - 4, botH, 1.5, 1.5, "S");
 
           // Precio
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(5.5);
+          doc.setFontSize(6.5);
           doc.setTextColor(100, 116, 139);
-          doc.text("PRECIO DE OFERTA:", x + 4, botY + 4);
+          doc.text("PRECIO DE OFERTA:", x + 4.5, botY + 4.2);
 
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(11);
+          doc.setFontSize(13);
           doc.setTextColor(5, 150, 105);
-          doc.text(`Bs. ${(unit.salePrice / 100).toFixed(2)}`, x + 4, botY + 9.8);
+          doc.text(`Bs. ${(unit.salePrice / 100).toFixed(2)}`, x + 4.5, botY + 10.5);
 
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(5.2);
+          doc.setFontSize(6.2);
           doc.setTextColor(71, 85, 105);
-          doc.text(`Garantía Real: ${unit.warrantyDays || 90} Días`, x + 4, botY + 13.5);
+          doc.text(`Garantía Real: ${unit.warrantyDays || 90} Días`, x + 4.5, botY + 14.8);
 
-          // QR Code
-          const qrImg = qrDataUrls[unit.id];
-          if (qrImg) {
-            doc.addImage(qrImg, "PNG", x + cardW - 17.5, botY + 0.8, 14, 14);
+          // Código de Barras en lugar del QR
+          const barcodeImg = barcodeDataUrls[unit.id];
+          if (barcodeImg) {
+            // Ancho 33mm, alto 9.5mm
+            doc.addImage(barcodeImg, "PNG", x + cardW - 37, botY + 1.8, 32, 9.5);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(6.5);
+            doc.setTextColor(30, 41, 59);
+            doc.text(unit.code, x + cardW - 21, botY + 14.8, { align: "center" });
           }
         });
 
