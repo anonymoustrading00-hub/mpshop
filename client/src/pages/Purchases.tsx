@@ -229,17 +229,46 @@ export default function Purchases() {
   };
 
   const filteredPurchases = useMemo(() => {
+    console.log('🔍 FILTRO DE COMPRAS - Input:', { 
+      totalPurchases: purchases?.length || 0,
+      filterDateFrom, 
+      filterDateTo,
+      searchQuery,
+      filterPayment
+    });
+    
     if (!purchases) return [];
-    return (purchases as any[]).filter((p: any) => {
+    
+    const filtered = (purchases as any[]).filter((p: any) => {
       const matchesSearch = !searchQuery || 
         p.purchaseNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.supplierName?.toLowerCase().includes(searchQuery.toLowerCase());
+      
       const matchesPayment = filterPayment === "all" || p.paymentMethod === filterPayment || (filterPayment === "credit" && p.isCredit === 1);
+      
       const purchaseDate = p.createdAt ? new Date(p.createdAt) : null;
       const matchesFrom = !filterDateFrom || (purchaseDate && purchaseDate >= new Date(filterDateFrom + "T00:00:00"));
       const matchesTo = !filterDateTo || (purchaseDate && purchaseDate <= new Date(filterDateTo + "T23:59:59"));
+      
+      if (filterDateFrom || filterDateTo) {
+        console.log('📅 Verificando fecha:', {
+          compra: p.purchaseNumber,
+          fecha: purchaseDate?.toISOString(),
+          matchesFrom,
+          matchesTo,
+          pasa: matchesFrom && matchesTo
+        });
+      }
+      
       return matchesSearch && matchesPayment && matchesFrom && matchesTo;
     });
+    
+    console.log('✅ FILTRO RESULTADO:', { 
+      filtradas: filtered.length,
+      total: purchases?.length || 0 
+    });
+    
+    return filtered;
   }, [purchases, searchQuery, filterPayment, filterDateFrom, filterDateTo]);
 
   const totalSpent = useMemo(() => {
