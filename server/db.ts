@@ -721,7 +721,8 @@ export async function createUser(data: any) {
     data.openId = `local_${crypto.randomUUID()}`;
   }
 
-  return await db.insert(users).values(data);
+  const result = await db.insert(users).values(data);
+  return { insertId: result[0]?.insertId || result.insertId };
 }
 
 export async function getAllUsers() {
@@ -865,7 +866,9 @@ export async function createCustomer(data: InsertCustomer) {
     MOCK_CUSTOMERS.push(newCustomer);
     return { insertId: newId };
   }
-  return await db.insert(customers).values(data);
+  
+  const result = await db.insert(customers).values(data);
+  return { insertId: result[0]?.insertId || result.insertId };
 }
 
 export async function updateCustomer(customerId: number, data: Partial<InsertCustomer>) {
@@ -1266,7 +1269,9 @@ export async function createOrder(data: InsertOrder) {
     syncMocksToDisk();
     return { insertId: newId };
   }
-  return await db.insert(orders).values(data);
+  
+  const result = await db.insert(orders).values(data);
+  return { insertId: result[0]?.insertId || result.insertId };
 }
 
 export async function updateOrder(orderId: number, data: Partial<InsertOrder>) {
@@ -1315,7 +1320,9 @@ export async function createDeliveryPerson(data: InsertUser) {
     MOCK_USERS.push(newUser as any);
     return { insertId: newId };
   }
-  return await db.insert(users).values(data);
+  
+  const result = await db.insert(users).values(data);
+  return { insertId: result[0]?.insertId || result.insertId };
 }
 
 export async function updateDeliveryPerson(userId: number, data: Partial<InsertUser>) {
@@ -1459,7 +1466,8 @@ export async function createOrderItem(data: InsertOrderItem) {
   }
 
   try {
-    return await db.insert(orderItems).values(payload);
+    const result = await db.insert(orderItems).values(payload);
+    return { insertId: result[0]?.insertId || result.insertId };
   } catch (err: any) {
     // If unitId or productId column differences occur, try targeted insertion
     if (err?.message?.includes("Unknown column 'unitId'") || err?.sqlMessage?.includes("Unknown column 'unitId'")) {
@@ -1470,7 +1478,8 @@ export async function createOrderItem(data: InsertOrderItem) {
         quantity: payload.quantity || 1,
         price: payload.price,
       };
-      return await db.insert(orderItems).values(fallback as any);
+      const result = await db.insert(orderItems).values(fallback as any);
+      return { insertId: result[0]?.insertId || result.insertId };
     }
     if (err?.message?.includes("productId") || err?.sqlMessage?.includes("productId")) {
       const fallback = {
@@ -1480,7 +1489,8 @@ export async function createOrderItem(data: InsertOrderItem) {
         quantity: payload.quantity || 1,
         price: payload.price,
       };
-      return await db.insert(orderItems).values(fallback as any);
+      const result = await db.insert(orderItems).values(fallback as any);
+      return { insertId: result[0]?.insertId || result.insertId };
     }
     throw err;
   }
@@ -1514,7 +1524,9 @@ export async function updatePayment(paymentId: number, data: any) {
 export async function createGPSTracking(data: InsertGPSTracking) {
   const db = await getDb();
   if (!db) return { insertId: Date.now() };
-  return await db.insert(gpsTracking).values(data);
+  
+  const result = await db.insert(gpsTracking).values(data);
+  return { insertId: result[0]?.insertId || result.insertId };
 }
 
 export async function getLatestGPSTracking(orderId: number) {
@@ -1613,7 +1625,9 @@ export async function createSupplier(data: any) {
     syncMocksToDisk();
     return { insertId: newId };
   }
-  return await db.insert(suppliers).values(data);
+  
+  const result = await db.insert(suppliers).values(data);
+  return { insertId: result[0]?.insertId || result.insertId };
 }
 
 export async function getPurchaseById(id: number) {
@@ -2662,7 +2676,8 @@ export async function createCashOpening(data: InsertCashOpening) {
     return { insertId: newId };
   }
 
-  return await db.insert(cashOpenings).values(data);
+  const result = await db.insert(cashOpenings).values(data);
+  return { insertId: result[0]?.insertId || result.insertId };
 }
 
 export async function updateCashOpeningStatus(id: number, status: string) {
@@ -2780,7 +2795,9 @@ export async function createCashClosure(data: InsertCashClosure) {
     syncMocksToDisk();
     return { insertId: newId };
   }
-  return await db.insert(cashClosures).values(data);
+  
+  const result = await db.insert(cashClosures).values(data);
+  return { insertId: result[0]?.insertId || result.insertId };
 }
 
 export async function getAllCashClosures(branchId?: number) {
@@ -3216,7 +3233,9 @@ export async function createSale(data: InsertSale) {
     });
     return { insertId: newId };
   }
-  return await db.insert(sales).values(data);
+  
+  const result = await db.insert(sales).values(data);
+  return { insertId: result[0]?.insertId || result.insertId };
 }
 
 export async function createSaleItem(data: InsertSaleItem) {
@@ -3234,7 +3253,9 @@ export async function createSaleItem(data: InsertSaleItem) {
     });
     return { insertId: newId };
   }
-  return await db.insert(saleItems).values(data);
+  
+  const result = await db.insert(saleItems).values(data);
+  return { insertId: result[0]?.insertId || result.insertId };
 }
 
 export async function getProductsWithStock() {
@@ -4169,7 +4190,9 @@ export async function createBranch(data: any) {
     syncMocksToDisk();
     return { insertId: newId };
   }
-  return await db.insert(branches).values(data);
+  
+  const result = await db.insert(branches).values(data);
+  return { insertId: result[0]?.insertId || result.insertId };
 }
 
 export async function updateBranch(id: number, data: any) {
