@@ -200,7 +200,6 @@ export const codesRouter = router({
 
       // 2. Generar códigos únicos según tipo y subtipo
       const codeValues = [];
-      const now = new Date();
       for (let i = 0; i < input.quantity; i++) {
         const codeString = generateCodeString(input.type, detectedSubtype);
         codeValues.push({
@@ -208,7 +207,6 @@ export const codesRouter = router({
           type: input.type,
           status: "unassigned" as const,
           batchId,
-          createdAt: now,
         });
       }
 
