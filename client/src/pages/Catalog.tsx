@@ -845,12 +845,7 @@ export default function Catalog() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <a href="/register-unit">
-                  <Button className="gap-2 bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-200">
-                    <Camera className="h-4 w-4" />
-                    Registrar Equipo
-                  </Button>
-                </a>
+                {/* BOTÓN REGISTRAR EQUIPO ELIMINADO */}
                 <Button
                   onClick={() => setIsDisplayCardsOpen(true)}
                   className="gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-md shadow-purple-200"
@@ -1033,12 +1028,7 @@ export default function Catalog() {
                   No hay artículos que coincidan con los filtros seleccionados.
                 </p>
               </div>
-              <a href="/register-unit">
-                <Button className="gap-2 mt-2">
-                  <Camera className="h-4 w-4" />
-                  Registrar primer equipo
-                </Button>
-              </a>
+              {/* BOTÓN REGISTRAR PRIMER EQUIPO ELIMINADO */}
             </div>
           ) : catalogMode === "grouped" ? (
             // ═══════════ VISTA AGRUPADA POR PRODUCTO / MODELO ═══════════
