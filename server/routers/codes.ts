@@ -178,14 +178,14 @@ export const codesRouter = router({
       }
 
       // 1. Registrar el lote
-      const [batchResult] = await db.insert(generatedCodeBatches).values({
+      const batchResult = await db.insert(generatedCodeBatches).values({
         quantity: input.quantity,
         type: input.type,
         createdBy: ctx.user.id,
         notes: input.notes || null,
       });
 
-      const batchId = batchResult?.insertId || batchResult?.[0]?.insertId;
+      const batchId = batchResult[0]?.insertId || batchResult.insertId;
 
       // 2. Generar códigos únicos según tipo y subtipo
       const codeValues = [];

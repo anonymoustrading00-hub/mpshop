@@ -296,7 +296,7 @@ export const warrantiesRouter = router({
         };
       }
 
-      const [result] = await db.insert(warranties).values({
+      const result = await db.insert(warranties).values({
         unitId: input.unitId,
         saleId: input.saleId || null,
         orderId: input.orderId || null,
@@ -308,7 +308,7 @@ export const warrantiesRouter = router({
 
       return {
         success: true,
-        warrantyId: result.insertId,
+        warrantyId: result[0]?.insertId || result.insertId,
         endDate,
       };
     }),

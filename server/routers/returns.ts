@@ -352,7 +352,7 @@ export const returnsRouter = router({
       const [unit] = await db.select().from(units).where(eq(units.id, input.unitId)).limit(1);
       if (!unit) throw new TRPCError({ code: "NOT_FOUND", message: "Unidad no encontrada" });
 
-      const [insertResult] = await db.insert(returns).values({
+      const insertResult = await db.insert(returns).values({
         unitId: input.unitId,
         warrantyId: input.warrantyId || null,
         saleId: input.saleId || null,
@@ -364,7 +364,7 @@ export const returnsRouter = router({
         refundPaymentMethod: input.refundPaymentMethod || null,
       });
 
-      const returnId = insertResult?.insertId || insertResult?.[0]?.insertId;
+      const returnId = insertResult[0]?.insertId || insertResult.insertId;
       const targetStatus = input.reenteredRepair ? "in_repair" : "returned";
       const oldStatus = unit.status;
 

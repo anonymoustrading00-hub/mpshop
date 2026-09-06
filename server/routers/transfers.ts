@@ -241,7 +241,7 @@ export const transfersRouter = router({
       const transferNumber = `TRP-${String(nextNum).padStart(4, "0")}`;
 
       // Insertar el traspaso en estado completed (traspaso directo)
-      const [insertResult] = await db.insert(inventoryTransfers).values({
+      const insertResult = await db.insert(inventoryTransfers).values({
         transferNumber,
         direction: "branch_transfer",
         sourceBranchId: input.sourceBranchId,
@@ -251,7 +251,7 @@ export const transfersRouter = router({
         notes: input.notes || null,
       });
 
-      const transferId = (insertResult as any).insertId || nextNum;
+      const transferId = insertResult[0]?.insertId || insertResult.insertId || nextNum;
 
       // Insertar items del traspaso y actualizar unidades
       for (const unit of selectedUnits) {
