@@ -27,10 +27,12 @@ import { TRPCError } from "@trpc/server";
 
 
 export const financeRouter = router({
-  getTransactions: protectedProcedure.query(async ({ ctx }) => {
-    // Si es repartidor, solo ve las suyas. Si es admin, ve todas.
-    const userId = ctx.user?.role === "admin" ? undefined : ctx.user?.id;
-    const branchId = ctx.branchId;
+  getTransactions: protectedProcedure
+    .input(z.object({ branchId: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      // Si es repartidor, solo ve las suyas. Si es admin, ve todas.
+      const userId = ctx.user?.role === "admin" ? undefined : ctx.user?.id;
+      const branchId = input?.branchId ?? ctx.branchId;
     
     const allTransactions = await getFinancialTransactions(userId, branchId);
     const allOpenings = await getAllCashOpenings();
