@@ -8,6 +8,27 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
 
+// Obtener token CSRF del servidor y mantenerlo actualizado
+let csrfToken: string | null = null;
+
+async function fetchCSRFToken() {
+  try {
+    const response = await fetch("/api/csrf-token", { credentials: "include" });
+    if (response.ok) {
+      const data = await response.json();
+      csrfToken = data.csrfToken;
+    }
+  } catch (error) {
+    console.error("[CSRF] Failed to fetch token:", error);
+  }
+}
+
+// Obtener token inicial
+fetchCSRFToken();
+
+// Renovar token cada 30 minutos
+setInterval(fetchCSRFToken, 30 * 60 * 1000);
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -57,9 +78,17 @@ const trpcClient = trpc.createClient({
       fetch(input, init) {
         const branchId = localStorage.getItem("x-branch-id");
         const headers = new Headers(init?.headers);
+        
+        // Agregar branch ID si existe
         if (branchId) {
           headers.set("x-branch-id", branchId);
         }
+        
+        // Agregar token CSRF para mutaciones
+        if (csrfToken) {
+          headers.set("X-CSRF-Token", csrfToken);
+        }
+        
         return globalThis.fetch(input, {
           ...(init ?? {}),
           headers,

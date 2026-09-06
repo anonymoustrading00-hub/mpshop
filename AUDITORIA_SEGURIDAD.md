@@ -10,13 +10,16 @@
 
 ## 📋 RESUMEN EJECUTIVO
 
-Se ha realizado una auditoría exhaustiva del sistema MP Shop identificando **15 vulnerabilidades críticas** y **22 mejoras recomendadas**. El sistema presenta riesgos de seguridad significativos que deben ser atendidos con prioridad.
+Se ha realizado una auditoría exhaustiva del sistema MP Shop identificando **15 vulnerabilidades** (5 críticas iniciales, 1 ya resuelta). El sistema presenta riesgos de seguridad que están siendo atendidos sistemáticamente.
 
 ### Hallazgos Principales:
-- ✅ **Fortalezas:** Uso de bcrypt, preparación con Drizzle ORM, HTTPS en producción
-- ❌ **Crítico:** Contraseñas hardcodeadas, sesiones sin rotación, falta CSRF
-- ⚠️ **Alto:** SQL dinámico sin sanitización, falta rate limiting
-- 📋 **Medio:** Logs sensibles, falta 2FA, permisos granulares limitados
+- ✅ **Fortalezas:** Uso de bcrypt, preparación con Drizzle ORM, HTTPS en producción, **CSRF implementado**
+- ❌ **Crítico:** Contraseñas hardcodeadas, sesiones sin rotación
+- ⚠️ **Alto:** SQL dinámico sin sanitización, falta rate limiting, falta 2FA
+- 📋 **Medio:** Logs sensibles, permisos granulares limitados
+
+### ✅ **Vulnerabilidad CSRF - RESUELTA**
+La protección CSRF ha sido implementada completamente con tokens HMAC SHA-256, validación automática y renovación periódica.
 
 ---
 
@@ -51,28 +54,37 @@ const isMasterAdmin =
 
 ---
 
-### 2. **Ausencia de Protección CSRF** 🔴 CRÍTICO
-**Descripción:** No se implementan tokens CSRF en formularios y mutaciones
+### 2. **Ausencia de Protección CSRF** ✅ RESUELTO (era 🔴 CRÍTICO)
+**Descripción:** ~~No se implementan tokens CSRF en formularios y mutaciones~~
 
-**Riesgo:**
+**✅ IMPLEMENTADO:**
+- Middleware de generación de tokens CSRF en el servidor
+- Validación automática en todas las mutaciones (POST, PUT, PATCH, DELETE)
+- Tokens con HMAC SHA-256 para seguridad
+- Renovación automática cada 30 minutos en el cliente
+- Endpoint `/api/csrf-token` para obtener tokens
+- Headers `X-CSRF-Token` en todas las requests del cliente
+
+**Archivos:**
+- `server/_core/csrf.ts` - Lógica de generación y validación
+- `server/_core/index.ts` - Integración en Express
+- `client/src/main.tsx` - Inclusión automática en tRPC
+- `client/src/hooks/useCSRF.ts` - Hook para React components
+
+**Protección:**
+- ✅ Generación criptográficamente segura con `crypto.randomBytes`
+- ✅ HMAC SHA-256 para signing
+- ✅ Comparación constant-time contra timing attacks
+- ✅ Expiración y renovación automática
+- ✅ Validación en servidor antes de procesar mutaciones
+
+~~**Riesgo:**
 - Atacante puede ejecutar acciones en nombre del usuario autenticado
 - Posible creación/modificación/eliminación de datos sin consentimiento
-- Transferencias fraudulentas, cambio de permisos
+- Transferencias fraudulentas, cambio de permisos~~
 
-**Impacto:** CRÍTICO  
-**Probabilidad:** MEDIA
-
-**Recomendación:**
-```typescript
-// Implementar middleware CSRF en tRPC
-import { csrf } from '@trpc/server/adapters/express';
-
-// En cada mutación sensible
-.use(csrfMiddleware)
-.mutation(async ({ ctx, input }) => {
-  // Validar token CSRF
-})
-```
+**Impacto:** ~~CRÍTICO~~ → **MITIGADO**  
+**Probabilidad:** ~~MEDIA~~ → **BAJA**
 
 ---
 

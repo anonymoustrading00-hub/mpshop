@@ -6,6 +6,7 @@ import net from "net";
 import multer from "multer";
 import mysql from "mysql2/promise";
 import path from "path";
+import cookieParser from "cookie-parser";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { drizzle } from "drizzle-orm/mysql2";
 import { migrate } from "drizzle-orm/mysql2/migrator";
@@ -15,6 +16,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import * as schema from "../../drizzle/schema";
 import { ensureTables } from "../../scripts/ensure_tables";
+import { csrfMiddleware, validateCSRF, getCSRFTokenEndpoint } from "./csrf";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -127,10 +129,18 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
   const uploadsDir = path.resolve(process.cwd(), "uploads");
+  
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.use(cookieParser()); // Required for CSRF protection
   app.use("/uploads", express.static(uploadsDir));
+
+  // CSRF Protection Middleware (generar tokens)
+  app.use(csrfMiddleware);
+  
+  // Endpoint para obtener token CSRF
+  app.get("/api/csrf-token", getCSRFTokenEndpoint);
 
   const kefirControlDir = path.resolve(
     process.cwd(),
@@ -1152,9 +1162,10 @@ async function startServer() {
 
   console.log(`[App] Version ${APP_VERSION} starting...`);
 
-  // tRPC API
+  // tRPC API con validación CSRF
   app.use(
     "/api/trpc",
+    validateCSRF, // Validar CSRF en todas las mutaciones tRPC
     createExpressMiddleware({
       router: appRouter,
       createContext,
