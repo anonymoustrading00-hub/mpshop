@@ -1,6 +1,7 @@
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import QuotationsView from "@/components/QuotationsView";
 import { trpc } from "@/lib/trpc";
@@ -57,6 +58,7 @@ import {
   Info,
   X,
   Download,
+  ScanLine,
 } from "lucide-react";
 import { useBranch } from "@/contexts/BranchContext";
 import jsPDF from "jspdf";
@@ -764,6 +766,31 @@ export default function Sales() {
   const [historyStatus, setHistoryStatus] = useState<"all" | "completed" | "cancelled">("all");
   const productSearchRef = useRef<HTMLInputElement>(null);
 
+  // ── Escáner de código de barras USB ──
+  const [scannerActive, setScannerActive]   = useState(false);
+  const [scannerPulse, setScannerPulse]     = useState(false);
+  const scanInputRef                        = useRef<HTMLInputElement>(null);
+
+  // Cuando el modal de venta está abierto y se activa el escáner,
+  // enfocar el input oculto del escáner para capturar el lector
+  useEffect(() => {
+    if (scannerActive && isCreateOpen) {
+      setTimeout(() => scanInputRef.current?.focus(), 80);
+      // Pulso visual cada 1.5s mientras está activo
+      const interval = setInterval(() => {
+        setScannerPulse(p => !p);
+      }, 750);
+      return () => clearInterval(interval);
+    } else {
+      setScannerPulse(false);
+    }
+  }, [scannerActive, isCreateOpen]);
+
+  // Desactivar escáner cuando se cierra el modal
+  useEffect(() => {
+    if (!isCreateOpen) setScannerActive(false);
+  }, [isCreateOpen]);
+
   const detailQuery = trpc.sales.getDetails.useQuery(
     { saleId: detailSaleId ?? 0 },
     { enabled: isDetailOpen && detailSaleId !== null }
@@ -1117,6 +1144,39 @@ export default function Sales() {
     }
     addProductToCart(toProductShape(nextUnit), forcedPricingType);
   };
+
+  // ── Función que procesa el código del lector USB ──
+  const handleBarcodeScan = useCallback((code: string) => {
+    if (!isCreateOpen) return;
+    const trimmed = code.trim().toLowerCase();
+    if (trimmed.length < 2) return;
+
+    const allItems = unitsList?.items || [];
+    // Buscar por código exacto, número de serie o RMA
+    const found = allItems.find((u: any) =>
+      u.status === "available" && (
+        u.code?.toLowerCase()         === trimmed ||
+        u.serialNumber?.toLowerCase() === trimmed ||
+        u.rmaNumber?.toLowerCase()    === trimmed
+      )
+    );
+
+    if (found) {
+      addProductToCart(toProductShape(found));
+      toast.success(`✅ ${found.brand} ${found.model} agregado al carrito`);
+      // Parpadeo visual de éxito
+      setScannerPulse(true);
+      setTimeout(() => setScannerPulse(false), 400);
+    } else {
+      toast.error(`Código "${code}" no encontrado o no disponible`);
+    }
+  }, [isCreateOpen, unitsList, addProductToCart]);
+
+  // Hook global de escáner (captura lecturas desde cualquier parte cuando el modal está abierto)
+  useBarcodeScanner({
+    onScan: handleBarcodeScan,
+    enabled: isCreateOpen && scannerActive,
+  });
 
   const updateCartItem = (productId: number, changes: Partial<CartItem>) => {
     setCartItems((current) =>
@@ -1842,8 +1902,23 @@ export default function Sales() {
               {/* 2. Buscador & Carrito de Productos */}
               <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex-1 min-h-0 flex flex-col overflow-hidden">
                 
-                {/* Buscador de productos */}
-                <div className="relative mb-2 shrink-0">
+                {/* Input oculto para capturar el lector de código de barras */}
+                <input
+                  ref={scanInputRef}
+                  type="text"
+                  className="absolute opacity-0 pointer-events-none w-0 h-0"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const val = (e.target as HTMLInputElement).value.trim();
+                      if (val.length >= 2) handleBarcodeScan(val);
+                      (e.target as HTMLInputElement).value = "";
+                    }
+                  }}
+                  tabIndex={-1}
+                />
+
+                {/* Buscador de productos + Botón escáner */}
+                <div className="flex items-center gap-2 mb-2 shrink-0">
                   <div className="relative flex-1 group">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 group-focus-within:text-slate-900 transition-colors" />
                     <Input
@@ -1875,9 +1950,42 @@ export default function Sales() {
                     </kbd>
                   </div>
 
-                  {/* Resultados de búsqueda flotantes/desplegables */}
+                  {/* ── Botón Escáner parpadeante ── */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !scannerActive;
+                      setScannerActive(next);
+                      if (next) {
+                        toast.success("🔍 Escáner activado — apunta el lector al código de barras");
+                        setTimeout(() => scanInputRef.current?.focus(), 80);
+                      } else {
+                        toast.info("Escáner desactivado");
+                        productSearchRef.current?.focus();
+                      }
+                    }}
+                    title={scannerActive ? "Escáner activo — clic para desactivar" : "Activar escáner de código de barras"}
+                    className={`
+                      relative shrink-0 flex items-center gap-1.5 h-9 px-3 rounded-xl border text-xs font-bold transition-all
+                      ${scannerActive
+                        ? "bg-emerald-500 border-emerald-600 text-white shadow-md shadow-emerald-200"
+                        : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:border-slate-300"
+                      }
+                    `}
+                  >
+                    {/* Punto parpadeante cuando está activo */}
+                    {scannerActive && (
+                      <span className={`absolute -top-1 -right-1 h-3 w-3 rounded-full border-2 border-white ${scannerPulse ? "bg-emerald-400" : "bg-emerald-600"} transition-colors duration-300`} />
+                    )}
+                    <ScanLine className={`h-3.5 w-3.5 ${scannerActive ? "text-white" : "text-slate-500"}`} />
+                    <span className="hidden sm:inline">{scannerActive ? "Leyendo..." : "Escanear"}</span>
+                  </button>
+                </div>
+
+                {/* Resultados de búsqueda flotantes/desplegables */}
+                <div className="relative">
                   {productSearch.trim().length >= 2 && (
-                    <div className="absolute left-0 right-0 top-full mt-1.5 z-40 rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden max-h-52 overflow-y-auto p-2">
+                    <div className="absolute left-0 right-0 top-0 mt-1.5 z-40 rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden max-h-52 overflow-y-auto p-2">
                       {groupedProducts.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {groupedProducts.map((group) => {
