@@ -980,6 +980,174 @@ async function startServer() {
     }
   });
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // RESTAURAR BACKUP — Importa un JSON generado por /api/admin/backup
+  // Uso: POST /api/admin/restore?secret=RESET_SECRET
+  // Body: el archivo JSON del backup (multipart/form-data campo "backup")
+  //       O JSON crudo en el body con Content-Type: application/json
+  // ──────────────────────────────────────────────────────────────────────────
+  app.post("/api/admin/restore", async (req, res) => {
+    const secret = process.env.RESET_SECRET || "mpshop-reset-2024";
+    if (req.query.secret !== secret) {
+      return res.status(403).json({ error: "Clave incorrecta. Agrega ?secret=TU_CLAVE a la URL." });
+    }
+
+    let connection: any;
+    try {
+      const backup = req.body;
+
+      // Validar estructura del backup
+      if (!backup || !backup.modulos) {
+        return res.status(400).json({
+          error: "Estructura de backup inválida. Debe tener la propiedad 'modulos'.",
+          hint: "Usa el archivo generado por /api/admin/backup",
+        });
+      }
+
+      const modulos = backup.modulos;
+      const resultados: Record<string, any> = {};
+
+      // ── MODO DEMO (sin DATABASE_URL) ──
+      if (!process.env.DATABASE_URL) {
+        const db = await import("../db");
+
+        // Orden de restauración (respeta dependencias)
+        const mapeo: Array<{ key: string; mock: any[] }> = [
+          { key: "sucursales",          mock: db.MOCK_BRANCHES },
+          { key: "proveedores",         mock: db.MOCK_SUPPLIERS },
+          { key: "clientes",            mock: db.MOCK_CUSTOMERS },
+          { key: "compras",             mock: db.MOCK_PURCHASES },
+          { key: "items_compras",       mock: db.MOCK_PURCHASE_ITEMS },
+          { key: "inventario",          mock: db.MOCK_UNITS },
+          { key: "eventos_equipos",     mock: db.MOCK_UNIT_EVENTS },
+          { key: "reparaciones",        mock: db.MOCK_REPAIRS },
+          { key: "garantias",           mock: db.MOCK_WARRANTIES },
+          { key: "cotizaciones",        mock: db.MOCK_QUOTATIONS },
+          { key: "items_cotizaciones",  mock: db.MOCK_QUOTATION_ITEMS },
+          { key: "ventas",              mock: db.MOCK_SALES },
+          { key: "items_ventas",        mock: db.MOCK_SALE_ITEMS },
+          { key: "devoluciones",        mock: db.MOCK_RETURNS },
+          { key: "caja_aperturas",      mock: db.MOCK_CASH_OPENINGS },
+          { key: "caja_cierres",        mock: db.MOCK_CASH_CLOSURES },
+          { key: "caja_transacciones",  mock: db.MOCK_FINANCIAL_TRANSACTIONS },
+          { key: "gastos_operativos",   mock: db.MOCK_OPERATIONAL_EXPENSES },
+          { key: "cuentas_por_pagar",   mock: db.MOCK_ACCOUNTS_PAYABLE },
+          { key: "cuentas_por_cobrar",  mock: db.MOCK_ACCOUNTS_RECEIVABLE },
+          { key: "pagos_credito",       mock: db.MOCK_CREDIT_PAYMENTS },
+        ];
+
+        for (const { key, mock } of mapeo) {
+          if (modulos[key]?.datos && Array.isArray(modulos[key].datos)) {
+            mock.length = 0;
+            mock.push(...modulos[key].datos);
+            resultados[key] = { restaurados: mock.length };
+          } else {
+            resultados[key] = { restaurados: 0, omitido: true };
+          }
+        }
+
+        db.syncMocksToDisk();
+
+        return res.json({
+          success: true,
+          message: "✅ Backup restaurado correctamente en modo demo.",
+          backupFecha: backup.meta?.generatedAt || "desconocida",
+          backupVersion: backup.meta?.version || "desconocida",
+          modulos: resultados,
+        });
+      }
+
+      // ── MODO PRODUCCIÓN (con DATABASE_URL) ──
+      const mysql = await import("mysql2/promise");
+      connection = await mysql.default.createConnection(process.env.DATABASE_URL);
+
+      // Deshabilitar FK checks para insertar en cualquier orden
+      await connection.query("SET FOREIGN_KEY_CHECKS = 0");
+
+      // Función helper para restaurar una tabla
+      const restaurarTabla = async (
+        key: string,
+        tabla: string,
+        transformar?: (row: any) => any
+      ) => {
+        if (!modulos[key]?.datos || !Array.isArray(modulos[key].datos)) {
+          resultados[key] = { restaurados: 0, omitido: true };
+          return;
+        }
+
+        const filas: any[] = modulos[key].datos;
+        if (filas.length === 0) {
+          resultados[key] = { restaurados: 0 };
+          return;
+        }
+
+        // Vaciar tabla antes de restaurar
+        try {
+          await connection.query(`TRUNCATE TABLE \`${tabla}\``);
+        } catch { /* tabla puede no existir */ }
+
+        let insertados = 0;
+        for (const fila of filas) {
+          try {
+            const data = transformar ? transformar(fila) : fila;
+            const cols = Object.keys(data).map(c => `\`${c}\``).join(", ");
+            const vals = Object.values(data);
+            const placeholders = vals.map(() => "?").join(", ");
+            await connection.query(
+              `INSERT IGNORE INTO \`${tabla}\` (${cols}) VALUES (${placeholders})`,
+              vals
+            );
+            insertados++;
+          } catch { /* ignorar filas con conflicto */ }
+        }
+
+        resultados[key] = { restaurados: insertados, total: filas.length };
+      };
+
+      // Restaurar en orden (tablas padre antes que hijas)
+      await restaurarTabla("sucursales",         "branches");
+      await restaurarTabla("proveedores",        "suppliers");
+      await restaurarTabla("clientes",           "customers");
+      await restaurarTabla("compras",            "purchases");
+      await restaurarTabla("items_compras",      "purchaseItems");
+      await restaurarTabla("inventario",         "units");
+      await restaurarTabla("eventos_equipos",    "unitEvents");
+      await restaurarTabla("reparaciones",       "repairs");
+      await restaurarTabla("garantias",          "warranties");
+      await restaurarTabla("cotizaciones",       "quotations");
+      await restaurarTabla("items_cotizaciones", "quotationItems");
+      await restaurarTabla("ventas",             "sales");
+      await restaurarTabla("items_ventas",       "saleItems");
+      await restaurarTabla("devoluciones",       "returns");
+      await restaurarTabla("caja_aperturas",     "cashOpenings");
+      await restaurarTabla("caja_cierres",       "cashClosures");
+      await restaurarTabla("caja_transacciones", "financialTransactions");
+      await restaurarTabla("gastos_operativos",  "operationalExpenses");
+      await restaurarTabla("cuentas_por_pagar",  "accountsPayable");
+      await restaurarTabla("cuentas_por_cobrar", "accountsReceivable");
+      await restaurarTabla("pagos_credito",      "creditPayments");
+
+      await connection.query("SET FOREIGN_KEY_CHECKS = 1");
+      await connection.end();
+
+      const totalRestaurados = Object.values(resultados)
+        .reduce((s: number, r: any) => s + (r.restaurados || 0), 0);
+
+      return res.json({
+        success: true,
+        message: `✅ Backup restaurado correctamente. ${totalRestaurados} registros importados.`,
+        backupFecha: backup.meta?.generatedAt || "desconocida",
+        backupVersion: backup.meta?.version || "desconocida",
+        modulos: resultados,
+      });
+
+    } catch (error: any) {
+      console.error("[Restore] Error:", error);
+      try { await connection?.end(); } catch {}
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
 
 
   console.log(`[App] Version ${APP_VERSION} starting...`);
