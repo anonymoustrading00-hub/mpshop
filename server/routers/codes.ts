@@ -237,8 +237,8 @@ export const codesRouter = router({
           quantity: Number(input.quantity),
           type: String(input.type),
         };
-        console.log("[generateBatch] Retornando respuesta:", response);
-        return response;
+        console.log("[generateBatch] Retornando respuesta:", JSON.stringify(response));
+        return JSON.parse(JSON.stringify(response));
       } catch (error) {
         console.error("[generateBatch] Error completo:", error);
         console.error("[generateBatch] Error stack:", error instanceof Error ? error.stack : "No stack");
