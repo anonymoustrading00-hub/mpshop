@@ -22,9 +22,14 @@ import {
   BookOpen,
   ScanLine,
   Settings,
+  Zap,
+  Loader2,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
-import { useState } from "react";
-import { GlobalScanner } from "./GlobalScanner";
+import { useState, useRef, useEffect } from "react";
+import { toast } from "sonner";
+import { Input } from "./ui/input";
 
 /* ─── nav item type ─────────────────────────────────────────────── */
 type NavItem = {
@@ -79,6 +84,118 @@ export const ADMIN_NAV_ROW2: NavItem[] = [
 // Flat list for mobile / command menu
 export const ADMIN_NAV: NavItem[] = [...ADMIN_NAV_ROW1, ...ADMIN_NAV_ROW2];
 
+/* ─── Quick Scanner Input Component ─────────────────────────────── */
+function QuickScannerInput() {
+  const [code, setCode] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [pulse, setPulse] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [, navigate] = useLocation();
+
+  const lookupQuery = trpc.units.getByCode.useQuery(
+    { code: code.trim() },
+    { enabled: false }
+  );
+
+  // Animación de pulso
+  useEffect(() => {
+    const interval = setInterval(() => setPulse(p => !p), 750);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleScan = async (scannedCode: string) => {
+    const trimmed = scannedCode.trim();
+    if (!trimmed || trimmed.length < 2) return;
+
+    setScanning(true);
+
+    try {
+      const res = await lookupQuery.refetch();
+      const data = res.data;
+
+      if (data?.found && data.unit) {
+        const unit = data.unit;
+        
+        if (unit.status !== "available") {
+          toast.error("❌ Equipo no disponible", {
+            description: `${unit.brand} ${unit.model} - Estado: ${unit.status}`,
+            duration: 3000,
+          });
+          setScanning(false);
+          setCode("");
+          return;
+        }
+
+        toast.success("✅ Equipo encontrado", {
+          description: `${unit.brand} ${unit.model} - Abriendo venta...`,
+          duration: 2000,
+        });
+
+        setTimeout(() => {
+          sessionStorage.setItem("quickSaleUnitId", unit.id.toString());
+          sessionStorage.setItem("quickSaleUnitCode", trimmed);
+          navigate("/sales");
+          setCode("");
+          setScanning(false);
+        }, 500);
+
+      } else {
+        toast.error("❌ CÓDIGO NO EXISTE", {
+          description: `El código "${trimmed}" no se encuentra en el inventario`,
+          duration: 3000,
+        });
+        setCode("");
+        setScanning(false);
+      }
+    } catch (err) {
+      toast.error("Error al buscar el código");
+      console.error(err);
+      setCode("");
+      setScanning(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && code.trim()) {
+      handleScan(code.trim());
+    }
+  };
+
+  return (
+    <div className="hidden lg:flex items-center gap-2 h-9 px-3 rounded-full border-2 border-emerald-300 bg-emerald-50/80 relative min-w-[240px] group hover:border-emerald-400 transition-all">
+      {/* Indicador parpadeante */}
+      <div className={`h-2.5 w-2.5 rounded-full transition-all duration-300 shrink-0 ${
+        scanning ? "bg-yellow-500 animate-pulse" : pulse ? "bg-emerald-600 scale-110" : "bg-emerald-400"
+      }`} />
+      
+      {/* Icono */}
+      {scanning ? (
+        <Loader2 className="h-3.5 w-3.5 text-emerald-700 animate-spin" />
+      ) : (
+        <ScanLine className="h-3.5 w-3.5 text-emerald-700" />
+      )}
+      
+      {/* Input */}
+      <input
+        ref={inputRef}
+        type="text"
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={scanning ? "Buscando..." : "Escanear código..."}
+        disabled={scanning}
+        className="flex-1 bg-transparent border-none outline-none text-xs font-mono font-semibold text-emerald-900 placeholder:text-emerald-600 disabled:opacity-50"
+        autoComplete="off"
+      />
+      
+      {/* Badge indicador */}
+      <div className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-md uppercase tracking-wide">
+        {scanning ? "..." : "Venta rápida"}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Tab Link Component ────────────────────────────────────────── */
 function TabLink({ item, active }: { item: NavItem; active: boolean }) {
   const Icon = item.icon;
@@ -110,7 +227,6 @@ export default function AppHeader() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
   const { activeBranchId, setActiveBranchId, branches } = useBranch();
-  const [scannerOpen, setScannerOpen] = useState(false);
   const { data: companyConfig } = trpc.settings.getCompanyConfig.useQuery();
 
   const isAdmin = user?.role === "admin";
@@ -195,17 +311,9 @@ export default function AppHeader() {
               </DropdownMenu>
             </div>
 
-            {/* Scanner button */}
+            {/* Campo de Escáner Rápido */}
             {user?.role === "admin" && (
-              <button
-                onClick={() => setScannerOpen(true)}
-                className="hidden lg:flex items-center gap-2 h-9 px-4 rounded-full border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-900/40 hover:shadow-sm transition-all text-sm text-slate-500 hover:text-slate-900 group"
-                title="Escáner QR global (Ctrl+Shift+S)"
-              >
-                <ScanLine className="h-3.5 w-3.5 group-hover:text-slate-900 transition-colors" />
-                <span>Escanear</span>
-                <kbd className="ml-1 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-mono text-slate-400">⇧S</kbd>
-              </button>
+              <QuickScannerInput />
             )}
 
             {/* Ctrl+K Search Trigger */}
@@ -312,26 +420,9 @@ export default function AppHeader() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-
-          {user?.role === "admin" && (
-            <button
-              onClick={() => setScannerOpen(true)}
-              className="flex items-center justify-center h-9 w-9 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors"
-              title="Escáner QR"
-            >
-              <ScanLine className="h-4 w-4 text-slate-600" />
-            </button>
-          )}
           <MobileMenu />
         </div>
       </div>
-
-
-      {/* GlobalScanner modal */}
-      {user?.role === "admin" && (
-        <GlobalScanner open={scannerOpen} onOpenChange={setScannerOpen} />
-      )}
-
     </header>
   );
 }
