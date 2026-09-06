@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
+import { toPlainObject } from "../_core/serialize";
 import { getDb } from "../db";
 import { generatedCodeBatches, generatedCodes, systemSettings, units, users } from "../../drizzle/schema";
 import { eq, desc, and, sql, inArray } from "drizzle-orm";

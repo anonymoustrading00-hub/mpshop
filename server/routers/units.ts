@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
+import { toPlainObject } from "../_core/serialize";
 import {
   getDb,
   getAllUnits,
@@ -1797,7 +1798,8 @@ export const unitsRouter = router({
         return { success: true };
       }
 
-      const [unit] = await db.select().from(units).where(eq(units.id, input.id)).limit(1);
+      const results = await db.select().from(units).where(eq(units.id, input.id)).limit(1);
+      const unit = toPlainObject(results[0]);
       if (!unit) throw new TRPCError({ code: "NOT_FOUND", message: "Unidad no encontrada" });
 
       // Registrar evento antes de eliminar
