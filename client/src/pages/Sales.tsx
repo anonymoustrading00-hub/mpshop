@@ -769,10 +769,12 @@ export default function Sales() {
   // ── Escáner de código de barras USB ──
   const [scannerActive, setScannerActive]   = useState(false);
   const [scannerPulse, setScannerPulse]     = useState(false);
+  const [lastScanned, setLastScanned]       = useState<string>("");
+  const [scannerValue, setScannerValue]     = useState<string>("");
   const scanInputRef                        = useRef<HTMLInputElement>(null);
 
   // Cuando el modal de venta está abierto y se activa el escáner,
-  // enfocar el input oculto del escáner para capturar el lector
+  // enfocar el input del escáner para capturar el lector
   useEffect(() => {
     if (scannerActive && isCreateOpen) {
       setTimeout(() => scanInputRef.current?.focus(), 80);
@@ -788,7 +790,11 @@ export default function Sales() {
 
   // Desactivar escáner cuando se cierra el modal
   useEffect(() => {
-    if (!isCreateOpen) setScannerActive(false);
+    if (!isCreateOpen) { 
+      setScannerActive(false); 
+      setLastScanned(""); 
+      setScannerValue("");
+    }
   }, [isCreateOpen]);
 
   const detailQuery = trpc.sales.getDetails.useQuery(
@@ -1163,12 +1169,23 @@ export default function Sales() {
 
     if (found) {
       addProductToCart(toProductShape(found));
-      toast.success(`✅ ${found.brand} ${found.model} agregado al carrito`);
+      toast.success(`✅ ${found.brand} ${found.model} agregado al carrito`, {
+        description: `Código: ${code}`,
+        duration: 2000,
+      });
       // Parpadeo visual de éxito
       setScannerPulse(true);
       setTimeout(() => setScannerPulse(false), 400);
+      setScannerValue("");
+      setLastScanned(code);
     } else {
-      toast.error(`Código "${code}" no encontrado o no disponible`);
+      toast.error(`❌ CÓDIGO NO EXISTE`, {
+        description: `El código "${code}" no se encuentra en el inventario o no está disponible`,
+        duration: 4000,
+      });
+      setScannerValue("");
+      // Mantener el foco en el input del escáner
+      setTimeout(() => scanInputRef.current?.focus(), 100);
     }
   }, [isCreateOpen, unitsList, addProductToCart]);
 
@@ -1902,20 +1919,58 @@ export default function Sales() {
               {/* 2. Buscador & Carrito de Productos */}
               <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex-1 min-h-0 flex flex-col overflow-hidden">
                 
-                {/* Input oculto para capturar el lector de código de barras */}
-                <input
-                  ref={scanInputRef}
-                  type="text"
-                  className="absolute opacity-0 pointer-events-none w-0 h-0"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      const val = (e.target as HTMLInputElement).value.trim();
-                      if (val.length >= 2) handleBarcodeScan(val);
-                      (e.target as HTMLInputElement).value = "";
-                    }
-                  }}
-                  tabIndex={-1}
-                />
+                {/* ── Campo de Escáner Visible ── */}
+                {scannerActive && (
+                  <div className="mb-3 p-3 rounded-xl border-2 border-emerald-500 bg-emerald-50/50 relative animate-pulse-slow">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`h-2.5 w-2.5 rounded-full ${scannerPulse ? "bg-emerald-600" : "bg-emerald-400"} transition-colors duration-300`} />
+                      <Label className="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
+                        <ScanLine className="h-4 w-4" />
+                        Escáner Activo - Apunte el lector al código de barras
+                      </Label>
+                    </div>
+                    <Input
+                      ref={scanInputRef}
+                      type="text"
+                      value={scannerValue}
+                      onChange={(e) => setScannerValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const val = scannerValue.trim();
+                          if (val.length >= 2) {
+                            setLastScanned(val);
+                            handleBarcodeScan(val);
+                            setScannerValue("");
+                          }
+                        } else if (e.key === "Escape") {
+                          setScannerActive(false);
+                          setScannerValue("");
+                          productSearchRef.current?.focus();
+                        }
+                      }}
+                      placeholder="Esperando código de barras..."
+                      className="h-11 text-sm font-mono font-bold border-emerald-300 bg-white focus:border-emerald-600 focus:ring-emerald-500"
+                      autoFocus
+                    />
+                    {lastScanned && (
+                      <p className="text-xs text-emerald-600 mt-1.5 font-medium">
+                        Último escaneado: <span className="font-mono font-bold">{lastScanned}</span>
+                      </p>
+                    )}
+                    <button
+                      onClick={() => {
+                        setScannerActive(false);
+                        setScannerValue("");
+                        setLastScanned("");
+                        productSearchRef.current?.focus();
+                      }}
+                      className="absolute top-2 right-2 h-6 w-6 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition-colors"
+                      title="Desactivar escáner (ESC)"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
 
                 {/* Buscador de productos + Botón escáner */}
                 <div className="flex items-center gap-2 mb-2 shrink-0">
