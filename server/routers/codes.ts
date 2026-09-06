@@ -185,10 +185,22 @@ export const codesRouter = router({
         notes: input.notes || null,
       });
 
-      const batchId = batchResult[0]?.insertId || batchResult.insertId;
+      // Extraer insertId de forma segura
+      let batchId: number;
+      if (Array.isArray(batchResult) && batchResult[0]?.insertId) {
+        batchId = batchResult[0].insertId;
+      } else if ((batchResult as any).insertId) {
+        batchId = (batchResult as any).insertId;
+      } else {
+        throw new TRPCError({ 
+          code: "INTERNAL_SERVER_ERROR", 
+          message: "No se pudo obtener el ID del lote generado" 
+        });
+      }
 
       // 2. Generar códigos únicos según tipo y subtipo
       const codeValues = [];
+      const now = new Date();
       for (let i = 0; i < input.quantity; i++) {
         const codeString = generateCodeString(input.type, detectedSubtype);
         codeValues.push({
@@ -196,18 +208,19 @@ export const codesRouter = router({
           type: input.type,
           status: "unassigned" as const,
           batchId,
-          createdAt: new Date(),
+          createdAt: now,
         });
       }
 
       // Insertar masivamente los códigos
       await db.insert(generatedCodes).values(codeValues);
 
+      // Retornar solo valores primitivos serializables
       return {
         success: true,
-        batchId,
-        quantity: input.quantity,
-        type: input.type,
+        batchId: Number(batchId),
+        quantity: Number(input.quantity),
+        type: input.type as string,
       };
     }),
 
