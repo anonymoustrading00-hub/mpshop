@@ -56,7 +56,7 @@ export const ADMIN_NAV_ROW1: NavItem[] = [
   { href: "/units",            label: "Unidades",     icon: Tag,         moduleKey: "units" },
   { href: "/repairs",          label: "Taller",       icon: Package,     moduleKey: "repairs" },
   { href: "/warranties",       label: "Garantías",    icon: Tag,         moduleKey: "warranties" },
-  { href: "/returns",          label: "Devoluciones", icon: Package,     moduleKey: "returns" },
+  // { href: "/returns",          label: "Devoluciones", icon: Package,     moduleKey: "returns" }, // OCULTO
   { href: "/orders",           label: "Pedidos",      icon: ShoppingCart, moduleKey: "orders" },
   { href: "/delivery-load",    label: "Mi Carga",    icon: Package,      moduleKey: "delivery-load" },
   { href: "/generate-codes",   label: "Códigos QR",   icon: Tag,         moduleKey: "generate-codes" },

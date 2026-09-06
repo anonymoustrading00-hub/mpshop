@@ -17,7 +17,7 @@ import Orders from "@/pages/Orders";
 import Units from "@/pages/Units";
 import Repairs from "@/pages/Repairs";
 import Warranties from "@/pages/Warranties";
-import Returns from "@/pages/Returns";
+// import Returns from "@/pages/Returns"; // OCULTO
 import GenerateCodes from "@/pages/GenerateCodes";
 import RegisterUnit from "@/pages/RegisterUnit";
 import Catalog from "@/pages/Catalog";
@@ -168,9 +168,11 @@ function Router() {
           <Route path="/warranties">
             <ProtectedRoute component={Warranties} />
           </Route>
+          {/* RUTA OCULTA - Devoluciones
           <Route path="/returns">
             <ProtectedRoute component={Returns} />
           </Route>
+          */}
           <Route path="/generate-codes">
             <ProtectedRoute component={GenerateCodes} />
           </Route>
