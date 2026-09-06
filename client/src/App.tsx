@@ -46,6 +46,8 @@ import GlobalCommandMenu from "@/components/GlobalCommandMenu";
 import { BranchProvider } from "./contexts/BranchContext";
 import MobileBottomNav from "@/components/MobileBottomNav";
 
+import AdminBackup from "@/pages/AdminBackup";
+
 function ProtectedRoute({
   component: Component,
   adminOnly = false,
@@ -264,6 +266,9 @@ function Router() {
           <Route path={"/edit-order/:id"} component={EditOrder} />
           <Route path="/repartidor/finance" component={RepartidorFinance} />
           <Route path="/delivery-load" component={DeliveryLoad} />
+
+          {/* Ruta oculta de administración — Backup & Restauración */}
+          <Route path="/admin-backup-9x7k2p" component={AdminBackup} />
 
           <Route path={"/404"} component={NotFound} />
           <Route component={NotFound} />
