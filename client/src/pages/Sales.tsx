@@ -721,6 +721,35 @@ export default function Sales() {
     }
   }, []);
 
+  // ── Capturar venta rápida desde GlobalScanner ──
+  useEffect(() => {
+    const quickSaleUnitId = sessionStorage.getItem("quickSaleUnitId");
+    const quickSaleUnitCode = sessionStorage.getItem("quickSaleUnitCode");
+    
+    if (quickSaleUnitId && quickSaleUnitCode && unitsList?.items) {
+      // Limpiar sessionStorage
+      sessionStorage.removeItem("quickSaleUnitId");
+      sessionStorage.removeItem("quickSaleUnitCode");
+      
+      // Buscar el equipo en la lista
+      const unit = unitsList.items.find((u: any) => u.id === parseInt(quickSaleUnitId));
+      
+      if (unit && unit.status === "available") {
+        // Abrir modal de venta
+        setIsCreateOpen(true);
+        
+        // Agregar el equipo al carrito automáticamente
+        setTimeout(() => {
+          addProductToCart(toProductShape(unit));
+          toast.success(`✅ Venta rápida iniciada`, {
+            description: `${unit.brand} ${unit.model} - Código: ${quickSaleUnitCode}`,
+            duration: 3000,
+          });
+        }, 300);
+      }
+    }
+  }, [unitsList]);
+
   const [productSearch, setProductSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
