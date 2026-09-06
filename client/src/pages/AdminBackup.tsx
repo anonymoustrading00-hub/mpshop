@@ -1,7 +1,7 @@
 /**
  * Panel de Administración — Backup & Restauración
  * Ruta oculta: /admin-backup-9x7k2p
- * Solo accesible para administradores
+ * Protegido con contraseña maestra adicional
  */
 import { useState, useRef } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -10,12 +10,14 @@ import {
   Download, Upload, Database, ShieldCheck, AlertTriangle,
   CheckCircle2, Clock, FileJson, RefreshCw, Trash2,
   Building2, Users, ShoppingCart, Package, Wrench,
-  Wallet, BarChart3, Lock, Info, ChevronDown, ChevronUp,
+  Wallet, BarChart3, Lock, Info, ChevronDown, ChevronUp, Eye, EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/currency";
 
 const SECRET = "mpshop-reset-2024";
+const MASTER_PASSWORD = "Jcpepe1234pepe#";
+const MASTER_KEY = "mpshop_backup_auth";
 
 // Módulos que contiene el backup con íconos y colores
 const MODULO_INFO: Record<string, { label: string; icon: any; color: string }> = {
@@ -64,6 +66,14 @@ export default function AdminBackup() {
   const [, navigate] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Autenticación por contraseña maestra ──
+  const [masterInput, setMasterInput]   = useState("");
+  const [showMaster, setShowMaster]     = useState(false);
+  const [masterError, setMasterError]   = useState("");
+  const [masterOk, setMasterOk]         = useState(
+    () => sessionStorage.getItem(MASTER_KEY) === "1"
+  );
+
   // Estados backup
   const [isDownloading, setIsDownloading] = useState(false);
   const [backupData, setBackupData] = useState<any>(null);
@@ -84,6 +94,80 @@ export default function AdminBackup() {
           <Lock className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-black text-slate-900 mb-2">Acceso Restringido</h2>
           <p className="text-slate-500 text-sm">Esta sección es solo para administradores del sistema.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Pantalla de contraseña maestra ──
+  if (!masterOk) {
+    const handleMasterSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (masterInput === MASTER_PASSWORD) {
+        sessionStorage.setItem(MASTER_KEY, "1");
+        setMasterOk(true);
+        setMasterError("");
+      } else {
+        setMasterError("Contraseña incorrecta. Acceso denegado.");
+        setMasterInput("");
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          {/* Logo / Header */}
+          <div className="text-center mb-8">
+            <div className="h-20 w-20 bg-emerald-500/20 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
+              <Database className="h-10 w-10 text-emerald-400" />
+            </div>
+            <h1 className="text-2xl font-black text-white">Panel de Backup</h1>
+            <p className="text-sm text-slate-400 mt-1">MP Shop · Acceso Restringido</p>
+          </div>
+
+          <form onSubmit={handleMasterSubmit} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8 space-y-5">
+            <div className="flex items-center gap-3 mb-2">
+              <Lock className="h-5 w-5 text-amber-400" />
+              <p className="text-sm font-bold text-white">Ingresa la contraseña maestra</p>
+            </div>
+
+            <div className="relative">
+              <input
+                type={showMaster ? "text" : "password"}
+                value={masterInput}
+                onChange={(e) => { setMasterInput(e.target.value); setMasterError(""); }}
+                placeholder="Contraseña maestra..."
+                autoFocus
+                className="w-full px-4 py-3.5 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400 pr-12"
+              />
+              <button
+                type="button"
+                onClick={() => setShowMaster(!showMaster)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+              >
+                {showMaster ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+
+            {masterError && (
+              <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
+                <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
+                <p className="text-xs font-bold text-red-300">{masterError}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={!masterInput}
+              className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 disabled:opacity-40 text-white font-black rounded-xl transition-all shadow-lg shadow-emerald-500/20 text-sm"
+            >
+              Ingresar al Panel
+            </button>
+
+            <p className="text-center text-xs text-slate-600">
+              Acceso exclusivo · MP Shop v1.5.0
+            </p>
+          </form>
         </div>
       </div>
     );
