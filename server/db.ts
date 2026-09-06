@@ -744,7 +744,9 @@ export async function updateUser(id: number, data: any) {
     }
     return { success: false };
   }
-  return await db.update(users).set(data).where(eq(users.id, id));
+  
+  await db.update(users).set(data).where(eq(users.id, id));
+  return { success: true };
 }
 
 export async function deleteUser(id: number) {
@@ -878,7 +880,8 @@ export async function updateCustomer(customerId: number, data: Partial<InsertCus
     return { success: false };
   }
 
-  return await db.update(customers).set(data).where(eq(customers.id, customerId));
+  await db.update(customers).set(data).where(eq(customers.id, customerId));
+  return { success: true };
 }
 
 // =============================================
@@ -955,8 +958,10 @@ export async function deleteUnit(id: number) {
 // Adaptadores de compatibilidad para Unidades (Reemplaza productos e inventario fungible)
 export async function updateProductPrice(unitId: number, price: number) {
   const db = await getDb();
-  if (!db) return;
-  return await db.update(units).set({ salePrice: price }).where(eq(units.id, unitId));
+  if (!db) return { success: false };
+  
+  await db.update(units).set({ salePrice: price }).where(eq(units.id, unitId));
+  return { success: true };
 }
 
 export async function updateProduct(unitId: number, data: any) {
@@ -1290,7 +1295,9 @@ export async function updateOrder(orderId: number, data: Partial<InsertOrder>) {
     }
     return { success: false };
   }
-  return await db.update(orders).set(data).where(eq(orders.id, orderId));
+  
+  await db.update(orders).set(data).where(eq(orders.id, orderId));
+  return { success: true };
 }
 
 // Repartidores
@@ -1320,7 +1327,9 @@ export async function updateDeliveryPerson(userId: number, data: Partial<InsertU
     }
     return { success: true };
   }
-  return await db.update(users).set(data).where(eq(users.id, userId));
+  
+  await db.update(users).set(data).where(eq(users.id, userId));
+  return { success: true };
 }
 
 export async function deleteDeliveryPerson(userId: number) {
@@ -1332,7 +1341,9 @@ export async function deleteDeliveryPerson(userId: number) {
     }
     return { success: true };
   }
-  return await db.delete(users).where(eq(users.id, userId));
+  
+  await db.delete(users).where(eq(users.id, userId));
+  return { success: true };
 }
 
 export async function getOrderById(orderId: number) {
@@ -1486,7 +1497,9 @@ export async function deleteOrderItems(orderId: number) {
     syncMocksToDisk();
     return { success: true };
   }
-  return await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
+  
+  await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
+  return { success: true };
 }
 // Pagos (OBSOLETO - tabla eliminada)
 export async function createPayment(data: any) {
@@ -2660,9 +2673,11 @@ export async function updateCashOpeningStatus(id: number, status: string) {
       MOCK_CASH_OPENINGS[idx].status = status;
       syncMocksToDisk();
     }
-    return;
+    return { success: true };
   }
-  return await db.update(cashOpenings).set({ status }).where(eq(cashOpenings.id, id));
+  
+  await db.update(cashOpenings).set({ status }).where(eq(cashOpenings.id, id));
+  return { success: true };
 }
 
 export async function closeAllActiveOpeningsForUser(userId: number, date: string) {
@@ -2826,7 +2841,9 @@ export async function updateCashClosure(id: number, data: any) {
     }
     return { success: false };
   }
-  return await db.update(cashClosures).set(data).where(eq(cashClosures.id, id));
+  
+  await db.update(cashClosures).set(data).where(eq(cashClosures.id, id));
+  return { success: true };
 }
 
 // Total de órdenes pendientes (no entregadas, no canceladas) por repartidor
@@ -3590,7 +3607,9 @@ export async function updateSale(saleId: number, data: Partial<InsertSale>) {
     MOCK_SALES[index] = { ...MOCK_SALES[index], ...data };
     return { success: true };
   }
-  return await db.update(sales).set(data).where(eq(sales.id, saleId));
+  
+  await db.update(sales).set(data).where(eq(sales.id, saleId));
+  return { success: true };
 }
 
 export async function markSalePaymentCompleted(saleId: number) {
@@ -4164,7 +4183,9 @@ export async function updateBranch(id: number, data: any) {
     }
     return { success: false };
   }
-  return await db.update(branches).set(data).where(eq(branches.id, id));
+  
+  await db.update(branches).set(data).where(eq(branches.id, id));
+  return { success: true };
 }
 
 export async function getBranchById(id: number) {
