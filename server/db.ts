@@ -759,7 +759,9 @@ export async function deleteUser(id: number) {
     }
     return { success: false };
   }
-  return await db.delete(users).where(eq(users.id, id));
+  
+  await db.delete(users).where(eq(users.id, id));
+  return { success: true };
 }
 
 export async function getUserById(id: number) {
@@ -4185,7 +4187,9 @@ export async function deleteBranch(id: number) {
     }
     return { success: false };
   }
-  return await db.delete(branches).where(eq(branches.id, id));
+  
+  await db.delete(branches).where(eq(branches.id, id));
+  return { success: true };
 }
 
 // ----------------------------------------------------
