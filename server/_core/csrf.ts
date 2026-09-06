@@ -61,8 +61,8 @@ function timingSafeEqual(a: Buffer, b: Buffer): boolean {
  * Lo agrega a res.locals para que esté disponible en el contexto
  */
 export function csrfMiddleware(req: Request, res: Response, next: NextFunction) {
-  // Obtener sessionId de la cookie
-  const sessionId = req.cookies?.sessionId || req.headers["x-session-id"] || "anonymous";
+  // Obtener sessionId de la cookie (app_session_id es la cookie de sesión real)
+  const sessionId = req.cookies?.app_session_id || req.cookies?.sessionId || req.headers["x-session-id"] || "anonymous";
   
   // Generar token CSRF
   const csrfToken = generateCSRFToken(sessionId);
@@ -98,8 +98,8 @@ export function validateCSRF(req: Request, res: Response, next: NextFunction) {
     req.body?._csrf ||
     req.query._csrf;
   
-  // Obtener sessionId
-  const sessionId = req.cookies?.sessionId || req.headers["x-session-id"];
+  // Obtener sessionId (app_session_id es la cookie real de sesión)
+  const sessionId = req.cookies?.app_session_id || req.cookies?.sessionId || req.headers["x-session-id"];
   
   if (!sessionId) {
     return res.status(401).json({
@@ -136,7 +136,7 @@ export function validateCSRF(req: Request, res: Response, next: NextFunction) {
  * GET /api/csrf-token
  */
 export function getCSRFTokenEndpoint(req: Request, res: Response) {
-  const sessionId = req.cookies?.sessionId || req.headers["x-session-id"] || "anonymous";
+  const sessionId = req.cookies?.app_session_id || req.cookies?.sessionId || req.headers["x-session-id"] || "anonymous";
   const csrfToken = generateCSRFToken(sessionId);
   
   res.json({
