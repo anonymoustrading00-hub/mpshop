@@ -90,6 +90,7 @@ function QuickScannerInput() {
   const [scanning, setScanning] = useState(false);
   const [pulse, setPulse] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [, navigate] = useLocation();
 
   const lookupQuery = trpc.units.getByCode.useQuery(
@@ -155,11 +156,41 @@ function QuickScannerInput() {
     }
   };
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCode(value);
+
+    // Limpiar timeout anterior
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // Si hay contenido, configurar timeout para búsqueda automática
+    if (value.trim().length >= 2) {
+      timeoutRef.current = setTimeout(() => {
+        handleScan(value);
+      }, 300); // 300ms después de que se deja de escribir
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && code.trim()) {
+      // Limpiar timeout si existe
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
       handleScan(code.trim());
     }
   };
+
+  // Limpiar timeout al desmontar
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="hidden lg:flex items-center gap-2 h-9 px-3 rounded-full border-2 border-emerald-300 bg-emerald-50/80 relative min-w-[240px] group hover:border-emerald-400 transition-all">
@@ -180,7 +211,7 @@ function QuickScannerInput() {
         ref={inputRef}
         type="text"
         value={code}
-        onChange={(e) => setCode(e.target.value)}
+        onChange={handleChange}
         onKeyDown={handleKeyDown}
         placeholder={scanning ? "Buscando..." : "Escanear código..."}
         disabled={scanning}
