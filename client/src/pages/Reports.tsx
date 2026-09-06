@@ -206,6 +206,7 @@ export default function Reports() {
       const pCost = (u.purchasePrice || 0) / 100;
       const sPrice = (u.salePrice || 0) / 100;
       const margin = sPrice - pCost;
+      const marginPct = sPrice > 0 ? ((margin / sPrice) * 100).toFixed(1) + "%" : "0%";
       const purchaseMatch = u.purchaseId ? purchasesQuery.data?.find((p: any) => p.id === u.purchaseId) : null;
       const rawDate = u.purchaseDate || purchaseMatch?.orderDate || purchaseMatch?.createdAt || u.createdAt;
       const purchaseDate = rawDate ? new Date(rawDate) : null;

@@ -648,6 +648,338 @@ async function startServer() {
     }
   });
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // BACKUP MANUAL DE BASE DE DATOS
+  // Descarga todos los datos operativos organizados por módulo en JSON.
+  // Uso: GET /api/admin/backup?secret=RESET_SECRET
+  // ──────────────────────────────────────────────────────────────────────────
+  app.get("/api/admin/backup", async (req, res) => {
+    const secret = process.env.RESET_SECRET || "mpshop-reset-2024";
+    if (req.query.secret !== secret) {
+      return res.status(403).json({ error: "Clave incorrecta. Agrega ?secret=TU_CLAVE a la URL." });
+    }
+
+    let connection: any;
+    try {
+      // ── MODO DEMO (sin DATABASE_URL) ──
+      if (!process.env.DATABASE_URL) {
+        const {
+          MOCK_UNITS, MOCK_SALES, MOCK_SALE_ITEMS, MOCK_PURCHASES, MOCK_PURCHASE_ITEMS,
+          MOCK_CUSTOMERS, MOCK_SUPPLIERS, MOCK_REPAIRS, MOCK_WARRANTIES, MOCK_RETURNS,
+          MOCK_FINANCIAL_TRANSACTIONS, MOCK_CASH_CLOSURES, MOCK_CASH_OPENINGS,
+          MOCK_OPERATIONAL_EXPENSES, MOCK_ACCOUNTS_PAYABLE, MOCK_ACCOUNTS_RECEIVABLE,
+          MOCK_CREDIT_PAYMENTS, MOCK_QUOTATIONS, MOCK_QUOTATION_ITEMS,
+          MOCK_UNIT_EVENTS, MOCK_USERS, MOCK_BRANCHES,
+        } = await import("../db");
+
+        const backup = {
+          meta: {
+            version: APP_VERSION,
+            generatedAt: new Date().toISOString(),
+            mode: "demo",
+            description: "Backup manual MP Shop — Modo Demo",
+          },
+          modulos: {
+            inventario: {
+              descripcion: "Equipos registrados en el sistema",
+              total: (MOCK_UNITS as any[]).length,
+              datos: MOCK_UNITS,
+            },
+            ventas: {
+              descripcion: "Historial completo de ventas",
+              total: (MOCK_SALES as any[]).length,
+              datos: MOCK_SALES,
+            },
+            items_ventas: {
+              descripcion: "Detalle de equipos por venta",
+              total: (MOCK_SALE_ITEMS as any[]).length,
+              datos: MOCK_SALE_ITEMS,
+            },
+            cotizaciones: {
+              descripcion: "Cotizaciones generadas",
+              total: (MOCK_QUOTATIONS as any[]).length,
+              datos: MOCK_QUOTATIONS,
+            },
+            compras: {
+              descripcion: "Historial de compras a proveedores",
+              total: (MOCK_PURCHASES as any[]).length,
+              datos: MOCK_PURCHASES,
+            },
+            items_compras: {
+              descripcion: "Detalle de items por compra",
+              total: (MOCK_PURCHASE_ITEMS as any[]).length,
+              datos: MOCK_PURCHASE_ITEMS,
+            },
+            proveedores: {
+              descripcion: "Proveedores registrados",
+              total: (MOCK_SUPPLIERS as any[]).length,
+              datos: MOCK_SUPPLIERS,
+            },
+            clientes: {
+              descripcion: "Clientes registrados",
+              total: (MOCK_CUSTOMERS as any[]).length,
+              datos: MOCK_CUSTOMERS,
+            },
+            reparaciones: {
+              descripcion: "Órdenes de reparación",
+              total: (MOCK_REPAIRS as any[]).length,
+              datos: MOCK_REPAIRS,
+            },
+            garantias: {
+              descripcion: "Garantías registradas",
+              total: (MOCK_WARRANTIES as any[]).length,
+              datos: MOCK_WARRANTIES,
+            },
+            devoluciones: {
+              descripcion: "Devoluciones procesadas",
+              total: (MOCK_RETURNS as any[]).length,
+              datos: MOCK_RETURNS,
+            },
+            caja_transacciones: {
+              descripcion: "Transacciones financieras (ingresos y egresos)",
+              total: (MOCK_FINANCIAL_TRANSACTIONS as any[]).length,
+              datos: MOCK_FINANCIAL_TRANSACTIONS,
+            },
+            caja_cierres: {
+              descripcion: "Cierres de caja",
+              total: (MOCK_CASH_CLOSURES as any[]).length,
+              datos: MOCK_CASH_CLOSURES,
+            },
+            caja_aperturas: {
+              descripcion: "Aperturas de caja",
+              total: (MOCK_CASH_OPENINGS as any[]).length,
+              datos: MOCK_CASH_OPENINGS,
+            },
+            gastos_operativos: {
+              descripcion: "Gastos operativos registrados",
+              total: (MOCK_OPERATIONAL_EXPENSES as any[]).length,
+              datos: MOCK_OPERATIONAL_EXPENSES,
+            },
+            cuentas_por_pagar: {
+              descripcion: "Cuentas pendientes de pago a proveedores",
+              total: (MOCK_ACCOUNTS_PAYABLE as any[]).length,
+              datos: MOCK_ACCOUNTS_PAYABLE,
+            },
+            cuentas_por_cobrar: {
+              descripcion: "Cuentas pendientes de cobro a clientes",
+              total: (MOCK_ACCOUNTS_RECEIVABLE as any[]).length,
+              datos: MOCK_ACCOUNTS_RECEIVABLE,
+            },
+            pagos_credito: {
+              descripcion: "Pagos realizados de créditos",
+              total: (MOCK_CREDIT_PAYMENTS as any[]).length,
+              datos: MOCK_CREDIT_PAYMENTS,
+            },
+            eventos_equipos: {
+              descripcion: "Historial de estados por equipo",
+              total: (MOCK_UNIT_EVENTS as any[]).length,
+              datos: MOCK_UNIT_EVENTS,
+            },
+            sucursales: {
+              descripcion: "Sucursales configuradas",
+              total: (MOCK_BRANCHES as any[]).length,
+              datos: MOCK_BRANCHES,
+            },
+            usuarios: {
+              descripcion: "Usuarios del sistema (sin contraseñas)",
+              total: (MOCK_USERS as any[]).length,
+              datos: (MOCK_USERS as any[]).map((u: any) => ({
+                id: u.id, username: u.username, name: u.name,
+                email: u.email, role: u.role, createdAt: u.createdAt,
+              })),
+            },
+          },
+        };
+
+        const filename = `mpshop-backup-demo-${new Date().toISOString().slice(0, 10)}.json`;
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        return res.json(backup);
+      }
+
+      // ── MODO PRODUCCIÓN (con DATABASE_URL) ──
+      const mysql = await import("mysql2/promise");
+      connection = await mysql.default.createConnection(process.env.DATABASE_URL);
+
+      const queryTable = async (table: string) => {
+        try {
+          const [rows] = await connection.query(`SELECT * FROM \`${table}\``);
+          return rows as any[];
+        } catch {
+          return [];
+        }
+      };
+
+      const [
+        units, sales, saleItems, quotations, quotationItems,
+        purchases, purchaseItems, suppliers, customers,
+        repairs, warranties, returns_,
+        transactions, closures, openings, opExpenses,
+        accountsPayable, accountsReceivable, creditPayments,
+        unitEvents, branches, users,
+      ] = await Promise.all([
+        queryTable("units"),
+        queryTable("sales"),
+        queryTable("saleItems"),
+        queryTable("quotations"),
+        queryTable("quotationItems"),
+        queryTable("purchases"),
+        queryTable("purchaseItems"),
+        queryTable("suppliers"),
+        queryTable("customers"),
+        queryTable("repairs"),
+        queryTable("warranties"),
+        queryTable("returns"),
+        queryTable("financialTransactions"),
+        queryTable("cashClosures"),
+        queryTable("cashOpenings"),
+        queryTable("operationalExpenses"),
+        queryTable("accountsPayable"),
+        queryTable("accountsReceivable"),
+        queryTable("creditPayments"),
+        queryTable("unitEvents"),
+        queryTable("branches"),
+        queryTable("users"),
+      ]);
+
+      const backup = {
+        meta: {
+          version: APP_VERSION,
+          generatedAt: new Date().toISOString(),
+          mode: "production",
+          description: "Backup manual MP Shop — Base de datos producción",
+        },
+        modulos: {
+          inventario: {
+            descripcion: "Equipos registrados en el sistema",
+            total: units.length,
+            datos: units,
+          },
+          ventas: {
+            descripcion: "Historial completo de ventas",
+            total: sales.length,
+            datos: sales,
+          },
+          items_ventas: {
+            descripcion: "Detalle de equipos por venta",
+            total: saleItems.length,
+            datos: saleItems,
+          },
+          cotizaciones: {
+            descripcion: "Cotizaciones generadas",
+            total: quotations.length,
+            datos: quotations,
+          },
+          items_cotizaciones: {
+            descripcion: "Detalle de items por cotización",
+            total: quotationItems.length,
+            datos: quotationItems,
+          },
+          compras: {
+            descripcion: "Historial de compras a proveedores",
+            total: purchases.length,
+            datos: purchases,
+          },
+          items_compras: {
+            descripcion: "Detalle de items por compra",
+            total: purchaseItems.length,
+            datos: purchaseItems,
+          },
+          proveedores: {
+            descripcion: "Proveedores registrados",
+            total: suppliers.length,
+            datos: suppliers,
+          },
+          clientes: {
+            descripcion: "Clientes registrados",
+            total: customers.length,
+            datos: customers,
+          },
+          reparaciones: {
+            descripcion: "Órdenes de reparación",
+            total: repairs.length,
+            datos: repairs,
+          },
+          garantias: {
+            descripcion: "Garantías registradas",
+            total: warranties.length,
+            datos: warranties,
+          },
+          devoluciones: {
+            descripcion: "Devoluciones procesadas",
+            total: returns_.length,
+            datos: returns_,
+          },
+          caja_transacciones: {
+            descripcion: "Transacciones financieras (ingresos y egresos)",
+            total: transactions.length,
+            datos: transactions,
+          },
+          caja_cierres: {
+            descripcion: "Cierres de caja",
+            total: closures.length,
+            datos: closures,
+          },
+          caja_aperturas: {
+            descripcion: "Aperturas de caja",
+            total: openings.length,
+            datos: openings,
+          },
+          gastos_operativos: {
+            descripcion: "Gastos operativos registrados",
+            total: opExpenses.length,
+            datos: opExpenses,
+          },
+          cuentas_por_pagar: {
+            descripcion: "Cuentas pendientes de pago a proveedores",
+            total: accountsPayable.length,
+            datos: accountsPayable,
+          },
+          cuentas_por_cobrar: {
+            descripcion: "Cuentas pendientes de cobro a clientes",
+            total: accountsReceivable.length,
+            datos: accountsReceivable,
+          },
+          pagos_credito: {
+            descripcion: "Pagos realizados de créditos",
+            total: creditPayments.length,
+            datos: creditPayments,
+          },
+          eventos_equipos: {
+            descripcion: "Historial de estados por equipo",
+            total: unitEvents.length,
+            datos: unitEvents,
+          },
+          sucursales: {
+            descripcion: "Sucursales configuradas",
+            total: branches.length,
+            datos: branches,
+          },
+          usuarios: {
+            descripcion: "Usuarios del sistema (sin contraseñas)",
+            total: users.length,
+            datos: users.map((u: any) => ({
+              id: u.id, username: u.username, name: u.name,
+              email: u.email, role: u.role, createdAt: u.createdAt,
+            })),
+          },
+        },
+      };
+
+      await connection.end();
+
+      const filename = `mpshop-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      return res.json(backup);
+
+    } catch (error: any) {
+      console.error("[Backup] Error:", error);
+      try { await connection?.end(); } catch {}
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
 
 
   console.log(`[App] Version ${APP_VERSION} starting...`);

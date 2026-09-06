@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { QrCode, Search, CheckCircle, AlertTriangle, Plus, Minus, Laptop, Trash2, Camera, ImagePlus, X, Smartphone, Tablet, Monitor, Plug, Package, MoreHorizontal, Wallet, Landmark, Video, ExternalLink, Play, Boxes, Layers, Calculator, Printer, Clock } from "lucide-react";
+import { QrCode, Search, CheckCircle, AlertTriangle, Plus, Minus, Laptop, Trash2, Camera, ImagePlus, X, XCircle, Smartphone, Tablet, Monitor, Plug, Package, MoreHorizontal, Wallet, Landmark, Video, ExternalLink, Play, Boxes, Layers, Calculator, Printer, Clock } from "lucide-react";
 import { useLocation } from "wouter";
 import { formatCurrency } from "@/lib/currency";
 import { useBranch } from "@/contexts/BranchContext";
