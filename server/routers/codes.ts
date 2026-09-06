@@ -130,96 +130,119 @@ export const codesRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Extraer subtipo de input o de las notas ej "[EAN13]"
-      let detectedSubtype = input.subtype;
-      if (!detectedSubtype && input.notes) {
-        const n = input.notes.toUpperCase();
-        if (n.includes("[EAN13]")) detectedSubtype = "ean13";
-        else if (n.includes("[UPCA]")) detectedSubtype = "upca";
-        else if (n.includes("[CODE39]")) detectedSubtype = "code39";
-        else if (n.includes("[CODE128]")) detectedSubtype = "code128";
-      }
+      try {
+        console.log("[generateBatch] Inicio:", { 
+          quantity: input.quantity, 
+          type: input.type, 
+          subtype: input.subtype,
+          userId: ctx.user.id 
+        });
 
-      const db = await getDb();
-      if (!db) {
-        const batchId = MOCK_BATCHES.length + 1;
+        // Extraer subtipo de input o de las notas ej "[EAN13]"
+        let detectedSubtype = input.subtype;
+        if (!detectedSubtype && input.notes) {
+          const n = input.notes.toUpperCase();
+          if (n.includes("[EAN13]")) detectedSubtype = "ean13";
+          else if (n.includes("[UPCA]")) detectedSubtype = "upca";
+          else if (n.includes("[CODE39]")) detectedSubtype = "code39";
+          else if (n.includes("[CODE128]")) detectedSubtype = "code128";
+        }
 
+        const db = await getDb();
+        if (!db) {
+          const batchId = MOCK_BATCHES.length + 1;
+
+          for (let i = 0; i < input.quantity; i++) {
+            const codeString = generateCodeString(input.type, detectedSubtype);
+            MOCK_CODES.push({
+              id: MOCK_CODES.length + 1,
+              code: codeString,
+              type: input.type,
+              status: "unassigned" as const,
+              batchId,
+              assignedUnitId: null,
+              assignedAt: null,
+              createdAt: new Date(),
+            });
+          }
+
+          const batchObj = {
+            id: batchId,
+            quantity: input.quantity,
+            type: input.type,
+            createdBy: ctx.user?.id || 1,
+            creatorName: ctx.user?.name || "Administrador",
+            notes: input.notes || null,
+            createdAt: new Date(),
+          };
+          MOCK_BATCHES.unshift(batchObj);
+
+          return {
+            success: true,
+            batchId,
+            quantity: input.quantity,
+            type: input.type,
+          };
+        }
+
+        // 1. Registrar el lote
+        console.log("[generateBatch] Insertando batch...");
+        const batchResult = await db.insert(generatedCodeBatches).values({
+          quantity: input.quantity,
+          type: input.type,
+          createdBy: ctx.user.id,
+          notes: input.notes || null,
+        });
+        console.log("[generateBatch] Batch insertado:", batchResult);
+
+        // Extraer insertId de forma segura
+        let batchId: number;
+        if (Array.isArray(batchResult) && batchResult[0]?.insertId) {
+          batchId = batchResult[0].insertId;
+        } else if ((batchResult as any).insertId) {
+          batchId = (batchResult as any).insertId;
+        } else {
+          console.error("[generateBatch] No se pudo extraer insertId:", batchResult);
+          throw new TRPCError({ 
+            code: "INTERNAL_SERVER_ERROR", 
+            message: "No se pudo obtener el ID del lote generado" 
+          });
+        }
+        console.log("[generateBatch] BatchId extraído:", batchId);
+
+        // 2. Generar códigos únicos según tipo y subtipo
+        console.log("[generateBatch] Generando códigos...");
+        const codeValues = [];
         for (let i = 0; i < input.quantity; i++) {
           const codeString = generateCodeString(input.type, detectedSubtype);
-          MOCK_CODES.push({
-            id: MOCK_CODES.length + 1,
+          codeValues.push({
             code: codeString,
             type: input.type,
             status: "unassigned" as const,
             batchId,
-            assignedUnitId: null,
-            assignedAt: null,
-            createdAt: new Date(),
           });
         }
+        console.log("[generateBatch] Códigos generados:", codeValues.length);
 
-        const batchObj = {
-          id: batchId,
-          quantity: input.quantity,
-          type: input.type,
-          createdBy: ctx.user?.id || 1,
-          creatorName: ctx.user?.name || "Administrador",
-          notes: input.notes || null,
-          createdAt: new Date(),
-        };
-        MOCK_BATCHES.unshift(batchObj);
+        // Insertar masivamente los códigos
+        console.log("[generateBatch] Insertando códigos...");
+        await db.insert(generatedCodes).values(codeValues);
+        console.log("[generateBatch] Códigos insertados");
 
-        return {
+        // Retornar solo valores primitivos serializables
+        const response = {
           success: true,
-          batchId,
-          quantity: input.quantity,
-          type: input.type,
+          batchId: Number(batchId),
+          quantity: Number(input.quantity),
+          type: String(input.type),
         };
+        console.log("[generateBatch] Retornando respuesta:", response);
+        return response;
+      } catch (error) {
+        console.error("[generateBatch] Error completo:", error);
+        console.error("[generateBatch] Error stack:", error instanceof Error ? error.stack : "No stack");
+        throw error;
       }
-
-      // 1. Registrar el lote
-      const batchResult = await db.insert(generatedCodeBatches).values({
-        quantity: input.quantity,
-        type: input.type,
-        createdBy: ctx.user.id,
-        notes: input.notes || null,
-      });
-
-      // Extraer insertId de forma segura
-      let batchId: number;
-      if (Array.isArray(batchResult) && batchResult[0]?.insertId) {
-        batchId = batchResult[0].insertId;
-      } else if ((batchResult as any).insertId) {
-        batchId = (batchResult as any).insertId;
-      } else {
-        throw new TRPCError({ 
-          code: "INTERNAL_SERVER_ERROR", 
-          message: "No se pudo obtener el ID del lote generado" 
-        });
-      }
-
-      // 2. Generar códigos únicos según tipo y subtipo
-      const codeValues = [];
-      for (let i = 0; i < input.quantity; i++) {
-        const codeString = generateCodeString(input.type, detectedSubtype);
-        codeValues.push({
-          code: codeString,
-          type: input.type,
-          status: "unassigned" as const,
-          batchId,
-        });
-      }
-
-      // Insertar masivamente los códigos
-      await db.insert(generatedCodes).values(codeValues);
-
-      // Retornar solo valores primitivos serializables
-      return {
-        success: true,
-        batchId: Number(batchId),
-        quantity: Number(input.quantity),
-        type: input.type as string,
-      };
     }),
 
 
