@@ -22,6 +22,12 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   // Solo cargar sucursales cuando el usuario esté autenticado
   const { data: branches = [], isLoading } = trpc.branches.list.useQuery(undefined, {
     enabled: !!user, // Solo ejecutar query si hay usuario
+    onSuccess: (data) => {
+      console.log("[BranchContext] 📥 Branches loaded:", data?.map((b: any) => ({ id: b.id, name: b.name })));
+    },
+    onError: (error) => {
+      console.error("[BranchContext] ❌ Failed to load branches:", error);
+    },
   });
 
   // Efecto para inicializar la sucursal activa cuando el usuario carga

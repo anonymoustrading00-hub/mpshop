@@ -285,6 +285,9 @@ export default function AppHeader() {
   const initial = user?.name?.charAt(0).toUpperCase() ?? "U";
 
   const activeBranch = branches.find(b => b.id === activeBranchId) || branches[0];
+  
+  // Determinar qué mostrar en el selector
+  const branchDisplayName = activeBranch?.name || (activeBranchId > 0 ? `Sucursal #${activeBranchId}` : "Seleccionar Sucursal");
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-2xl border-b border-slate-200/80 shadow-[0_4px_20px_-10px_rgba(15,23,42,0.1)]">
@@ -324,7 +327,7 @@ export default function AppHeader() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="h-9 gap-2 border-slate-200 font-semibold bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900">
                     <Store className="h-4 w-4 text-primary" />
-                    {activeBranch?.name || "Seleccionar Sucursal"}
+                    {branchDisplayName}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
