@@ -81,6 +81,42 @@ export const appRouter = router({
           },
         };
       }),
+    
+    verifyAdminCredentials: publicProcedure
+      .input(
+        z.object({
+          username: z.string().min(1),
+          password: z.string().min(1),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const user = await authenticateUser(input.username, input.password);
+
+        if (!user) {
+          return {
+            valid: false,
+            message: "Usuario o contraseña incorrectos",
+          };
+        }
+
+        if (user.role !== "admin") {
+          return {
+            valid: false,
+            message: "Solo los administradores pueden cambiar de sucursal",
+          };
+        }
+
+        return {
+          valid: true,
+          message: "Credenciales válidas",
+          user: {
+            id: user.id,
+            username: user.username,
+            name: user.name,
+            role: user.role,
+          },
+        };
+      }),
   }),
 
   orders: ordersRouter,
