@@ -22,8 +22,9 @@
     "db:seed-devices": "tsx scripts/seed_device_catalogs.ts",
     "db:fix-units": "tsx scripts/fix_units_table.ts",
     "db:fix-columns": "tsx scripts/fix_missing_columns.ts",
+    "db:remove-code-unique": "tsx scripts/remove-code-unique-constraint.ts",
     "db:unify-codes": "tsx scripts/unify-fungible-codes.ts",
-    "railway:predeploy": "pnpm run db:ensure-tables && pnpm run db:fix-columns && pnpm run db:clean-data && pnpm run db:seed-admin && pnpm run db:unify-codes",
+    "railway:predeploy": "pnpm run db:ensure-tables && pnpm run db:fix-columns && pnpm run db:clean-data && pnpm run db:seed-admin && pnpm run db:remove-code-unique && pnpm run db:unify-codes",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {
