@@ -268,10 +268,18 @@ export const usersRouter = router({
         loginMethod: "traditional",
       });
 
+      // Extraer el insertId de forma segura
+      let userId: number | undefined;
+      if (Array.isArray(result) && result.length > 0 && typeof result[0] === 'object' && 'insertId' in result[0]) {
+        userId = Number(result[0].insertId);
+      } else if (result && typeof result === 'object' && 'insertId' in result) {
+        userId = Number((result as any).insertId);
+      }
+
       return {
         success: true,
         message: "Usuario creado exitosamente con permisos asignados",
-        userId: Array.isArray(result) && result.length > 0 ? result[0].insertId : (result as any)?.insertId,
+        userId,
       };
     }),
 
@@ -465,9 +473,17 @@ export const usersRouter = router({
         loginMethod: "traditional",
       });
 
+      // Extraer el insertId de forma segura
+      let userId: number | undefined;
+      if (Array.isArray(result) && result.length > 0 && typeof result[0] === 'object' && 'insertId' in result[0]) {
+        userId = Number(result[0].insertId);
+      } else if (result && typeof result === 'object' && 'insertId' in result) {
+        userId = Number((result as any).insertId);
+      }
+
       return {
         success: true,
-        userId: Array.isArray(result) && result.length > 0 ? result[0].insertId : (result as any)?.insertId,
+        userId,
       };
     }),
 });
