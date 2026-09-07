@@ -741,13 +741,11 @@ export async function updateUser(id: number, data: any) {
       MOCK_USERS[index] = { ...MOCK_USERS[index], ...data, updatedAt: new Date() };
       syncMocksToDisk();
       console.log("[DB] Demo Mode: User updated in memory", id);
-      return { success: true };
     }
-    return { success: false };
+    return;
   }
   
   await db.update(users).set(data).where(eq(users.id, id));
-  return { success: true };
 }
 
 export async function deleteUser(id: number) {
@@ -758,13 +756,11 @@ export async function deleteUser(id: number) {
       MOCK_USERS.splice(index, 1);
       syncMocksToDisk();
       console.log("[DB] Demo Mode: User deleted from memory", id);
-      return { success: true };
     }
-    return { success: false };
+    return;
   }
   
   await db.delete(users).where(eq(users.id, id));
-  return { success: true };
 }
 
 export async function getUserById(id: number) {
