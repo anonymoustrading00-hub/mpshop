@@ -17,8 +17,12 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   const [activeBranchId, setActiveBranchIdState] = useState<number>(1);
   const [pendingBranchId, setPendingBranchId] = useState<number | null>(null);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
-  const { data: branches = [], isLoading } = trpc.branches.list.useQuery();
   const { user } = useAuth();
+  
+  // Solo cargar sucursales cuando el usuario esté autenticado
+  const { data: branches = [], isLoading } = trpc.branches.list.useQuery(undefined, {
+    enabled: !!user, // Solo ejecutar query si hay usuario
+  });
 
   // Efecto para inicializar la sucursal activa cuando el usuario carga
   useEffect(() => {
