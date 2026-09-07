@@ -963,28 +963,37 @@ export default function Sales() {
   }, [filteredProducts]);
 
   // Map a raw unit item to the product shape used in the cart
-  const toProductShape = (u: any) => ({
-    id: u.id,
-    name: `${u.brand} ${u.model}`,
-    code: u.code,
-    brand: u.brand,
-    model: u.model,
-    unitType: u.type,
-    specs: u.specs,
-    serialNumber: u.serialNumber,
-    condition: u.condition,
-    damageNotes: u.damageNotes,
-    location: u.location,
-    salePrice: u.salePrice || 0,
-    wholesalePrice: u.wholesalePrice || u.salePrice || 0,
-    discountPrice: u.discountPrice || u.salePrice || 0,
-    purchasePrice: u.purchasePrice || 0,
-    price: u.salePrice || 0,
-    status: u.status,
-    category: "unit",
-    stock: 1,
-    rawUnit: u,
-  });
+  const toProductShape = (u: any) => {
+    // Contar unidades disponibles del mismo modelo
+    const availableUnitsOfSameModel = (unitsList?.items || []).filter((unit: any) => 
+      unit.brand === u.brand && 
+      unit.model === u.model && 
+      unit.status === 'available'
+    ).length;
+
+    return {
+      id: u.id,
+      name: `${u.brand} ${u.model}`,
+      code: u.code,
+      brand: u.brand,
+      model: u.model,
+      unitType: u.type,
+      specs: u.specs,
+      serialNumber: u.serialNumber,
+      condition: u.condition,
+      damageNotes: u.damageNotes,
+      location: u.location,
+      salePrice: u.salePrice || 0,
+      wholesalePrice: u.wholesalePrice || u.salePrice || 0,
+      discountPrice: u.discountPrice || u.salePrice || 0,
+      purchasePrice: u.purchasePrice || 0,
+      price: u.salePrice || 0,
+      status: u.status,
+      category: "unit",
+      stock: availableUnitsOfSameModel,
+      rawUnit: u,
+    };
+  };
 
   // Total available units (for empty state messaging)
   const totalAvailable = useMemo(() => {
@@ -1091,12 +1100,28 @@ export default function Sales() {
       const existingIndex = current.findIndex((item) => item.productId === product.id);
 
       if (existingIndex >= 0) {
-        // Units can only be sold once
-        if (isUnit) {
-          toast.error("Este equipo ya está en el carrito");
-          return current;
-        }
         const existing = current[existingIndex];
+        
+        // Para unidades: verificar cuántas disponibles hay del mismo modelo
+        if (isUnit) {
+          // Contar unidades disponibles del mismo modelo
+          const availableCount = products?.filter((p: any) => 
+            p.brand === product.brand && 
+            p.model === product.model && 
+            p.status === 'available'
+          ).length || 1;
+          
+          if (existing.quantity >= availableCount) {
+            toast.error(`Solo hay ${availableCount} unidades disponibles de este modelo`);
+            return current;
+          }
+          
+          const updated = [...current];
+          updated[existingIndex] = { ...existing, quantity: existing.quantity + 1 };
+          return updated;
+        }
+        
+        // Para productos fungibles: verificar stock
         if (existing.quantity >= product.stock) {
           toast.error(`Solo hay ${product.stock} unidades disponibles`);
           return current;
@@ -1105,6 +1130,19 @@ export default function Sales() {
         const updated = [...current];
         updated[existingIndex] = { ...existing, quantity: existing.quantity + 1 };
         return updated;
+      }
+
+      // Calcular stock disponible para nuevos items
+      let availableStock = 1;
+      if (isUnit) {
+        // Para unidades: contar cuántas del mismo modelo están disponibles
+        availableStock = products?.filter((p: any) => 
+          p.brand === product.brand && 
+          p.model === product.model && 
+          p.status === 'available'
+        ).length || 1;
+      } else {
+        availableStock = product.stock;
       }
 
       return [
@@ -1123,7 +1161,7 @@ export default function Sales() {
           location: product.location || product.rawUnit?.location,
           purchasePrice: product.purchasePrice || product.rawUnit?.purchasePrice,
           rawUnit: product.rawUnit || product,
-          stock: isUnit ? 1 : product.stock,
+          stock: availableStock,
           quantity: 1,
           basePrice: calculatedBasePrice,
           pricingType: mode,

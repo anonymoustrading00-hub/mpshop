@@ -12,7 +12,7 @@ import {
   getDb,
 } from "../db";
 import { units } from "../../drizzle/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, and } from "drizzle-orm";
 import { ensureCustomerRecord } from "./customer_utils";
 
 const discountTypeSchema = z.enum(["none", "percentage", "fixed"]);
@@ -125,24 +125,72 @@ export const salesRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // ─── VALIDACIÓN SERVIDOR: verificar que todas las unidades existen y están disponibles ───
+      // ─── VALIDACIÓN SERVIDOR: expandir items con quantity > 1 a múltiples unidades ───
       const db = await getDb();
-      if (db) {
-        const unitIds = input.items.map((i) => i.unitId);
-        const foundUnits = await db.select({ id: units.id, status: units.status }).from(units).where(inArray(units.id, unitIds));
-        const foundMap = new Map(foundUnits.map((u: { id: number; status: string }) => [u.id, u.status]));
-        for (const item of input.items) {
-          const status = foundMap.get(item.unitId);
-          if (!status) {
-            throw new TRPCError({ code: "BAD_REQUEST", message: `La unidad ID ${item.unitId} no existe en el catálogo. Revisa el carrito de venta.` });
+      
+      // Expandir items: si quantity > 1, buscar múltiples unidades del mismo modelo
+      const expandedItems = [];
+      
+      for (const item of input.items) {
+        if (item.quantity === 1) {
+          // Cantidad 1: verificar que la unidad existe y está disponible
+          if (db) {
+            const [unit] = await db.select({ id: units.id, status: units.status }).from(units).where(eq(units.id, item.unitId)).limit(1);
+            if (!unit) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: `La unidad ID ${item.unitId} no existe en el catálogo.` });
+            }
+            if (unit.status !== "available") {
+              throw new TRPCError({ code: "BAD_REQUEST", message: `La unidad ID ${item.unitId} no está disponible (estado: ${unit.status}).` });
+            }
           }
-          if (status !== "available") {
-            throw new TRPCError({ code: "BAD_REQUEST", message: `La unidad ID ${item.unitId} no está disponible (estado: ${status}). Es posible que ya fue vendida.` });
+          expandedItems.push(item);
+        } else {
+          // Cantidad > 1: buscar unidades disponibles del mismo modelo
+          if (!db) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "No se pueden vender múltiples unidades en modo demo." });
+          }
+          
+          // Obtener la unidad base para conocer marca y modelo
+          const [baseUnit] = await db.select().from(units).where(eq(units.id, item.unitId)).limit(1);
+          if (!baseUnit) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: `La unidad ID ${item.unitId} no existe.` });
+          }
+          
+          // Buscar unidades disponibles del mismo modelo
+          const availableUnits = await db.select({ id: units.id })
+            .from(units)
+            .where(
+              and(
+                eq(units.brand, baseUnit.brand),
+                eq(units.model, baseUnit.model),
+                eq(units.status, "available")
+              )
+            )
+            .limit(item.quantity);
+          
+          if (availableUnits.length < item.quantity) {
+            throw new TRPCError({ 
+              code: "BAD_REQUEST", 
+              message: `Solo hay ${availableUnits.length} unidades disponibles de ${baseUnit.brand} ${baseUnit.model}. Solicitaste ${item.quantity}.` 
+            });
+          }
+          
+          // Crear un item por cada unidad encontrada
+          for (const unit of availableUnits) {
+            expandedItems.push({
+              unitId: unit.id,
+              pricingType: item.pricingType,
+              quantity: 1,
+              basePrice: item.basePrice,
+              discountType: item.discountType,
+              discountValue: item.discountValue,
+            });
           }
         }
       }
-
-      const normalizedItems = input.items.map((item) => {
+      
+      // Continuar con los items expandidos
+      const normalizedItems = expandedItems.map((item) => {
         const pricing = getLinePricing(item.basePrice, 1, item.discountType, item.discountValue);
 
         return {
