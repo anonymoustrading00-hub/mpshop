@@ -442,9 +442,20 @@ function printSaleTicket(detail: any, companyConfig?: any, action: "print" | "do
       if (item.specs) {
         try {
           parsedSpecs = typeof item.specs === 'string' ? JSON.parse(item.specs) : item.specs;
-        } catch {
+          
+          // DEBUG: Log para ver qué specs tiene el item
+          console.log(`[DEBUG] Item ${item.productName}:`, {
+            specsRaw: item.specs,
+            specsParsed: parsedSpecs,
+            specsKeys: Object.keys(parsedSpecs),
+            specsEntries: Object.entries(parsedSpecs)
+          });
+        } catch (err) {
+          console.error(`[DEBUG] Error parseando specs de ${item.productName}:`, err);
           parsedSpecs = {};
         }
+      } else {
+        console.log(`[DEBUG] Item ${item.productName} NO tiene specs:`, item.specs);
       }
       
       // Formatear TODAS las specs sin filtrar (mostrar todo)
@@ -2782,9 +2793,17 @@ export default function Sales() {
                         if (item.specs) {
                           try {
                             parsedSpecs = typeof item.specs === 'string' ? JSON.parse(item.specs) : item.specs;
-                          } catch {
+                            console.log(`[DEBUG DETALLE] Item ${item.productName}:`, {
+                              specsRaw: item.specs,
+                              specsParsed: parsedSpecs,
+                              specsCount: Object.keys(parsedSpecs).length
+                            });
+                          } catch (err) {
+                            console.error(`[DEBUG DETALLE] Error parseando:`, err);
                             parsedSpecs = {};
                           }
+                        } else {
+                          console.log(`[DEBUG DETALLE] Item ${item.productName} sin specs`);
                         }
                         
                         const specsList = Object.entries(parsedSpecs)
