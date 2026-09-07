@@ -25,8 +25,7 @@
     "db:remove-code-unique": "tsx scripts/remove-code-unique-constraint.ts",
     "db:unify-codes": "tsx scripts/unify-fungible-codes.ts",
     "db:fix-sale-subtotals": "tsx scripts/fix-sale-subtotals.ts",
-    "db:update-asus-specs": "tsx scripts/update-asus-vivobook-specs.ts",
-    "railway:predeploy": "pnpm run db:ensure-tables && pnpm run db:fix-columns && pnpm run db:clean-data && pnpm run db:seed-admin && pnpm run db:remove-code-unique && pnpm run db:unify-codes && pnpm run db:fix-sale-subtotals && pnpm run db:update-asus-specs",
+    "railway:predeploy": "pnpm run db:ensure-tables && pnpm run db:fix-columns && pnpm run db:clean-data && pnpm run db:seed-admin && pnpm run db:remove-code-unique && pnpm run db:unify-codes && pnpm run db:fix-sale-subtotals",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {

@@ -442,6 +442,16 @@ function printSaleTicket(detail: any, companyConfig?: any, action: "print" | "do
       if (item.specs) {
         try {
           parsedSpecs = typeof item.specs === 'string' ? JSON.parse(item.specs) : item.specs;
+          // DEBUG TEMPORAL: Ver qué specs llegan
+          if (item.productName?.toLowerCase().includes('asus') || item.productName?.toLowerCase().includes('vivobook')) {
+            console.log('🔍 SPECS DEBUG:', {
+              producto: item.productName,
+              specsRaw: item.specs,
+              specsParsed: parsedSpecs,
+              cantidadCampos: Object.keys(parsedSpecs).length,
+              campos: Object.keys(parsedSpecs)
+            });
+          }
         } catch {
           parsedSpecs = {};
         }
