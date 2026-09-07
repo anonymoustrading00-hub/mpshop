@@ -436,6 +436,39 @@ function printSaleTicket(detail: any, companyConfig?: any, action: "print" | "do
       const code = item.productCode || `0000${idx + 1}`;
       const unitType = item.unitType || "PZA";
       const name = item.productName || "PRODUCTO GENERAL";
+      
+      // Agregar especificaciones técnicas si existen
+      let specsText = "";
+      if (item.specs) {
+        const specs = typeof item.specs === 'string' ? JSON.parse(item.specs) : item.specs;
+        const specParts: string[] = [];
+        
+        // Extraer specs relevantes
+        if (specs.watts) specParts.push(`${specs.watts}W`);
+        if (specs.voltage) specParts.push(`${specs.voltage}V`);
+        if (specs.amperage) specParts.push(`${specs.amperage}A`);
+        if (specs.connector) specParts.push(specs.connector);
+        if (specs.cpu) specParts.push(specs.cpu);
+        if (specs.ram) specParts.push(specs.ram);
+        if (specs.storage) specParts.push(specs.storage);
+        if (specs.screen) specParts.push(`${specs.screen}"`);
+        if (specs.color) specParts.push(specs.color);
+        
+        if (specParts.length > 0) {
+          specsText = `\n  ${specParts.join(" • ")}`;
+        }
+      }
+      
+      // Agregar condición si no es 10/10
+      if (item.condition && item.condition < 10) {
+        specsText += `\n  Condición: ${item.condition}/10`;
+      }
+      
+      // Agregar notas de daño si existen
+      if (item.damageNotes && item.damageNotes.trim()) {
+        specsText += `\n  ${item.damageNotes}`;
+      }
+      
       const itemDiscount = item.discountAmount || 0;
       const descText = itemDiscount > 0
         ? `\n  ↳ Desc.: -Bs. ${(itemDiscount / 100).toFixed(2)}${item.discountType === "percentage" ? ` (${item.discountValue}%)` : ""}`
@@ -444,7 +477,7 @@ function printSaleTicket(detail: any, companyConfig?: any, action: "print" | "do
       return [
         idx + 1,
         code,
-        name + descText,
+        name + specsText + descText,
         unitType,
         item.quantity || 1,
         pUnit,
@@ -2712,30 +2745,64 @@ export default function Sales() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-dashed divide-slate-200">
-                      {(detail.items || []).map((item: any, idx: number) => (
-                        <>
-                          <tr key={item.id} className="hover:bg-slate-50/60">
-                            <td className="py-2 px-1 text-center font-bold text-slate-500">{idx + 1}</td>
-                            <td className="py-2 px-2 font-mono text-[11px] text-slate-600">{item.productCode || `0000${idx + 1}`}</td>
-                            <td className="py-2 px-2 font-bold text-slate-900">{item.productName}</td>
-                            <td className="py-2 px-1 text-center text-slate-600">{item.unitType || "PZA"}</td>
-                            <td className="py-2 px-1 text-center font-bold text-slate-900">{item.quantity}</td>
-                            <td className="py-2 px-2 text-right font-mono">{formatCurrency(item.finalUnitPrice || item.basePrice)}</td>
-                            <td className="py-2 px-2 text-right font-mono font-bold text-slate-900">{formatCurrency(item.subtotal)}</td>
-                          </tr>
-                          {(item.discountAmount || 0) > 0 && (
-                            <tr key={`disc-${item.id}`} className="bg-yellow-50">
-                              <td colSpan={5} className="py-1 px-4 text-[10px] text-amber-700 italic">
-                                ↳ Desc. sobre artículo: -{formatCurrency(item.discountAmount)}
-                                {item.discountType === "percentage" && ` (${item.discountValue}%)`}
+                      {(detail.items || []).map((item: any, idx: number) => {
+                        // Construir specs para mostrar
+                        let specsDisplay = "";
+                        if (item.specs) {
+                          const specs = typeof item.specs === 'string' ? JSON.parse(item.specs) : item.specs;
+                          const specParts: string[] = [];
+                          
+                          if (specs.watts) specParts.push(`${specs.watts}W`);
+                          if (specs.voltage) specParts.push(`${specs.voltage}V`);
+                          if (specs.amperage) specParts.push(`${specs.amperage}A`);
+                          if (specs.connector) specParts.push(specs.connector);
+                          if (specs.cpu) specParts.push(specs.cpu);
+                          if (specs.ram) specParts.push(specs.ram);
+                          if (specs.storage) specParts.push(specs.storage);
+                          if (specs.screen) specParts.push(`${specs.screen}"`);
+                          if (specs.color) specParts.push(specs.color);
+                          
+                          if (specParts.length > 0) {
+                            specsDisplay = specParts.join(" • ");
+                          }
+                        }
+                        
+                        return (
+                          <>
+                            <tr key={item.id} className="hover:bg-slate-50/60">
+                              <td className="py-2 px-1 text-center font-bold text-slate-500">{idx + 1}</td>
+                              <td className="py-2 px-2 font-mono text-[11px] text-slate-600">{item.productCode || `0000${idx + 1}`}</td>
+                              <td className="py-2 px-2">
+                                <div className="font-bold text-slate-900">{item.productName}</div>
+                                {specsDisplay && (
+                                  <div className="text-[10px] text-slate-500 mt-0.5">{specsDisplay}</div>
+                                )}
+                                {item.condition && item.condition < 10 && (
+                                  <div className="text-[10px] text-amber-600 mt-0.5">Condición: {item.condition}/10</div>
+                                )}
+                                {item.damageNotes && item.damageNotes.trim() && (
+                                  <div className="text-[10px] text-slate-500 italic mt-0.5">{item.damageNotes}</div>
+                                )}
                               </td>
-                              <td colSpan={2} className="py-1 px-2 text-right text-[10px] text-amber-700 italic font-mono">
-                                -{formatCurrency(item.discountAmount)}
-                              </td>
+                              <td className="py-2 px-1 text-center text-slate-600">{item.unitType || "PZA"}</td>
+                              <td className="py-2 px-1 text-center font-bold text-slate-900">{item.quantity}</td>
+                              <td className="py-2 px-2 text-right font-mono">{formatCurrency(item.finalUnitPrice || item.basePrice)}</td>
+                              <td className="py-2 px-2 text-right font-mono font-bold text-slate-900">{formatCurrency(item.subtotal)}</td>
                             </tr>
-                          )}
-                        </>
-                      ))}
+                            {(item.discountAmount || 0) > 0 && (
+                              <tr key={`disc-${item.id}`} className="bg-yellow-50">
+                                <td colSpan={5} className="py-1 px-4 text-[10px] text-amber-700 italic">
+                                  ↳ Desc. sobre artículo: -{formatCurrency(item.discountAmount)}
+                                  {item.discountType === "percentage" && ` (${item.discountValue}%)`}
+                                </td>
+                                <td colSpan={2} className="py-1 px-2 text-right text-[10px] text-amber-700 italic font-mono">
+                                  -{formatCurrency(item.discountAmount)}
+                                </td>
+                              </tr>
+                            )}
+                          </>
+                        );
+                      })}
                       {(detail.sale.discountAmount || 0) > 0 && (() => {
                         const lineSubtotalAmt = (detail.items || []).reduce((s: number, i: any) => s + (i.subtotal || 0), 0);
                         return (
