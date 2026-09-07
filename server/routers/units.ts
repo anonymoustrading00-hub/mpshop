@@ -530,7 +530,14 @@ export const unitsRouter = router({
       const genPurchaseNumber = (id: number | string) =>
         `COMP-UNIT-${String(id).padStart(6, "0")}`;
 
+      // Determinar si es fungible
+      const isFungible = ['charger', 'accessory', 'battery', 'cable', 'case', 'other'].includes(input.type);
+
       const getUnitCode = (index: number) => {
+        // Para fungibles con qty > 1: MISMO código para todos
+        if (isFungible && qty > 1) return baseCodeClean;
+        
+        // Para únicos o qty=1: código individual
         if (qty <= 1) return baseCodeClean;
         const padLen = qty > 99 ? 3 : 2;
         return `${baseCodeClean}-${String(index + 1).padStart(padLen, "0")}`;
@@ -1042,9 +1049,19 @@ export const unitsRouter = router({
           }
 
           const baseCode = (targetUnit.code || "ART").split("-")[0];
+          
+          // Determinar si es fungible
+          const unitType = (targetUnit.type || "").toLowerCase();
+          const isFungible = ['charger', 'accessory', 'battery', 'cable', 'case', 'other'].includes(unitType);
+          
+          // Para fungibles: UN código compartido; para únicos: códigos individuales
+          const sharedCode = isFungible 
+            ? `${baseCode}-${String(Date.now() % 100000).padStart(5, "0")}`
+            : null;
+          
           for (let i = 0; i < addQty; i++) {
             const newUnitId = MOCK_UNITS.length + 1;
-            const unitCode = `${baseCode}-${String(Date.now() % 100000 + i).padStart(5, "0")}`;
+            const unitCode = sharedCode || `${baseCode}-${String(Date.now() % 100000 + i).padStart(5, "0")}`;
             MOCK_UNITS.push({
               id: newUnitId,
               code: unitCode,
@@ -1388,8 +1405,18 @@ export const unitsRouter = router({
             });
           }
 
+          // Determinar si el producto es fungible
+          const unitType = (unit.type || "").toLowerCase();
+          const isFungible = ['charger', 'accessory', 'battery', 'cable', 'case', 'other'].includes(unitType);
+          
+          // Para productos fungibles: UN SOLO código compartido
+          // Para productos únicos: códigos individuales
+          const sharedCode = isFungible 
+            ? `${baseCodeClean}-${String(Date.now() % 100000).padStart(5, "0")}`
+            : null;
+
           for (let i = 0; i < addQty; i++) {
-            const newCode = `${baseCodeClean}-${String(Date.now() % 100000 + i + Math.floor(Math.random() * 900)).padStart(5, "0")}`;
+            const newCode = sharedCode || `${baseCodeClean}-${String(Date.now() % 100000 + i + Math.floor(Math.random() * 900)).padStart(5, "0")}`;
             await tx.insert(units).values({
               code: newCode,
               type: unit.type,
