@@ -8,8 +8,36 @@ import { eq, and, like, or } from "drizzle-orm";
 
 // Base de datos de especificaciones completas por modelo
 const MODEL_SPECS_DATABASE: Record<string, Record<string, any>> = {
-  // Asus Vivobook E410M
+  // Asus Vivobook E410M - Múltiples variantes de nombre
   "asus vivobook e410m": {
+    cpu: "Celeron N4010",
+    ram: "4GB",
+    storage: "128GB SSD",
+    resolution: "FHD",
+    os: "WINDOWS 11",
+    screenSize: "14.0\"",
+    gpu: "Intel UHD Graphics",
+    connectivity: "WiFi, Bluetooth",
+    batteryDuration: "Hasta 8 horas",
+    weight: "1.3 kg",
+    color: "Silver",
+    caracteristicasAdicionales: "teclado luminoso"
+  },
+  "asus vivobook e410": {
+    cpu: "Celeron N4010",
+    ram: "4GB",
+    storage: "128GB SSD",
+    resolution: "FHD",
+    os: "WINDOWS 11",
+    screenSize: "14.0\"",
+    gpu: "Intel UHD Graphics",
+    connectivity: "WiFi, Bluetooth",
+    batteryDuration: "Hasta 8 horas",
+    weight: "1.3 kg",
+    color: "Silver",
+    caracteristicasAdicionales: "teclado luminoso"
+  },
+  "vivobook e410m": {
     cpu: "Celeron N4010",
     ram: "4GB",
     storage: "128GB SSD",
@@ -35,7 +63,8 @@ async function updateModelSpecs() {
     process.exit(1);
   }
 
-  console.log("🔄 Actualizando especificaciones de modelos conocidos...\n");
+  console.log("🔄 Actualizando especificaciones de modelos conocidos...");
+  console.log(`📚 Modelos en base de datos: ${Object.keys(MODEL_SPECS_DATABASE).length}\n`);
 
   let totalUpdated = 0;
   let totalSkipped = 0;
@@ -43,13 +72,21 @@ async function updateModelSpecs() {
   // Iterar sobre cada modelo en la base de datos
   for (const [modelKey, completeSpecs] of Object.entries(MODEL_SPECS_DATABASE)) {
     console.log(`\n📦 Buscando: ${modelKey.toUpperCase()}`);
+    console.log(`   Total unidades en BD: ${allUnits.length}`);
     
     // Buscar unidades que coincidan con este modelo (búsqueda flexible)
     const allUnits = await db.select().from(units);
     
     const matchingUnits = allUnits.filter(unit => {
-      const searchText = `${unit.brand} ${unit.model}`.toLowerCase();
-      return searchText.includes(modelKey.toLowerCase());
+      const brandLower = (unit.brand || "").toLowerCase().trim();
+      const modelLower = (unit.model || "").toLowerCase().trim();
+      const searchText = `${brandLower} ${modelLower}`;
+      const keyLower = modelKey.toLowerCase().trim();
+      
+      // Búsqueda flexible que ignora espacios y variaciones
+      return searchText.includes(keyLower) || 
+             modelLower.includes(keyLower) ||
+             searchText.replace(/\s+/g, '').includes(keyLower.replace(/\s+/g, ''));
     });
 
     if (matchingUnits.length === 0) {
