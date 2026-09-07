@@ -10,11 +10,13 @@
  * 3. Actualiza sale_items
  * 4. Recalcula el total de cada venta afectada
  * 5. Actualiza la tabla sales
+ * 6. Actualiza financial_transactions (Libro de Movimientos)
+ * 7. Actualiza accounts_receivable si aplica (créditos)
  */
 
 import { getDb } from "../server/db";
-import { sales, saleItems } from "../drizzle/schema";
-import { eq, gt, sql } from "drizzle-orm";
+import { sales, saleItems, financialTransactions, accountsReceivable } from "../drizzle/schema";
+import { eq, gt, and } from "drizzle-orm";
 
 interface SaleItem {
   id: number;
@@ -32,6 +34,23 @@ interface Sale {
   subtotal: number;
   total: number;
   discountAmount: number;
+  paymentMethod: string;
+  paymentStatus: string;
+}
+
+interface FinancialTransaction {
+  id: number;
+  referenceId: number | null;
+  amount: number;
+  category: string;
+}
+
+interface AccountReceivable {
+  id: number;
+  saleId: number;
+  totalAmount: number;
+  paidAmount: number;
+  balance: number;
 }
 
 async function fixSaleSubtotals() {
@@ -102,6 +121,8 @@ async function fixSaleSubtotals() {
     console.log("🔄 [Fix Subtotals] Recalculando totales de ventas afectadas...\n");
 
     let salesFixed = 0;
+    let financialTxFixed = 0;
+    let accountsReceivableFixed = 0;
 
     for (const saleId of affectedSales) {
       // Obtener la venta
@@ -123,14 +144,16 @@ async function fixSaleSubtotals() {
       const newSubtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
       const discountAmount = sale.discountAmount || 0;
       const newTotal = Math.max(0, newSubtotal - discountAmount);
+      const oldTotal = sale.total;
 
       console.log(`📌 Venta ${sale.saleNumber} (ID: ${saleId})`);
-      console.log(`   Subtotal anterior: ${(sale.subtotal / 100).toFixed(2)}`);
-      console.log(`   Subtotal correcto: ${(newSubtotal / 100).toFixed(2)}`);
-      console.log(`   Descuento: ${(discountAmount / 100).toFixed(2)}`);
-      console.log(`   Total anterior: ${(sale.total / 100).toFixed(2)}`);
-      console.log(`   Total correcto: ${(newTotal / 100).toFixed(2)}`);
+      console.log(`   Subtotal anterior: Bs. ${(sale.subtotal / 100).toFixed(2)}`);
+      console.log(`   Subtotal correcto: Bs. ${(newSubtotal / 100).toFixed(2)}`);
+      console.log(`   Descuento: Bs. ${(discountAmount / 100).toFixed(2)}`);
+      console.log(`   Total anterior: Bs. ${(oldTotal / 100).toFixed(2)}`);
+      console.log(`   Total correcto: Bs. ${(newTotal / 100).toFixed(2)}`);
 
+      // Actualizar venta
       await db
         .update(sales)
         .set({
@@ -141,14 +164,89 @@ async function fixSaleSubtotals() {
         .where(eq(sales.id, saleId));
 
       salesFixed++;
-      console.log(`   ✅ Venta actualizada\n`);
+      console.log(`   ✅ Venta actualizada`);
+
+      // Actualizar transacción financiera si existe (Libro de Movimientos)
+      if (sale.paymentStatus === 'completed' && sale.paymentMethod !== 'credit') {
+        const category = sale.saleNumber?.includes('delivery') ? 'sale_delivery' : 'sale_local';
+        
+        const financialTxs = await db
+          .select()
+          .from(financialTransactions)
+          .where(
+            and(
+              eq(financialTransactions.referenceId, saleId),
+              eq(financialTransactions.type, 'income')
+            )
+          ) as FinancialTransaction[];
+
+        if (financialTxs.length > 0) {
+          for (const tx of financialTxs) {
+            if (tx.amount !== newTotal) {
+              console.log(`   💰 Actualizando transacción financiera ID ${tx.id}`);
+              console.log(`      Monto anterior: Bs. ${(tx.amount / 100).toFixed(2)}`);
+              console.log(`      Monto correcto: Bs. ${(newTotal / 100).toFixed(2)}`);
+              
+              await db
+                .update(financialTransactions)
+                .set({ 
+                  amount: newTotal,
+                  updatedAt: new Date()
+                })
+                .where(eq(financialTransactions.id, tx.id));
+              
+              financialTxFixed++;
+              console.log(`      ✅ Transacción actualizada`);
+            }
+          }
+        }
+      }
+
+      // Actualizar cuentas por cobrar si es crédito
+      if (sale.paymentMethod === 'credit') {
+        const receivables = await db
+          .select()
+          .from(accountsReceivable)
+          .where(eq(accountsReceivable.saleId, saleId)) as AccountReceivable[];
+
+        if (receivables.length > 0) {
+          for (const receivable of receivables) {
+            const newBalance = newTotal - (receivable.paidAmount || 0);
+            
+            if (receivable.totalAmount !== newTotal) {
+              console.log(`   📋 Actualizando cuenta por cobrar ID ${receivable.id}`);
+              console.log(`      Monto total anterior: Bs. ${(receivable.totalAmount / 100).toFixed(2)}`);
+              console.log(`      Monto total correcto: Bs. ${(newTotal / 100).toFixed(2)}`);
+              console.log(`      Pagado: Bs. ${(receivable.paidAmount / 100).toFixed(2)}`);
+              console.log(`      Balance anterior: Bs. ${(receivable.balance / 100).toFixed(2)}`);
+              console.log(`      Balance correcto: Bs. ${(newBalance / 100).toFixed(2)}`);
+              
+              await db
+                .update(accountsReceivable)
+                .set({
+                  totalAmount: newTotal,
+                  balance: newBalance,
+                  updatedAt: new Date()
+                })
+                .where(eq(accountsReceivable.id, receivable.id));
+              
+              accountsReceivableFixed++;
+              console.log(`      ✅ Cuenta por cobrar actualizada`);
+            }
+          }
+        }
+      }
+
+      console.log();
     }
 
     console.log("=".repeat(70));
     console.log(`✨ [Fix Subtotals] COMPLETADO`);
     console.log(`   • Items corregidos: ${itemsFixed}`);
     console.log(`   • Ventas recalculadas: ${salesFixed}`);
-    console.log(`   • Reportes, KPIs e ingresos ahora reflejarán valores correctos`);
+    console.log(`   • Transacciones financieras actualizadas: ${financialTxFixed}`);
+    console.log(`   • Cuentas por cobrar actualizadas: ${accountsReceivableFixed}`);
+    console.log(`   • Reportes, KPIs, Libro de Movimientos e ingresos ahora correctos`);
     console.log("=".repeat(70) + "\n");
 
   } catch (error: any) {
