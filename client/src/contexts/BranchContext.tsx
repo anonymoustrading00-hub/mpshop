@@ -20,7 +20,10 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   const { data: branches = [], isLoading } = trpc.branches.list.useQuery();
   const { user } = useAuth();
 
+  // Efecto para inicializar la sucursal activa cuando el usuario carga
   useEffect(() => {
+    if (!user) return;
+
     console.log("[BranchContext] 🔍 User changed:", {
       userId: user?.id,
       username: user?.username,
@@ -29,56 +32,55 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     });
 
     const stored = localStorage.getItem("x-branch-id");
-    if (stored) {
-      const storedId = parseInt(stored, 10);
-      console.log("[BranchContext] 📦 Found stored branch:", storedId);
-      
-      // Validar que el usuario tenga acceso a la sucursal guardada
-      if (user && user.id !== 999 && user.id !== 1000) { // No validar para super admin
-        const assignedBranches = Array.isArray(user.assignedBranchIds) ? user.assignedBranchIds : ["all"];
-        console.log("[BranchContext] ✅ Assigned branches:", assignedBranches);
-        
-        // Si el usuario no tiene acceso a todas las sucursales
-        if (!assignedBranches.includes("all")) {
-          const allowedIds = assignedBranches
-            .map((id: any) => typeof id === "string" ? parseInt(id, 10) : id)
-            .filter((id: any) => !isNaN(id));
-          
-          console.log("[BranchContext] 🔒 User is restricted to:", allowedIds);
-          
-          // Si la sucursal guardada no está permitida, usar la primera permitida
-          if (!allowedIds.includes(storedId)) {
-            console.log("[BranchContext] ⚠️ Stored branch NOT allowed. Forcing to:", allowedIds[0]);
-            if (allowedIds.length > 0) {
-              setActiveBranchIdState(allowedIds[0]);
-              localStorage.setItem("x-branch-id", allowedIds[0].toString());
-              return;
-            }
-          } else {
-            console.log("[BranchContext] ✅ Stored branch IS allowed");
-          }
-        } else {
-          console.log("[BranchContext] 🌍 User has global access");
-        }
+    const storedId = stored ? parseInt(stored, 10) : null;
+    console.log("[BranchContext] 📦 Stored branch ID:", storedId);
+    
+    // Si el usuario es super admin (999 o 1000), permitir cualquier sucursal
+    if (user.id === 999 || user.id === 1000) {
+      console.log("[BranchContext] 👑 Super admin detected, using stored or default branch");
+      if (storedId) {
+        setActiveBranchIdState(storedId);
       }
-      
-      setActiveBranchIdState(storedId);
-    } else if (user && user.id !== 999 && user.id !== 1000) {
-      console.log("[BranchContext] 📦 No stored branch, checking restrictions...");
-      // Si no hay sucursal guardada y el usuario tiene restricciones
-      const assignedBranches = Array.isArray(user.assignedBranchIds) ? user.assignedBranchIds : ["all"];
-      if (!assignedBranches.includes("all")) {
-        const allowedIds = assignedBranches
-          .map((id: any) => typeof id === "string" ? parseInt(id, 10) : id)
-          .filter((id: any) => !isNaN(id));
-        
-        console.log("[BranchContext] 🔒 Forcing user to first allowed branch:", allowedIds[0]);
-        if (allowedIds.length > 0) {
-          setActiveBranchIdState(allowedIds[0]);
-          localStorage.setItem("x-branch-id", allowedIds[0].toString());
-        }
-      }
+      return;
     }
+
+    // Obtener sucursales asignadas al usuario
+    const assignedBranches = Array.isArray(user.assignedBranchIds) ? user.assignedBranchIds : ["all"];
+    console.log("[BranchContext] ✅ Assigned branches:", assignedBranches);
+    
+    // Si el usuario tiene acceso global, permitir cualquier sucursal
+    if (assignedBranches.includes("all")) {
+      console.log("[BranchContext] 🌍 User has global access");
+      if (storedId) {
+        setActiveBranchIdState(storedId);
+      }
+      return;
+    }
+
+    // Usuario con restricción de sucursales
+    const allowedIds = assignedBranches
+      .map((id: any) => typeof id === "string" ? parseInt(id, 10) : id)
+      .filter((id: any) => !isNaN(id));
+    
+    console.log("[BranchContext] 🔒 User is restricted to branches:", allowedIds);
+
+    if (allowedIds.length === 0) {
+      console.warn("[BranchContext] ⚠️ User has no allowed branches!");
+      return;
+    }
+
+    // Si hay una sucursal guardada, verificar si está permitida
+    if (storedId && allowedIds.includes(storedId)) {
+      console.log("[BranchContext] ✅ Stored branch IS allowed, using it:", storedId);
+      setActiveBranchIdState(storedId);
+      return;
+    }
+
+    // Si no hay sucursal guardada o no está permitida, usar la primera permitida
+    const defaultBranchId = allowedIds[0];
+    console.log("[BranchContext] 🎯 Setting default branch:", defaultBranchId);
+    setActiveBranchIdState(defaultBranchId);
+    localStorage.setItem("x-branch-id", defaultBranchId.toString());
   }, [user]);
 
   const setActiveBranchId = (id: number) => {
