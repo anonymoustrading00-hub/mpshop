@@ -194,9 +194,7 @@ export const usersRouter = router({
   // Listar todos los usuarios
   list: protectedProcedure.query(async () => {
     const allUsers = await getAllUsers();
-    console.log("[Users] getAllUsers returned:", allUsers?.length, "users");
     const formatted = (allUsers as any[]).map(formatUserResponse);
-    console.log("[Users] After formatting:", formatted?.length, "users");
     return formatted;
   }),
 

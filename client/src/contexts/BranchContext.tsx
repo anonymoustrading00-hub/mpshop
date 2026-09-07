@@ -22,32 +22,17 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   // Solo cargar sucursales cuando el usuario esté autenticado
   const { data: branches = [], isLoading } = trpc.branches.list.useQuery(undefined, {
     enabled: !!user, // Solo ejecutar query si hay usuario
-    onSuccess: (data) => {
-      console.log("[BranchContext] 📥 Branches loaded:", data?.map((b: any) => ({ id: b.id, name: b.name })));
-    },
-    onError: (error) => {
-      console.error("[BranchContext] ❌ Failed to load branches:", error);
-    },
   });
 
   // Efecto para inicializar la sucursal activa cuando el usuario carga
   useEffect(() => {
     if (!user) return;
 
-    console.log("[BranchContext] 🔍 User changed:", {
-      userId: user?.id,
-      username: user?.username,
-      assignedBranchIds: user?.assignedBranchIds,
-      isArray: Array.isArray(user?.assignedBranchIds),
-    });
-
     const stored = localStorage.getItem("x-branch-id");
     const storedId = stored ? parseInt(stored, 10) : null;
-    console.log("[BranchContext] 📦 Stored branch ID:", storedId);
     
     // Si el usuario es super admin (999 o 1000), permitir cualquier sucursal
     if (user.id === 999 || user.id === 1000) {
-      console.log("[BranchContext] 👑 Super admin detected, using stored or default branch");
       if (storedId) {
         setActiveBranchIdState(storedId);
       }
@@ -56,11 +41,9 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
 
     // Obtener sucursales asignadas al usuario
     const assignedBranches = Array.isArray(user.assignedBranchIds) ? user.assignedBranchIds : ["all"];
-    console.log("[BranchContext] ✅ Assigned branches:", assignedBranches);
     
     // Si el usuario tiene acceso global, permitir cualquier sucursal
     if (assignedBranches.includes("all")) {
-      console.log("[BranchContext] 🌍 User has global access");
       if (storedId) {
         setActiveBranchIdState(storedId);
       }
@@ -71,30 +54,25 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     const allowedIds = assignedBranches
       .map((id: any) => typeof id === "string" ? parseInt(id, 10) : id)
       .filter((id: any) => !isNaN(id));
-    
-    console.log("[BranchContext] 🔒 User is restricted to branches:", allowedIds);
 
     if (allowedIds.length === 0) {
-      console.warn("[BranchContext] ⚠️ User has no allowed branches!");
+      console.warn("[BranchContext] User has no allowed branches");
       return;
     }
 
     // Si hay una sucursal guardada, verificar si está permitida
     if (storedId && allowedIds.includes(storedId)) {
-      console.log("[BranchContext] ✅ Stored branch IS allowed, using it:", storedId);
       setActiveBranchIdState(storedId);
       return;
     }
 
     // Si no hay sucursal guardada o no está permitida, usar la primera permitida
     const defaultBranchId = allowedIds[0];
-    console.log("[BranchContext] 🎯 Setting default branch:", defaultBranchId);
     setActiveBranchIdState(defaultBranchId);
     localStorage.setItem("x-branch-id", defaultBranchId.toString());
     
     // Si el ID almacenado cambió, recargar la página para aplicar el nuevo contexto
     if (storedId !== defaultBranchId) {
-      console.log("[BranchContext] 🔄 Branch changed, reloading page...");
       setTimeout(() => window.location.reload(), 100);
     }
   }, [user]);
@@ -160,10 +138,6 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         return allowedIds.includes(branch.id);
       })
     : branches;
-
-  console.log("[BranchContext] 📋 All branches:", branches.map((b: any) => ({ id: b.id, name: b.name })));
-  console.log("[BranchContext] 👁️ Visible branches:", visibleBranches.map((b: any) => ({ id: b.id, name: b.name })));
-  console.log("[BranchContext] 🎯 Active branch ID:", activeBranchId);
 
   return (
     <BranchContext.Provider
