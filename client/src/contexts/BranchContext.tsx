@@ -85,6 +85,12 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     console.log("[BranchContext] 🎯 Setting default branch:", defaultBranchId);
     setActiveBranchIdState(defaultBranchId);
     localStorage.setItem("x-branch-id", defaultBranchId.toString());
+    
+    // Si el ID almacenado cambió, recargar la página para aplicar el nuevo contexto
+    if (storedId !== defaultBranchId) {
+      console.log("[BranchContext] 🔄 Branch changed, reloading page...");
+      setTimeout(() => window.location.reload(), 100);
+    }
   }, [user]);
 
   const setActiveBranchId = (id: number) => {
