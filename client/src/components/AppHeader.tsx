@@ -365,7 +365,13 @@ export default function AppHeader() {
               <div className="flex flex-col">
                 <span className="text-xs font-bold text-slate-800 leading-none">{user.name}</span>
                 <span className="text-[10px] font-medium text-slate-500 mt-0.5 leading-none">
-                  {user.role === "admin" ? "Administrador" : "Repartidor"}
+                  {user.role === "admin" ? "Administrador" : 
+                   user.role === "seller" ? "Vendedor" :
+                   user.role === "technician" ? "Técnico" :
+                   user.role === "cashier" ? "Cajero" :
+                   user.role === "delivery" ? "Repartidor" :
+                   user.role === "warehouse" ? "Bodeguero" :
+                   user.role === "manager" ? "Gerente" : "Usuario"}
                 </span>
               </div>
             </div>
