@@ -4,6 +4,7 @@ import mysql from "mysql2/promise";
 import fs from "fs";
 import path from "path";
 import * as schema from "../drizzle/schema";
+import { toPlainObject } from "./_core/serialize";
 import {
   DEFAULT_DEVICE_BRANDS,
   DEFAULT_DEVICE_MODELS,
