@@ -1256,18 +1256,27 @@ export default function Sales() {
         
         if (item.isFungible) {
           // Para fungibles: contar unidades disponibles del mismo brand+model
-          availableStock = products?.filter((p: any) => 
-            p.brand === item.brand && 
-            p.model === item.model && 
-            p.status === 'available'
-          ).length || 0;
+          const matchingUnits = (unitsList?.items || []).filter((u: any) => 
+            u.brand === item.brand && 
+            u.model === item.model && 
+            u.status === 'available'
+          );
+          availableStock = matchingUnits.length;
+          
+          // Debug: mostrar en consola
+          console.log('[Sales] Stock calculation:', {
+            brand: item.brand,
+            model: item.model,
+            availableStock,
+            matchingUnits: matchingUnits.map((u: any) => ({ id: u.id, code: u.code, status: u.status }))
+          });
         }
         
         const next = { ...item, ...changes, stock: availableStock };
         
         // Validar que la nueva cantidad no exceda el stock
         if (changes.quantity && changes.quantity > availableStock) {
-          toast.error(`Solo hay ${availableStock} unidades disponibles${item.isFungible ? ` de ${item.brand} ${item.model}` : ''}`);
+          toast.error(`Solo hay ${availableStock} unidad${availableStock !== 1 ? 'es' : ''} disponible${availableStock !== 1 ? 's' : ''}${item.isFungible ? ` de ${item.brand} ${item.model}` : ''}`);
           return { ...item, stock: availableStock }; // Actualizar stock pero no cantidad
         }
         
