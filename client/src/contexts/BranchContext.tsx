@@ -27,7 +27,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       
       // Validar que el usuario tenga acceso a la sucursal guardada
       if (user && user.id !== 999 && user.id !== 1000) { // No validar para super admin
-        const assignedBranches = user.assignedBranchIds || ["all"];
+        const assignedBranches = Array.isArray(user.assignedBranchIds) ? user.assignedBranchIds : ["all"];
         
         // Si el usuario no tiene acceso a todas las sucursales
         if (!assignedBranches.includes("all")) {
@@ -49,7 +49,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       setActiveBranchIdState(storedId);
     } else if (user && user.id !== 999 && user.id !== 1000) {
       // Si no hay sucursal guardada y el usuario tiene restricciones
-      const assignedBranches = user.assignedBranchIds || ["all"];
+      const assignedBranches = Array.isArray(user.assignedBranchIds) ? user.assignedBranchIds : ["all"];
       if (!assignedBranches.includes("all")) {
         const allowedIds = assignedBranches
           .map((id: any) => typeof id === "string" ? parseInt(id, 10) : id)
@@ -66,7 +66,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   const setActiveBranchId = (id: number) => {
     // Validar que el usuario tenga permiso para acceder a esta sucursal
     if (user && user.id !== 999 && user.id !== 1000) { // No validar para super admin
-      const assignedBranches = user.assignedBranchIds || ["all"];
+      const assignedBranches = Array.isArray(user.assignedBranchIds) ? user.assignedBranchIds : ["all"];
       
       // Si el usuario no tiene acceso a todas las sucursales
       if (!assignedBranches.includes("all")) {
@@ -114,7 +114,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   // Filtrar sucursales visibles según permisos del usuario
   const visibleBranches = user && user.id !== 999 && user.id !== 1000 
     ? branches.filter((branch: any) => {
-        const assignedBranches = user.assignedBranchIds || ["all"];
+        const assignedBranches = Array.isArray(user.assignedBranchIds) ? user.assignedBranchIds : ["all"];
         if (assignedBranches.includes("all")) return true;
         
         const allowedIds = assignedBranches
