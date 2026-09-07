@@ -42,6 +42,7 @@ import AccountsReceivable from "@/pages/AccountsReceivable";
 import AccountsPayable from "@/pages/AccountsPayable";
 import UsersManagement from "@/pages/UsersManagement";
 import Settings from "@/pages/Settings";
+import AdminMigration from "@/pages/AdminMigration";
 import GlobalCommandMenu from "@/components/GlobalCommandMenu";
 import { BranchProvider } from "./contexts/BranchContext";
 import MobileBottomNav from "@/components/MobileBottomNav";
@@ -271,6 +272,11 @@ function Router() {
 
           {/* Ruta oculta de administración — Backup & Restauración */}
           <Route path="/admin-backup-9x7k2p" component={AdminBackup} />
+
+          {/* Ruta oculta de administración — Migración de Códigos */}
+          <Route path="/admin-migration-codes">
+            <ProtectedRoute component={AdminMigration} adminOnly={true} />
+          </Route>
 
           <Route path={"/404"} component={NotFound} />
           <Route component={NotFound} />
