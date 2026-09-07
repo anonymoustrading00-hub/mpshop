@@ -966,13 +966,19 @@ export default function Sales() {
   const toProductShape = (u: any) => {
     const isFungible = ['charger', 'accessory', 'battery', 'cable', 'case', 'other'].includes(u.type?.toLowerCase());
     
+    // Normalizar para comparación
+    const uBrand = (u.brand || "").trim().toLowerCase();
+    const uModel = (u.model || "").trim().toLowerCase();
+    
     // Para productos fungibles, contar cuántos hay con el mismo brand+model
     // Para productos únicos (laptops), contar cuántos del mismo modelo están disponibles
-    const availableUnitsOfSameModel = (unitsList?.items || []).filter((unit: any) => 
-      unit.brand === u.brand && 
-      unit.model === u.model && 
-      unit.status === 'available'
-    ).length;
+    const availableUnitsOfSameModel = (unitsList?.items || []).filter((unit: any) => {
+      const unitBrand = (unit.brand || "").trim().toLowerCase();
+      const unitModel = (unit.model || "").trim().toLowerCase();
+      return unitBrand === uBrand && 
+             unitModel === uModel && 
+             unit.status === 'available';
+    }).length;
 
     return {
       id: u.id,
@@ -1255,20 +1261,36 @@ export default function Sales() {
         let availableStock = item.stock;
         
         if (item.isFungible) {
-          // Para fungibles: contar unidades disponibles del mismo brand+model
-          const matchingUnits = (unitsList?.items || []).filter((u: any) => 
-            u.brand === item.brand && 
-            u.model === item.model && 
-            u.status === 'available'
-          );
+          // Normalizar brand y model para comparación (trim + lowercase)
+          const itemBrand = (item.brand || "").trim().toLowerCase();
+          const itemModel = (item.model || "").trim().toLowerCase();
+          
+          // Para fungibles: contar TODAS las unidades disponibles del mismo brand+model
+          const matchingUnits = (unitsList?.items || []).filter((u: any) => {
+            const uBrand = (u.brand || "").trim().toLowerCase();
+            const uModel = (u.model || "").trim().toLowerCase();
+            return uBrand === itemBrand && 
+                   uModel === itemModel && 
+                   u.status === 'available';
+          });
+          
           availableStock = matchingUnits.length;
           
           // Debug: mostrar en consola
           console.log('[Sales] Stock calculation:', {
-            brand: item.brand,
-            model: item.model,
+            itemBrand: item.brand,
+            itemModel: item.model,
+            normalizedBrand: itemBrand,
+            normalizedModel: itemModel,
             availableStock,
-            matchingUnits: matchingUnits.map((u: any) => ({ id: u.id, code: u.code, status: u.status }))
+            currentQuantityInCart: item.quantity,
+            matchingUnits: matchingUnits.map((u: any) => ({ 
+              id: u.id, 
+              code: u.code, 
+              brand: u.brand,
+              model: u.model,
+              status: u.status 
+            }))
           });
         }
         
