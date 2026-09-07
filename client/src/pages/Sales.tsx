@@ -437,26 +437,57 @@ function printSaleTicket(detail: any, companyConfig?: any, action: "print" | "do
       const unitType = item.unitType || "PZA";
       const name = item.productName || "PRODUCTO GENERAL";
       
-      // Agregar especificaciones técnicas si existen
-      let specsText = "";
+      // Parsear y construir especificaciones técnicas como en cotizaciones
+      let parsedSpecs: Record<string, any> = {};
       if (item.specs) {
-        const specs = typeof item.specs === 'string' ? JSON.parse(item.specs) : item.specs;
-        const specParts: string[] = [];
-        
-        // Extraer specs relevantes
-        if (specs.watts) specParts.push(`${specs.watts}W`);
-        if (specs.voltage) specParts.push(`${specs.voltage}V`);
-        if (specs.amperage) specParts.push(`${specs.amperage}A`);
-        if (specs.connector) specParts.push(specs.connector);
-        if (specs.cpu) specParts.push(specs.cpu);
-        if (specs.ram) specParts.push(specs.ram);
-        if (specs.storage) specParts.push(specs.storage);
-        if (specs.screen) specParts.push(`${specs.screen}"`);
-        if (specs.color) specParts.push(specs.color);
-        
-        if (specParts.length > 0) {
-          specsText = `\n  ${specParts.join(" • ")}`;
+        try {
+          parsedSpecs = typeof item.specs === 'string' ? JSON.parse(item.specs) : item.specs;
+        } catch {
+          parsedSpecs = {};
         }
+      }
+      
+      // Formatear TODAS las specs sin filtrar (mostrar todo)
+      const specsList = Object.entries(parsedSpecs)
+        .filter(([_, v]) => {
+          // Solo eliminar valores completamente vacíos o null
+          if (v === null || v === undefined) return false;
+          const str = String(v).trim();
+          if (str === "" || str === "null" || str === "undefined" || str === "N/A" || str === "n/a") return false;
+          return true;
+        })
+        .map(([k, v]) => {
+          // Traducir claves técnicas al español para mejor legibilidad
+          const labels: Record<string, string> = {
+            cpu: "PROCESADOR",
+            ram: "RAM",
+            storage: "ALMACENAMIENTO",
+            screenSize: "PANTALLA",
+            gpu: "GPU",
+            resolution: "RESOLUCIÓN",
+            os: "S.O.",
+            androidVersion: "ANDROID",
+            iosVersion: "IOS",
+            camera: "CÁMARA",
+            wattage: "POTENCIA",
+            connector: "CONECTOR",
+            voltage: "VOLTAJE",
+            amperage: "AMPERAJE",
+            color: "COLOR",
+            weight: "PESO",
+            connectivity: "CONECTIVIDAD",
+            panelType: "PANEL",
+            refreshRate: "REFRESCO",
+            batteryDuration: "BATERÍA",
+            serialNumber: "S/N",
+          };
+          const label = labels[k] || k.toUpperCase();
+          return `${label}: ${v}`;
+        });
+      
+      let specsText = "";
+      if (specsList.length > 0) {
+        specsText = `\n  ${specsList.join("  ·  ")}`;
       }
       
       // Agregar condición si no es 10/10
@@ -2746,26 +2777,35 @@ export default function Sales() {
                     </thead>
                     <tbody className="divide-y divide-dashed divide-slate-200">
                       {(detail.items || []).map((item: any, idx: number) => {
-                        // Construir specs para mostrar
-                        let specsDisplay = "";
+                        // Parsear y formatear TODAS las especificaciones
+                        let parsedSpecs: Record<string, any> = {};
                         if (item.specs) {
-                          const specs = typeof item.specs === 'string' ? JSON.parse(item.specs) : item.specs;
-                          const specParts: string[] = [];
-                          
-                          if (specs.watts) specParts.push(`${specs.watts}W`);
-                          if (specs.voltage) specParts.push(`${specs.voltage}V`);
-                          if (specs.amperage) specParts.push(`${specs.amperage}A`);
-                          if (specs.connector) specParts.push(specs.connector);
-                          if (specs.cpu) specParts.push(specs.cpu);
-                          if (specs.ram) specParts.push(specs.ram);
-                          if (specs.storage) specParts.push(specs.storage);
-                          if (specs.screen) specParts.push(`${specs.screen}"`);
-                          if (specs.color) specParts.push(specs.color);
-                          
-                          if (specParts.length > 0) {
-                            specsDisplay = specParts.join(" • ");
+                          try {
+                            parsedSpecs = typeof item.specs === 'string' ? JSON.parse(item.specs) : item.specs;
+                          } catch {
+                            parsedSpecs = {};
                           }
                         }
+                        
+                        const specsList = Object.entries(parsedSpecs)
+                          .filter(([_, v]) => {
+                            if (v === null || v === undefined) return false;
+                            const str = String(v).trim();
+                            if (str === "" || str === "null" || str === "undefined" || str === "N/A" || str === "n/a") return false;
+                            return true;
+                          })
+                          .map(([k, v]) => {
+                            const labels: Record<string, string> = {
+                              cpu: "PROCESADOR", ram: "RAM", storage: "ALMACENAMIENTO", screenSize: "PANTALLA",
+                              gpu: "GPU", resolution: "RESOLUCIÓN", os: "S.O.", androidVersion: "ANDROID",
+                              iosVersion: "IOS", camera: "CÁMARA", wattage: "POTENCIA", connector: "CONECTOR",
+                              voltage: "VOLTAJE", amperage: "AMPERAJE", color: "COLOR", weight: "PESO",
+                              connectivity: "CONECTIVIDAD", panelType: "PANEL", refreshRate: "REFRESCO",
+                              batteryDuration: "BATERÍA", serialNumber: "S/N",
+                            };
+                            const label = labels[k] || k.toUpperCase();
+                            return `${label}: ${v}`;
+                          });
                         
                         return (
                           <>
@@ -2774,14 +2814,17 @@ export default function Sales() {
                               <td className="py-2 px-2 font-mono text-[11px] text-slate-600">{item.productCode || `0000${idx + 1}`}</td>
                               <td className="py-2 px-2">
                                 <div className="font-bold text-slate-900">{item.productName}</div>
-                                {specsDisplay && (
-                                  <div className="text-[10px] text-slate-500 mt-0.5">{specsDisplay}</div>
+                                {specsList.length > 0 && (
+                                  <div className="mt-1.5 text-[11px] text-slate-600 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200 leading-relaxed">
+                                    <span className="font-bold text-slate-800">Especificaciones: </span>
+                                    <span className="text-slate-600">{specsList.join(" · ")}</span>
+                                  </div>
                                 )}
                                 {item.condition && item.condition < 10 && (
-                                  <div className="text-[10px] text-amber-600 mt-0.5">Condición: {item.condition}/10</div>
+                                  <div className="text-[10px] text-amber-600 mt-1">Condición: {item.condition}/10</div>
                                 )}
                                 {item.damageNotes && item.damageNotes.trim() && (
-                                  <div className="text-[10px] text-slate-500 italic mt-0.5">{item.damageNotes}</div>
+                                  <div className="text-[10px] text-slate-500 italic mt-1">{item.damageNotes}</div>
                                 )}
                               </td>
                               <td className="py-2 px-1 text-center text-slate-600">{item.unitType || "PZA"}</td>

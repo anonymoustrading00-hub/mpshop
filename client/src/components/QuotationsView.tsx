@@ -881,7 +881,23 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
                       {detailQuery.data.items.map((item: any) => {
                         let parsedSpecs: Record<string, any> = {};
                         if (item.specs) { try { parsedSpecs = typeof item.specs === "string" ? JSON.parse(item.specs) : item.specs; } catch { parsedSpecs = {}; } }
-                        const specsList = Object.entries(parsedSpecs).filter(([_, v]) => v && String(v).trim() !== "" && String(v) !== "null").map(([k, v]) => `${k.toUpperCase()}: ${v}`);
+                        const specsList = Object.entries(parsedSpecs).filter(([_, v]) => {
+                          if (v === null || v === undefined) return false;
+                          const str = String(v).trim();
+                          if (str === "" || str === "null" || str === "undefined" || str === "N/A" || str === "n/a") return false;
+                          return true;
+                        }).map(([k, v]) => {
+                          const labels: Record<string, string> = {
+                            cpu: "PROCESADOR", ram: "RAM", storage: "ALMACENAMIENTO", screenSize: "PANTALLA",
+                            gpu: "GPU", resolution: "RESOLUCIÓN", os: "S.O.", androidVersion: "ANDROID",
+                            iosVersion: "IOS", camera: "CÁMARA", wattage: "POTENCIA", connector: "CONECTOR",
+                            voltage: "VOLTAJE", amperage: "AMPERAJE", color: "COLOR", weight: "PESO",
+                            connectivity: "CONECTIVIDAD", panelType: "PANEL", refreshRate: "REFRESCO",
+                            batteryDuration: "BATERÍA", serialNumber: "S/N",
+                          };
+                          const label = labels[k] || k.toUpperCase();
+                          return `${label}: ${v}`;
+                        });
                         return (
                           <tr key={item.id} style={{ verticalAlign: 'top' }}>
                             <td style={{ padding: '12px 10px', borderBottom: '1px solid #ddd' }}>
