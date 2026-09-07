@@ -12,7 +12,7 @@ import {
   getDb,
 } from "../db";
 import { units } from "../../drizzle/schema";
-import { eq, inArray, and } from "drizzle-orm";
+import { eq, inArray, and, sql } from "drizzle-orm";
 import { ensureCustomerRecord } from "./customer_utils";
 
 const discountTypeSchema = z.enum(["none", "percentage", "fixed"]);
@@ -125,37 +125,63 @@ export const salesRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // ─── VALIDACIÓN SERVIDOR: expandir items con quantity > 1 a múltiples unidades ───
+      // ─── VALIDACIÓN SERVIDOR: expandir items con quantity > 1 a múltiples unidades (solo para no-fungibles) ───
       const db = await getDb();
       
       // Expandir items: si quantity > 1, buscar múltiples unidades del mismo modelo
       const expandedItems = [];
       
       for (const item of input.items) {
+        // Primero obtener la unidad para verificar su tipo
+        if (!db) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No se pueden procesar ventas en modo demo." });
+        }
+        
+        const [baseUnit] = await db.select().from(units).where(eq(units.id, item.unitId)).limit(1);
+        if (!baseUnit) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `La unidad ID ${item.unitId} no existe en el catálogo.` });
+        }
+        
+        // Determinar si es fungible
+        const unitType = (baseUnit.type || "").toLowerCase();
+        const isFungible = ['charger', 'accessory', 'battery', 'cable', 'case', 'other'].includes(unitType);
+        
         if (item.quantity === 1) {
-          // Cantidad 1: verificar que la unidad existe y está disponible
-          if (db) {
-            const [unit] = await db.select({ id: units.id, status: units.status }).from(units).where(eq(units.id, item.unitId)).limit(1);
-            if (!unit) {
-              throw new TRPCError({ code: "BAD_REQUEST", message: `La unidad ID ${item.unitId} no existe en el catálogo.` });
-            }
-            if (unit.status !== "available") {
-              throw new TRPCError({ code: "BAD_REQUEST", message: `La unidad ID ${item.unitId} no está disponible (estado: ${unit.status}).` });
-            }
+          // Cantidad 1: verificar que está disponible
+          if (baseUnit.status !== "available") {
+            throw new TRPCError({ code: "BAD_REQUEST", message: `La unidad ID ${item.unitId} no está disponible (estado: ${baseUnit.status}).` });
           }
           expandedItems.push(item);
+        } else if (isFungible) {
+          // ✅ Productos fungibles: NO expandir, mantener como un solo item con quantity > 1
+          // Verificar que hay suficiente stock
+          const availableCount = await db.select({ count: sql`count(*)` })
+            .from(units)
+            .where(
+              and(
+                eq(units.brand, baseUnit.brand),
+                eq(units.model, baseUnit.model),
+                eq(units.status, "available")
+              )
+            );
+          
+          const stockCount = Number(availableCount[0]?.count || 0);
+          if (stockCount < item.quantity) {
+            throw new TRPCError({ 
+              code: "BAD_REQUEST", 
+              message: `Solo hay ${stockCount} unidades disponibles de ${baseUnit.brand} ${baseUnit.model}. Solicitaste ${item.quantity}.` 
+            });
+          }
+          
+          // Mantener como un solo item con quantity (se procesará después)
+          expandedItems.push({
+            ...item,
+            isFungible: true,
+            brand: baseUnit.brand,
+            model: baseUnit.model,
+          });
         } else {
-          // Cantidad > 1: buscar unidades disponibles del mismo modelo
-          if (!db) {
-            throw new TRPCError({ code: "BAD_REQUEST", message: "No se pueden vender múltiples unidades en modo demo." });
-          }
-          
-          // Obtener la unidad base para conocer marca y modelo
-          const [baseUnit] = await db.select().from(units).where(eq(units.id, item.unitId)).limit(1);
-          if (!baseUnit) {
-            throw new TRPCError({ code: "BAD_REQUEST", message: `La unidad ID ${item.unitId} no existe.` });
-          }
-          
+          // ❌ Productos únicos (laptops): expandir a múltiples unit IDs
           // Buscar unidades disponibles del mismo modelo
           const availableUnits = await db.select({ id: units.id })
             .from(units)
@@ -190,19 +216,23 @@ export const salesRouter = router({
       }
       
       // Continuar con los items expandidos
-      const normalizedItems = expandedItems.map((item) => {
-        const pricing = getLinePricing(item.basePrice, 1, item.discountType, item.discountValue);
+      const normalizedItems = expandedItems.map((item: any) => {
+        const itemQuantity = item.isFungible ? item.quantity : 1;
+        const pricing = getLinePricing(item.basePrice, itemQuantity, item.discountType, item.discountValue);
 
         return {
           unitId: item.unitId,
           pricingType: item.pricingType,
-          quantity: 1,
+          quantity: itemQuantity,
           basePrice: pricing.basePrice,
           discountType: item.discountType,
           discountValue: pricing.discountValue,
           discountAmount: pricing.discountAmount,
           finalUnitPrice: pricing.finalUnitPrice,
           subtotal: pricing.subtotal,
+          isFungible: item.isFungible || false,
+          brand: item.brand,
+          model: item.model,
         };
       });
 

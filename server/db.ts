@@ -3515,67 +3515,156 @@ export async function createSaleWithItems(payload: SaleCreatePayload) {
     const saleId = getInsertId(saleResult);
 
     for (const item of payload.items) {
-      await tx.insert(saleItems).values({
-        ...item,
-        saleId,
-      });
-
-      // Obtener datos de la unidad para COGS y garantía
-      const [unitRow] = await tx.select().from(units).where(eq(units.id, item.unitId)).limit(1);
-
-      // Actualizar estado de la unidad a vendida
-      await tx.update(units).set({
-        status: "sold",
-        updatedAt: new Date(),
-      }).where(eq(units.id, item.unitId));
-
-      // Registrar evento
-      await tx.insert(unitEvents).values({
-        unitId: item.unitId,
-        eventType: "sold",
-        fromStatus: "available",
-        toStatus: "sold",
-        userId: payload.soldBy,
-        notes: `Vendido en venta #${payload.saleNumber}`,
-      });
-
-      // Crear registro de garantía si aplica
-      const warrantyDays = payload.warrantyDays !== undefined ? payload.warrantyDays : 30;
-      if (warrantyDays > 0) {
-        const startDate = new Date();
-        const endDate = new Date(startDate.getTime() + warrantyDays * 24 * 60 * 60 * 1000);
-        await tx.insert(schema.warranties).values({
-          unitId: item.unitId,
+      const itemAny = item as any;
+      const isFungible = itemAny.isFungible || false;
+      const quantity = itemAny.quantity || 1;
+      
+      if (isFungible && quantity > 1) {
+        // ✅ Producto fungible con cantidad > 1: buscar N unidades del mismo brand+model
+        const unitsToSell = await tx.select()
+          .from(units)
+          .where(
+            and(
+              eq(units.brand, itemAny.brand),
+              eq(units.model, itemAny.model),
+              eq(units.status, "available")
+            )
+          )
+          .limit(quantity);
+        
+        if (unitsToSell.length < quantity) {
+          throw new Error(`No hay suficientes unidades disponibles de ${itemAny.brand} ${itemAny.model}`);
+        }
+        
+        // Insertar UN SOLO sale_item con quantity
+        await tx.insert(saleItems).values({
           saleId,
-          orderId: payload.orderId || null,
-          days: warrantyDays,
-          startDate,
-          endDate,
-          status: "active",
+          unitId: unitsToSell[0].id, // Usar el ID de la primera unidad como referencia
+          pricingType: item.pricingType,
+          quantity: quantity,
+          basePrice: item.basePrice,
+          discountType: item.discountType,
+          discountValue: item.discountValue,
+          discountAmount: item.discountAmount,
+          finalUnitPrice: item.finalUnitPrice,
+          subtotal: item.subtotal,
         });
-      }
+        
+        // Marcar TODAS las unidades como vendidas
+        for (const unit of unitsToSell) {
+          await tx.update(units).set({
+            status: "sold",
+            updatedAt: new Date(),
+          }).where(eq(units.id, unit.id));
+          
+          await tx.insert(unitEvents).values({
+            unitId: unit.id,
+            eventType: "sold",
+            fromStatus: "available",
+            toStatus: "sold",
+            userId: payload.soldBy,
+            notes: `Vendido en venta #${payload.saleNumber} (fungible: ${itemAny.brand} ${itemAny.model})`,
+          });
+          
+          // COGS para cada unidad
+          if (unit.purchasePrice && unit.purchasePrice > 0) {
+            await tx.insert(operationalExpenses).values({
+              branchId: payload.branchId || 1,
+              description: `COGS - ${unit.brand || ""} ${unit.model || ""} (${unit.code || unit.id}) · Venta ${payload.saleNumber}`,
+              category: "cogs",
+              costType: "direct_cost",
+              referenceType: "sale",
+              referenceId: saleId,
+              isAutomatic: 1,
+              amount: unit.purchasePrice,
+              paymentMethod: "cash",
+              expenseDate: new Date(),
+              status: "paid",
+              userId: payload.soldBy,
+              notes: `Costo de adquisición registrado al momento de venta ${payload.saleNumber}`,
+            });
+          }
+        }
+        
+        // Crear garantía para productos fungibles (una sola para el grupo)
+        const warrantyDays = payload.warrantyDays !== undefined ? payload.warrantyDays : 30;
+        if (warrantyDays > 0) {
+          const startDate = new Date();
+          const endDate = new Date(startDate.getTime() + warrantyDays * 24 * 60 * 60 * 1000);
+          await tx.insert(schema.warranties).values({
+            unitId: unitsToSell[0].id,
+            saleId,
+            orderId: payload.orderId || null,
+            days: warrantyDays,
+            startDate,
+            endDate,
+            status: "active",
+          });
+        }
+      } else {
+        // ❌ Producto único o fungible con quantity=1: lógica original
+        await tx.insert(saleItems).values({
+          ...item,
+          saleId,
+        });
 
-      // COGS: registrar costo de adquisición de la unidad vendida
-      // Solo va a operationalExpenses (P&L). NO se inserta en financialTransactions
-      // porque el COGS es un costo contable, no un egreso real de caja.
-      // El dinero de compra ya salió cuando se registró la unidad (category: "purchase").
-      if (unitRow && unitRow.purchasePrice && unitRow.purchasePrice > 0) {
-        await tx.insert(operationalExpenses).values({
-          branchId: payload.branchId || 1,
-          description: `COGS - ${unitRow.brand || ""} ${unitRow.model || ""} (${unitRow.code || item.unitId}) · Venta ${payload.saleNumber}`,
-          category: "cogs",
-          costType: "direct_cost",
-          referenceType: "sale",
-          referenceId: saleId,
-          isAutomatic: 1,
-          amount: unitRow.purchasePrice,
-          paymentMethod: "cash",
-          expenseDate: new Date(),
-          status: "paid",
+        // Obtener datos de la unidad para COGS y garantía
+        const [unitRow] = await tx.select().from(units).where(eq(units.id, item.unitId)).limit(1);
+
+        // Actualizar estado de la unidad a vendida
+        await tx.update(units).set({
+          status: "sold",
+          updatedAt: new Date(),
+        }).where(eq(units.id, item.unitId));
+
+        // Registrar evento
+        await tx.insert(unitEvents).values({
+          unitId: item.unitId,
+          eventType: "sold",
+          fromStatus: "available",
+          toStatus: "sold",
           userId: payload.soldBy,
-          notes: `Costo de adquisición registrado al momento de venta ${payload.saleNumber}`,
+          notes: `Vendido en venta #${payload.saleNumber}`,
         });
-        // ⚠️ No insertar en financialTransactions — COGS no afecta saldo de caja.
+
+        // Crear registro de garantía si aplica
+        const warrantyDays = payload.warrantyDays !== undefined ? payload.warrantyDays : 30;
+        if (warrantyDays > 0) {
+          const startDate = new Date();
+          const endDate = new Date(startDate.getTime() + warrantyDays * 24 * 60 * 60 * 1000);
+          await tx.insert(schema.warranties).values({
+            unitId: item.unitId,
+            saleId,
+            orderId: payload.orderId || null,
+            days: warrantyDays,
+            startDate,
+            endDate,
+            status: "active",
+          });
+        }
+
+        // COGS: registrar costo de adquisición de la unidad vendida
+        // Solo va a operationalExpenses (P&L). NO se inserta en financialTransactions
+        // porque el COGS es un costo contable, no un egreso real de caja.
+        // El dinero de compra ya salió cuando se registró la unidad (category: "purchase").
+        if (unitRow && unitRow.purchasePrice && unitRow.purchasePrice > 0) {
+          await tx.insert(operationalExpenses).values({
+            branchId: payload.branchId || 1,
+            description: `COGS - ${unitRow.brand || ""} ${unitRow.model || ""} (${unitRow.code || item.unitId}) · Venta ${payload.saleNumber}`,
+            category: "cogs",
+            costType: "direct_cost",
+            referenceType: "sale",
+            referenceId: saleId,
+            isAutomatic: 1,
+            amount: unitRow.purchasePrice,
+            paymentMethod: "cash",
+            expenseDate: new Date(),
+            status: "paid",
+            userId: payload.soldBy,
+            notes: `Costo de adquisición registrado al momento de venta ${payload.saleNumber}`,
+          });
+          // ⚠️ No insertar en financialTransactions — COGS no afecta saldo de caja.
+        }
       }
     }
 

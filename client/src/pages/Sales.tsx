@@ -964,7 +964,10 @@ export default function Sales() {
 
   // Map a raw unit item to the product shape used in the cart
   const toProductShape = (u: any) => {
-    // Contar unidades disponibles del mismo modelo
+    const isFungible = ['charger', 'accessory', 'battery', 'cable', 'case', 'other'].includes(u.type?.toLowerCase());
+    
+    // Para productos fungibles, contar cuántos hay con el mismo brand+model
+    // Para productos únicos (laptops), contar cuántos del mismo modelo están disponibles
     const availableUnitsOfSameModel = (unitsList?.items || []).filter((unit: any) => 
       unit.brand === u.brand && 
       unit.model === u.model && 
@@ -989,9 +992,10 @@ export default function Sales() {
       purchasePrice: u.purchasePrice || 0,
       price: u.salePrice || 0,
       status: u.status,
-      category: "unit",
+      category: isFungible ? "fungible" : "unit",
       stock: availableUnitsOfSameModel,
       rawUnit: u,
+      isFungible,
     };
   };
 
@@ -1081,9 +1085,9 @@ export default function Sales() {
   };
 
   const addProductToCart = (product: any, forcedPricingType?: "unit" | "discount" | "wholesale") => {
-    // Units (laptops/accesorios) don't have a stock field - they are single items
-    const isUnit = product.category === "unit";
-    if (!isUnit && product.stock <= 0) {
+    const isFungible = product.isFungible;
+    
+    if (product.stock <= 0) {
       toast.error("Ese producto no tiene stock disponible");
       return;
     }
@@ -1097,54 +1101,33 @@ export default function Sales() {
     }
 
     setCartItems((current) => {
-      const existingIndex = current.findIndex((item) => item.productId === product.id);
+      // Para productos fungibles, buscar por brand+model (agrupar)
+      // Para productos únicos, buscar por ID específico
+      const existingIndex = isFungible 
+        ? current.findIndex((item) => 
+            item.brand === product.brand && 
+            item.model === product.model &&
+            item.isFungible === true
+          )
+        : current.findIndex((item) => item.productId === product.id);
 
       if (existingIndex >= 0) {
         const existing = current[existingIndex];
         
-        // Para unidades: verificar cuántas disponibles hay del mismo modelo
-        if (isUnit) {
-          // Contar unidades disponibles del mismo modelo
-          const availableCount = products?.filter((p: any) => 
-            p.brand === product.brand && 
-            p.model === product.model && 
-            p.status === 'available'
-          ).length || 1;
-          
-          if (existing.quantity >= availableCount) {
-            toast.error(`Solo hay ${availableCount} unidades disponibles de este modelo`);
-            return current;
-          }
-          
-          const updated = [...current];
-          updated[existingIndex] = { ...existing, quantity: existing.quantity + 1 };
-          return updated;
-        }
+        // Verificar stock disponible
+        const availableCount = product.stock;
         
-        // Para productos fungibles: verificar stock
-        if (existing.quantity >= product.stock) {
-          toast.error(`Solo hay ${product.stock} unidades disponibles`);
+        if (existing.quantity >= availableCount) {
+          toast.error(`Solo hay ${availableCount} unidades disponibles de este modelo`);
           return current;
         }
-
+        
         const updated = [...current];
         updated[existingIndex] = { ...existing, quantity: existing.quantity + 1 };
         return updated;
       }
 
-      // Calcular stock disponible para nuevos items
-      let availableStock = 1;
-      if (isUnit) {
-        // Para unidades: contar cuántas del mismo modelo están disponibles
-        availableStock = products?.filter((p: any) => 
-          p.brand === product.brand && 
-          p.model === product.model && 
-          p.status === 'available'
-        ).length || 1;
-      } else {
-        availableStock = product.stock;
-      }
-
+      // Nuevo item en el carrito
       return [
         ...current,
         {
@@ -1161,12 +1144,13 @@ export default function Sales() {
           location: product.location || product.rawUnit?.location,
           purchasePrice: product.purchasePrice || product.rawUnit?.purchasePrice,
           rawUnit: product.rawUnit || product,
-          stock: availableStock,
+          stock: product.stock,
           quantity: 1,
           basePrice: calculatedBasePrice,
           pricingType: mode,
           discountType: "none",
           discountValue: 0,
+          isFungible: isFungible,
         },
       ];
     });
