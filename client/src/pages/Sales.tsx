@@ -1250,11 +1250,27 @@ export default function Sales() {
     setCartItems((current) =>
       current.map((item) => {
         if (item.productId !== productId) return item;
-        const next = { ...item, ...changes };
-        if (next.quantity > item.stock) {
-          toast.error(`Solo hay ${item.stock} unidades disponibles`);
-          return item;
+        
+        // Calcular stock disponible dinámicamente
+        let availableStock = item.stock;
+        
+        if (item.isFungible) {
+          // Para fungibles: contar unidades disponibles del mismo brand+model
+          availableStock = products?.filter((p: any) => 
+            p.brand === item.brand && 
+            p.model === item.model && 
+            p.status === 'available'
+          ).length || 0;
         }
+        
+        const next = { ...item, ...changes, stock: availableStock };
+        
+        // Validar que la nueva cantidad no exceda el stock
+        if (changes.quantity && changes.quantity > availableStock) {
+          toast.error(`Solo hay ${availableStock} unidades disponibles${item.isFungible ? ` de ${item.brand} ${item.model}` : ''}`);
+          return { ...item, stock: availableStock }; // Actualizar stock pero no cantidad
+        }
+        
         return next;
       })
     );
