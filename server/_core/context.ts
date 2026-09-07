@@ -32,6 +32,37 @@ export async function createContext(
     }
   }
 
+  // Validar que el usuario tenga permiso para acceder a la sucursal solicitada
+  if (user && user.id !== 999 && user.id !== 1000) { // Excluir super admin (id 999 y 1000)
+    let assignedBranchIds: any[] = ["all"];
+    try {
+      if (typeof user.assignedBranchIds === "string") {
+        assignedBranchIds = JSON.parse(user.assignedBranchIds);
+      } else if (Array.isArray(user.assignedBranchIds)) {
+        assignedBranchIds = user.assignedBranchIds;
+      }
+    } catch {
+      assignedBranchIds = ["all"];
+    }
+
+    // Si el usuario NO tiene acceso a todas las sucursales
+    if (!assignedBranchIds.includes("all")) {
+      // Convertir a números para comparación
+      const allowedBranches = assignedBranchIds.map((id: any) => 
+        typeof id === "string" ? parseInt(id, 10) : id
+      ).filter((id: any) => !isNaN(id));
+
+      // Si la sucursal solicitada no está en la lista de permitidas
+      if (!allowedBranches.includes(branchId)) {
+        // Forzar al usuario a su primera sucursal asignada
+        if (allowedBranches.length > 0) {
+          branchId = allowedBranches[0];
+          console.log(`[Context] User ${user.username} forced to branch ${branchId} (not authorized for ${branchHeader})`);
+        }
+      }
+    }
+  }
+
   return {
     req: opts.req,
     res: opts.res,
