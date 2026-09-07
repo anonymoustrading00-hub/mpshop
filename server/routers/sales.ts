@@ -21,7 +21,7 @@ const paymentStatusSchema = z.enum(["pending", "completed"]);
 
 function getLinePricing(basePrice: number, quantity: number, discountType: "none" | "percentage" | "fixed", discountValue: number) {
   const safeBasePrice = Math.max(0, Math.round(basePrice));
-  const safeQuantity = 1; // 1 unidad por item
+  const safeQuantity = Math.max(1, Math.round(quantity)); // Usar el quantity recibido
   const safeDiscountValue = Math.max(0, Math.round(discountValue));
 
   let finalUnitPrice = safeBasePrice;
