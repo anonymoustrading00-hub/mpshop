@@ -2305,10 +2305,10 @@ export default function Sales() {
                             <div className="flex items-center gap-1 bg-white px-1 py-0.5 rounded-lg border border-slate-200 shrink-0">
                               <button
                                 type="button"
-                                className="h-5 w-5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-600"
+                                className="h-5 w-5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-sm"
                                 onClick={() => updateCartItem(item.productId, { quantity: Math.max(1, item.quantity - 1) })}
                               >
-                                <Minus className="h-2.5 w-2.5" />
+                                −
                               </button>
                               <input
                                 type="number"
@@ -2321,10 +2321,10 @@ export default function Sales() {
                               />
                               <button
                                 type="button"
-                                className="h-5 w-5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-600"
+                                className="h-5 w-5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-sm"
                                 onClick={() => updateCartItem(item.productId, { quantity: Math.min(item.stock, item.quantity + 1) })}
                               >
-                                <Plus className="h-2.5 w-2.5" />
+                                +
                               </button>
                             </div>
 
