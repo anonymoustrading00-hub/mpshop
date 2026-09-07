@@ -145,6 +145,10 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       })
     : branches;
 
+  console.log("[BranchContext] 📋 All branches:", branches.map((b: any) => ({ id: b.id, name: b.name })));
+  console.log("[BranchContext] 👁️ Visible branches:", visibleBranches.map((b: any) => ({ id: b.id, name: b.name })));
+  console.log("[BranchContext] 🎯 Active branch ID:", activeBranchId);
+
   return (
     <BranchContext.Provider
       value={{ activeBranchId, setActiveBranchId, branches: visibleBranches, isLoading }}
