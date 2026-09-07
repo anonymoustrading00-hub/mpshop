@@ -34,12 +34,27 @@ export function useAuth(options?: UseAuthOptions) {
         error instanceof TRPCClientError &&
         error.data?.code === "UNAUTHORIZED"
       ) {
-        return;
+        // Usuario ya no autenticado, continuar con logout local
+      } else {
+        console.error("Error during logout:", error);
       }
-      throw error;
     } finally {
+      // Siempre limpiar sesión local
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
+      
+      // Limpiar localStorage
+      try {
+        localStorage.removeItem("manus-runtime-user-info");
+        localStorage.removeItem("x-branch-id");
+      } catch (e) {
+        console.warn("Failed to clear localStorage", e);
+      }
+      
+      // Redirigir al login
+      if (typeof window !== "undefined") {
+        window.location.href = getLoginUrl();
+      }
     }
   }, [logoutMutation, utils]);
 
