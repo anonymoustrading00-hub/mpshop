@@ -730,7 +730,8 @@ export async function getAllUsers() {
   if (!db) {
     return MOCK_USERS;
   }
-  return await db.select().from(users);
+  const result = await db.select().from(users);
+  return toPlainObject(result);
 }
 
 export async function updateUser(id: number, data: any) {
