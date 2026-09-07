@@ -345,6 +345,16 @@ export default function UsersManagement() {
 
   // Filtrado de usuarios
   const usersList = usersQuery.data || [];
+  
+  // DEBUG: Ver qué usuarios llegan
+  console.log("[UsersManagement] usersQuery:", {
+    isLoading: usersQuery.isLoading,
+    isError: usersQuery.isError,
+    error: usersQuery.error,
+    dataLength: usersList.length,
+    data: usersList
+  });
+
   const filteredUsers = useMemo(() => {
     return usersList.filter((u: any) => {
       const matchSearch =
