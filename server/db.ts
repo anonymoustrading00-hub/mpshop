@@ -3929,15 +3929,28 @@ export async function getSaleItemsBySaleId(saleId: number) {
   const resolved = await Promise.all(items.map(async (item: any) => {
     let name = item.productName;
     let code = item.productCode || "";
+    let specs = null;
+    let condition = null;
+    let damageNotes = null;
     let foundUnit = false;
     const uId = item.unitId ?? item.productId;
     if (uId) {
-      const unit = await db.select({ brand: units.brand, model: units.model, code: units.code }).from(units).where(eq(units.id, uId)).limit(1);
+      const unit = await db.select({ 
+        brand: units.brand, 
+        model: units.model, 
+        code: units.code,
+        specs: units.specs,
+        condition: units.condition,
+        damageNotes: units.damageNotes
+      }).from(units).where(eq(units.id, uId)).limit(1);
       const u = unit[0];
       if (u) {
         foundUnit = true;
         name = `${u.brand || ""} ${u.model || ""}`.trim() || u.code || `Unidad #${uId}`;
         code = u.code || "";
+        specs = u.specs;
+        condition = u.condition;
+        damageNotes = u.damageNotes;
       }
     }
     // Si no se encontro la unidad en el catalogo, marcar como huerfano
@@ -3945,6 +3958,9 @@ export async function getSaleItemsBySaleId(saleId: number) {
       ...item,
       productName: name || `Articulo #${item.id}`,
       productCode: code,
+      specs,
+      condition,
+      damageNotes,
       unitType: "PZA",
       _orphan: !foundUnit && !!(uId),
     };
