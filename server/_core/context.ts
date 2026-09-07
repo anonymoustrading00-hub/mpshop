@@ -32,18 +32,18 @@ export async function createContext(
     }
   }
 
+  // Parsear assignedBranchIds si viene como string JSON
+  if (user && typeof user.assignedBranchIds === "string") {
+    try {
+      user.assignedBranchIds = JSON.parse(user.assignedBranchIds);
+    } catch {
+      user.assignedBranchIds = ["all"];
+    }
+  }
+
   // Validar que el usuario tenga permiso para acceder a la sucursal solicitada
   if (user && user.id !== 999 && user.id !== 1000) { // Excluir super admin (id 999 y 1000)
-    let assignedBranchIds: any[] = ["all"];
-    try {
-      if (typeof user.assignedBranchIds === "string") {
-        assignedBranchIds = JSON.parse(user.assignedBranchIds);
-      } else if (Array.isArray(user.assignedBranchIds)) {
-        assignedBranchIds = user.assignedBranchIds;
-      }
-    } catch {
-      assignedBranchIds = ["all"];
-    }
+    let assignedBranchIds: any[] = Array.isArray(user.assignedBranchIds) ? user.assignedBranchIds : ["all"];
 
     // Si el usuario NO tiene acceso a todas las sucursales
     if (!assignedBranchIds.includes("all")) {
