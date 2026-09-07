@@ -7,6 +7,8 @@
  * Ejemplo:
  * ANTES: 101010-01, 101010-02, 101010-03, 101010-04, 101010-05
  * DESPUÉS: 101010, 101010, 101010, 101010, 101010
+ * 
+ * IDEMPOTENTE: Se puede ejecutar múltiples veces sin problemas.
  */
 
 import { getDb } from "../server/db";
@@ -19,11 +21,11 @@ async function unifyFungibleCodes() {
   const db = await getDb();
   
   if (!db) {
-    console.error("❌ No se pudo conectar a la base de datos");
-    process.exit(1);
+    console.log("⚠️  No hay conexión a base de datos (modo demo) - Saltando migración de códigos");
+    process.exit(0);
   }
 
-  console.log("🔍 Buscando unidades fungibles con códigos individuales...\n");
+  console.log("🔍 [Migración Códigos] Buscando unidades fungibles con códigos individuales...\n");
 
   // Obtener todas las unidades fungibles
   const fungibleUnits = await db
@@ -31,7 +33,12 @@ async function unifyFungibleCodes() {
     .from(units)
     .where(sql`${units.type} IN (${sql.join(FUNGIBLE_TYPES.map(t => sql`${t}`), sql`, `)})`);
 
-  console.log(`📦 Total de unidades fungibles encontradas: ${fungibleUnits.length}\n`);
+  if (fungibleUnits.length === 0) {
+    console.log("✅ [Migración Códigos] No hay unidades fungibles en la base de datos\n");
+    process.exit(0);
+  }
+
+  console.log(`📦 [Migración Códigos] Total de unidades fungibles: ${fungibleUnits.length}\n`);
 
   // Agrupar por brand + model
   const groupedByModel = new Map<string, typeof fungibleUnits>();
@@ -44,10 +51,11 @@ async function unifyFungibleCodes() {
     groupedByModel.get(key)!.push(unit);
   }
 
-  console.log(`🔢 Modelos únicos encontrados: ${groupedByModel.size}\n`);
+  console.log(`🔢 [Migración Códigos] Modelos únicos: ${groupedByModel.size}\n`);
 
   let totalUpdated = 0;
   let groupsProcessed = 0;
+  let groupsSkipped = 0;
 
   // Procesar cada grupo
   for (const [key, unitsInGroup] of groupedByModel.entries()) {
@@ -55,6 +63,7 @@ async function unifyFungibleCodes() {
     
     // Si solo hay 1 unidad, no necesita unificación
     if (unitsInGroup.length <= 1) {
+      groupsSkipped++;
       continue;
     }
 
@@ -62,49 +71,53 @@ async function unifyFungibleCodes() {
     const firstCode = unitsInGroup[0].code || "";
     const baseCode = firstCode.split("-")[0];
 
-    // Verificar si realmente tienen sufijos
+    // Verificar si realmente tienen sufijos numéricos
     const hasSuffixes = unitsInGroup.some(u => {
       const code = u.code || "";
-      return code.includes("-") && /\d+$/.test(code.split("-")[1]);
+      const parts = code.split("-");
+      // Tiene sufijo si: tiene guión Y la última parte es solo números
+      return parts.length > 1 && /^\d+$/.test(parts[parts.length - 1]);
     });
 
     if (!hasSuffixes) {
-      // Ya están unificados
+      // Ya están unificados o no tienen sufijos numéricos
+      groupsSkipped++;
       continue;
     }
 
     groupsProcessed++;
-    console.log(`\n📌 Grupo ${groupsProcessed}: ${brand} ${model} (${type})`);
+    console.log(`\n📌 [Migración] ${brand} ${model} (${type})`);
     console.log(`   Unidades: ${unitsInGroup.length}`);
-    console.log(`   Código base: ${baseCode}`);
-    console.log(`   Códigos actuales: ${unitsInGroup.map(u => u.code).join(", ")}`);
+    console.log(`   Código actual: ${unitsInGroup.map(u => u.code).join(", ")}`);
+    console.log(`   → Unificando a: ${baseCode}`);
 
     // Actualizar todas las unidades del grupo al código base
     for (const unit of unitsInGroup) {
       if (unit.code !== baseCode) {
         await db
           .update(units)
-          .set({ code: baseCode })
+          .set({ code: baseCode, updatedAt: new Date() })
           .where(eq(units.id, unit.id));
         
         totalUpdated++;
       }
     }
 
-    console.log(`   ✅ ${unitsInGroup.length} unidades actualizadas al código: ${baseCode}`);
+    console.log(`   ✅ Actualizado`);
   }
 
-  console.log("\n" + "=".repeat(60));
-  console.log(`✨ Migración completada`);
-  console.log(`   Grupos procesados: ${groupsProcessed}`);
-  console.log(`   Unidades actualizadas: ${totalUpdated}`);
-  console.log("=".repeat(60) + "\n");
+  console.log("\n" + "=".repeat(70));
+  console.log(`✨ [Migración Códigos] Completada`);
+  console.log(`   • Grupos procesados: ${groupsProcessed}`);
+  console.log(`   • Grupos sin cambios: ${groupsSkipped}`);
+  console.log(`   • Unidades actualizadas: ${totalUpdated}`);
+  console.log("=".repeat(70) + "\n");
 
   process.exit(0);
 }
 
 // Ejecutar
 unifyFungibleCodes().catch((error) => {
-  console.error("❌ Error durante la migración:", error);
+  console.error("❌ [Migración Códigos] Error:", error);
   process.exit(1);
 });
