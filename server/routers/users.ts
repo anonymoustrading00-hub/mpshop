@@ -177,8 +177,8 @@ function formatUserResponse(u: any) {
     allowedModules,
     specialPermissions,
     assignedBranchIds,
-    createdAt: u.createdAt,
-    lastSignedIn: u.lastSignedIn,
+    createdAt: u.createdAt ? (u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt)) : null,
+    lastSignedIn: u.lastSignedIn ? (u.lastSignedIn instanceof Date ? u.lastSignedIn.toISOString() : String(u.lastSignedIn)) : null,
   };
 }
 

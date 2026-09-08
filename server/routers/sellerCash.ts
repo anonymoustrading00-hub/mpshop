@@ -1,7 +1,9 @@
 import { z } from "zod";
+import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
+import { toPlainObject } from "../_core/serialize";
 import { 
   sellerCashRegisters, 
   sellerPartialDeliveries, 
@@ -55,7 +57,7 @@ export const sellerCashRouter = router({
     const expectedQr = cashRegister.salesQr;
     const expectedTransfer = cashRegister.salesTransfer;
     
-    return {
+    return toPlainObject({
       hasBox: true,
       box: {
         ...cashRegister,
@@ -63,7 +65,7 @@ export const sellerCashRouter = router({
         expectedQr,
         expectedTransfer,
       }
-    };
+    });
   }),
   
   /**
@@ -123,7 +125,7 @@ export const sellerCashRouter = router({
       return { 
         success: true, 
         message: "Solicitud de apertura enviada. Espera la aprobación del administrador.",
-        cashRegisterId: result.insertId
+        cashRegisterId: Number((result as any).insertId ?? 0)
       };
     }),
   
@@ -330,7 +332,7 @@ export const sellerCashRouter = router({
         .orderBy(desc(sellerCashRegisters.date))
         .limit(input.limit);
       
-      return history;
+      return toPlainObject(history);
     }),
   
   /**
@@ -360,10 +362,10 @@ export const sellerCashRouter = router({
         ),
     ]);
     
-    return {
+    return toPlainObject({
       pendingDeliveries,
       pendingExpenses,
-    };
+    });
   }),
 
   // ═══════════════════════════════════════════════════════════════
@@ -418,7 +420,7 @@ export const sellerCashRouter = router({
         .where(and(...conditions))
         .orderBy(desc(sellerCashRegisters.createdAt));
       
-      return boxes;
+      return toPlainObject(boxes);
     }),
   
   /**
@@ -486,13 +488,13 @@ export const sellerCashRouter = router({
         .where(eq(sellerCashExpenses.status, "pending")),
     ]);
     
-    return {
+    return toPlainObject({
       pendingOpenings,
       pendingClosings,
       pendingDeliveries,
       pendingExpenses,
       totalPending: pendingOpenings.length + pendingClosings.length + pendingDeliveries.length + pendingExpenses.length,
-    };
+    });
   }),
   
   /**
@@ -841,21 +843,29 @@ export const sellerCashRouter = router({
     if (!db) return { error: "Database not available" };
     
     try {
-      // Verificar si las tablas existen
-      const tables = await db.execute(sql`SHOW TABLES LIKE 'seller_%'`);
-      
-      // Contar registros en cada tabla
-      const [cashRegistersCount] = await db.execute(sql`SELECT COUNT(*) as count FROM seller_cash_registers`) as any;
-      const [deliveriesCount] = await db.execute(sql`SELECT COUNT(*) as count FROM seller_partial_deliveries`) as any;
-      const [expensesCount] = await db.execute(sql`SELECT COUNT(*) as count FROM seller_cash_expenses`) as any;
-      
+      // SHOW TABLES devuelve [rows, fields] — extraer solo las filas
+      const tablesRaw = await db.execute(sql`SHOW TABLES LIKE 'seller_%'`);
+      const tableRows = Array.isArray((tablesRaw as any)[0])
+        ? (tablesRaw as any)[0]
+        : (Array.isArray(tablesRaw) ? tablesRaw : []);
+
+      // COUNT(*) devuelve BigInt en mysql2 — convertir explícitamente con Number()
+      const [crRaw] = await db.execute(sql`SELECT COUNT(*) as count FROM seller_cash_registers`) as any;
+      const [delRaw] = await db.execute(sql`SELECT COUNT(*) as count FROM seller_partial_deliveries`) as any;
+      const [expRaw] = await db.execute(sql`SELECT COUNT(*) as count FROM seller_cash_expenses`) as any;
+
+      const parseCount = (raw: any) => {
+        const rows = Array.isArray(raw[0]) ? raw[0] : raw;
+        return Number(rows?.[0]?.count ?? 0);
+      };
+
       return {
         success: true,
-        tablesFound: tables,
+        tablesFound: tableRows.length,
         counts: {
-          cashRegisters: cashRegistersCount?.[0]?.count || 0,
-          deliveries: deliveriesCount?.[0]?.count || 0,
-          expenses: expensesCount?.[0]?.count || 0,
+          cashRegisters: parseCount([crRaw]),
+          deliveries: parseCount([delRaw]),
+          expenses: parseCount([expRaw]),
         },
         user: {
           id: ctx.user?.id,

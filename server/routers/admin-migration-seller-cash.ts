@@ -124,14 +124,17 @@ export const adminMigrationSellerCashRouter = router({
       `);
       migrations.push("seller_cash_expenses");
 
-      // Verificar que las tablas se crearon
-      const tables = await db.execute(sql`SHOW TABLES LIKE 'seller_%'`);
+      // Verificar que las tablas se crearon (solo las filas, no los FieldPackets)
+      const tablesRaw = await db.execute(sql`SHOW TABLES LIKE 'seller_%'`);
+      const tablesCount = Array.isArray((tablesRaw as any)[0])
+        ? (tablesRaw as any)[0].length
+        : (Array.isArray(tablesRaw) ? tablesRaw.length : 0);
 
       return {
         success: true,
-        message: "Migración ejecutada correctamente",
+        message: "Migracion ejecutada correctamente",
         migratedTables: migrations,
-        verifiedTables: tables,
+        verifiedTablesCount: tablesCount,
       };
     } catch (error: any) {
       throw new TRPCError({
@@ -155,30 +158,38 @@ export const adminMigrationSellerCashRouter = router({
     }
 
     try {
-      const tables = await db.execute(sql`SHOW TABLES LIKE 'seller_%'`);
-      
+      // SHOW TABLES devuelve [rows, fields] — solo usar rows para contar
+      const tablesRaw = await db.execute(sql`SHOW TABLES LIKE 'seller_%'`);
+      const tableRows = Array.isArray((tablesRaw as any)[0])
+        ? (tablesRaw as any)[0]
+        : (Array.isArray(tablesRaw) ? tablesRaw : []);
+      const tablesCount = tableRows.length;
+
       let counts = { cashRegisters: 0, deliveries: 0, expenses: 0 };
-      
+
       try {
-        const [cashRegistersResult] = await db.execute(sql`SELECT COUNT(*) as count FROM seller_cash_registers`) as any;
-        counts.cashRegisters = cashRegistersResult?.[0]?.count || 0;
+        const countRaw = await db.execute(sql`SELECT COUNT(*) as count FROM seller_cash_registers`) as any;
+        const rows = Array.isArray(countRaw[0]) ? countRaw[0] : countRaw;
+        counts.cashRegisters = Number(rows?.[0]?.count ?? 0);
       } catch {}
-      
+
       try {
-        const [deliveriesResult] = await db.execute(sql`SELECT COUNT(*) as count FROM seller_partial_deliveries`) as any;
-        counts.deliveries = deliveriesResult?.[0]?.count || 0;
+        const countRaw = await db.execute(sql`SELECT COUNT(*) as count FROM seller_partial_deliveries`) as any;
+        const rows = Array.isArray(countRaw[0]) ? countRaw[0] : countRaw;
+        counts.deliveries = Number(rows?.[0]?.count ?? 0);
       } catch {}
-      
+
       try {
-        const [expensesResult] = await db.execute(sql`SELECT COUNT(*) as count FROM seller_cash_expenses`) as any;
-        counts.expenses = expensesResult?.[0]?.count || 0;
+        const countRaw = await db.execute(sql`SELECT COUNT(*) as count FROM seller_cash_expenses`) as any;
+        const rows = Array.isArray(countRaw[0]) ? countRaw[0] : countRaw;
+        counts.expenses = Number(rows?.[0]?.count ?? 0);
       } catch {}
 
       return {
         success: true,
-        tables,
+        tablesExist: tablesCount === 3,
+        tablesCount,
         counts,
-        tablesExist: tables && (tables as any[]).length === 3,
       };
     } catch (error: any) {
       return {
