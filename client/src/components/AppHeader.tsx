@@ -26,6 +26,7 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
+  Wallet,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
@@ -37,6 +38,8 @@ type NavItem = {
   label: string;
   icon: React.ElementType;
   moduleKey?: string;
+  adminOnly?: boolean;   // si true, solo admins lo ven en el nav
+  sellerOnly?: boolean;  // si true, solo sellers lo ven en el nav
 };
 
 import { useBranch } from "@/contexts/BranchContext";
@@ -66,21 +69,21 @@ export const ADMIN_NAV_ROW1: NavItem[] = [
 ];
 
 export const ADMIN_NAV_ROW2: NavItem[] = [
-  { href: "/dashboard-kpis",      label: "📊 KPIs",        icon: BarChart3,        moduleKey: "dashboard-kpis" },
-  { href: "/reports",             label: "📈 Reportes",    icon: BarChart3,        moduleKey: "reports" },
-  { href: "/analytics",           label: "Analítica",      icon: TrendingUp,       moduleKey: "analytics" },
-  { href: "/rentabilidad",        label: "💰 Rentabilidad",icon: TrendingUp,       moduleKey: "finance" },
-  { href: "/finance",             label: "Finanzas",       icon: DollarSign,       moduleKey: "finance" },
-  { href: "/repartidor/finance",  label: "Caja Reparto",   icon: DollarSign,       moduleKey: "repartidor-finance" },
-  { href: "/vendedor/caja",       label: "Mi Caja",        icon: DollarSign,       moduleKey: "seller-cash" },
-  { href: "/admin/cajas-vendedores", label: "Cajas Vendedores", icon: Store,           moduleKey: "seller-boxes-admin" },
-  { href: "/accounts-receivable", label: "C. por Cobrar",  icon: CreditCard,       moduleKey: "accounts-receivable" },
-  { href: "/accounts-payable",    label: "C. por Pagar",   icon: Landmark,         moduleKey: "accounts-payable" },
-  { href: "/expenses",            label: "Gastos",         icon: Receipt,          moduleKey: "expenses" },
-  { href: "/branches",            label: "Sucursales",     icon: Store,            moduleKey: "branches" },
-  { href: "/users",               label: "👥 Usuarios",    icon: Users,            moduleKey: "users" },
-  { href: "/delivery-persons",    label: "Repartidores",   icon: Truck,            moduleKey: "delivery-persons" },
-  { href: "/settings",            label: "⚙️ Config.",     icon: Settings,         moduleKey: "settings-admin" },
+  { href: "/dashboard-kpis",         label: "📊 KPIs",           icon: BarChart3,  moduleKey: "dashboard-kpis" },
+  { href: "/reports",                 label: "📈 Reportes",       icon: BarChart3,  moduleKey: "reports" },
+  { href: "/analytics",              label: "Analítica",          icon: TrendingUp, moduleKey: "analytics" },
+  { href: "/rentabilidad",           label: "💰 Rentabilidad",   icon: TrendingUp, moduleKey: "finance" },
+  { href: "/finance",                label: "Finanzas",           icon: DollarSign, moduleKey: "finance" },
+  { href: "/admin/cajas-vendedores", label: "🏪 Cajas Vendedores", icon: Store,    moduleKey: "seller-boxes-admin", adminOnly: true },
+  { href: "/repartidor/finance",     label: "Caja Reparto",       icon: DollarSign, moduleKey: "repartidor-finance" },
+  { href: "/vendedor/caja",          label: "Mi Caja",            icon: Wallet,     moduleKey: "seller-cash" },
+  { href: "/accounts-receivable",    label: "C. por Cobrar",      icon: CreditCard, moduleKey: "accounts-receivable" },
+  { href: "/accounts-payable",       label: "C. por Pagar",       icon: Landmark,   moduleKey: "accounts-payable" },
+  { href: "/expenses",               label: "Gastos",             icon: Receipt,    moduleKey: "expenses" },
+  { href: "/branches",               label: "Sucursales",         icon: Store,      moduleKey: "branches" },
+  { href: "/users",                  label: "👥 Usuarios",        icon: Users,      moduleKey: "users" },
+  { href: "/delivery-persons",       label: "Repartidores",       icon: Truck,      moduleKey: "delivery-persons" },
+  { href: "/settings",               label: "⚙️ Config.",         icon: Settings,   moduleKey: "settings-admin" },
 ];
 
 // Flat list for mobile / command menu
@@ -282,7 +285,11 @@ export default function AppHeader() {
 
   // Cada empleado ve exactamente los módulos que tiene asignados en allowedModules
   const visibleRow1 = ADMIN_NAV_ROW1.filter(item => isModuleAllowed(item.moduleKey));
-  const visibleRow2 = ADMIN_NAV_ROW2.filter(item => isModuleAllowed(item.moduleKey));
+  const visibleRow2 = ADMIN_NAV_ROW2.filter(item => {
+    if (item.adminOnly && !isAdmin) return false;
+    if (item.sellerOnly && user?.role !== "seller") return false;
+    return isModuleAllowed(item.moduleKey);
+  });
 
   const initial = user?.name?.charAt(0).toUpperCase() ?? "U";
 
