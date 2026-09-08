@@ -69,10 +69,12 @@ export const salesRouter = router({
   }),
 
   list: protectedProcedure
-    .input(z.object({ branchId: z.number().optional() }).optional())
+    .input(z.object({ branchId: z.number().optional(), soldBy: z.number().optional() }).optional())
     .query(async ({ ctx, input }) => {
       const branchId = input?.branchId;
-      const allSales = await getAllSales(branchId);
+      // Si el usuario es vendedor (seller), forzar que solo vea sus propias ventas
+      const soldBy = ctx.user?.role === "seller" ? ctx.user.id : input?.soldBy;
+      const allSales = await getAllSales(branchId, soldBy);
       return allSales;
     }),
 

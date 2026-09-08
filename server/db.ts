@@ -3855,21 +3855,35 @@ export async function cancelSaleRecord(saleId: number, cancelledByUserId: number
   return { success: true };
 }
 
-export async function getAllSales(branchId?: number) {
+export async function getAllSales(branchId?: number, soldBy?: number) {
   const db = await getDb();
   if (!db) {
-    let list = MOCK_SALES;
+    let list = MOCK_SALES as any[];
     if (branchId) {
       list = list.filter((s: any) => !s.branchId || s.branchId === branchId);
+    }
+    if (soldBy) {
+      list = list.filter((s: any) => s.soldBy === soldBy);
     }
     return list.map((sale: any) => {
       return mapSaleWithRelations(sale, MOCK_USERS, MOCK_CUSTOMERS);
     }).sort((a: any, b: any) => new Date(b.createdAt || Date.now()).getTime() - new Date(a.createdAt || Date.now()).getTime());
   }
 
-  let rawSalesQuery = db.select().from(sales).$dynamic();
+  // Construir condiciones WHERE
+  const conditions: any[] = [];
   if (branchId) {
-    rawSalesQuery = rawSalesQuery.where(or(eq(sales.branchId, branchId), isNull(sales.branchId)));
+    conditions.push(or(eq(sales.branchId, branchId), isNull(sales.branchId)));
+  }
+  if (soldBy) {
+    conditions.push(eq(sales.soldBy, soldBy));
+  }
+
+  let rawSalesQuery = db.select().from(sales).$dynamic();
+  if (conditions.length === 1) {
+    rawSalesQuery = rawSalesQuery.where(conditions[0]);
+  } else if (conditions.length > 1) {
+    rawSalesQuery = rawSalesQuery.where(and(...conditions));
   }
 
   const [rawSales, usersList, customersList, branchesList] = await Promise.all([
