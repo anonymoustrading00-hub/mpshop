@@ -210,6 +210,83 @@ export default function SellerCashRegister() {
   const hasRejectedOpening = hasBox && currentBox?.openingStatus === "rejected";
   const hasPendingClosing  = hasBox && currentBox?.closingStatus === "pending";
   const hasRejectedClosing = hasBox && currentBox?.closingStatus === "rejected";
+  const hasApprovedClosing = hasBox && (currentBox?.closingStatus === "approved" || currentBox?.closingStatus === "forced_closed");
+
+  // Si el cierre fue APROBADO → mostrar resumen final
+  if (hasApprovedClosing) {
+    return (
+      <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6 mb-10">
+        <Card className="border-t-4 border-t-emerald-500 shadow-xl overflow-hidden">
+          <CardHeader className="text-center pb-2 bg-emerald-50/50">
+            <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm">
+              <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+            </div>
+            <CardTitle className="text-2xl font-black text-slate-800">Caja Cerrada</CardTitle>
+            <CardDescription className="text-slate-500 font-medium">
+              Tu caja del {today} ha sido cerrada y aprobada por el administrador.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-6">
+            <div className="flex justify-between items-center px-4 py-3 bg-white border border-slate-100 rounded-xl shadow-sm">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Estado Final</span>
+              <Badge className="bg-emerald-600 hover:bg-emerald-700 font-bold px-3 py-1">
+                CERRADA Y APROBADA ✓
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="bg-emerald-50/50 border-none shadow-none">
+                <CardContent className="p-4 text-center">
+                  <p className="text-[10px] text-slate-400 font-black uppercase mb-1">Efectivo Entregado</p>
+                  <p className="text-2xl font-black text-emerald-700">{formatCurrency(currentBox?.reportedCash || 0)}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-blue-50/50 border-none shadow-none">
+                <CardContent className="p-4 text-center">
+                  <p className="text-[10px] text-slate-400 font-black uppercase mb-1">QR Total</p>
+                  <p className="text-2xl font-black text-blue-700">{formatCurrency(currentBox?.reportedQr || 0)}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-purple-50/50 border-none shadow-none">
+                <CardContent className="p-4 text-center">
+                  <p className="text-[10px] text-slate-400 font-black uppercase mb-1">Transf. Total</p>
+                  <p className="text-2xl font-black text-purple-700">{formatCurrency(currentBox?.reportedTransfer || 0)}</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="p-6 bg-slate-900 rounded-xl text-center">
+              <p className="text-[10px] text-slate-400 font-black uppercase mb-2 tracking-widest">Total Ventas del Día</p>
+              <p className="text-4xl font-black text-emerald-400">
+                {formatCurrency((currentBox?.salesCash || 0) + (currentBox?.salesQr || 0) + (currentBox?.salesTransfer || 0))}
+              </p>
+            </div>
+
+            {currentBox?.closingNotes && (
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <p className="text-xs font-bold text-slate-600 uppercase mb-2">Notas del Administrador</p>
+                <p className="text-sm text-slate-700">{currentBox.closingNotes}</p>
+              </div>
+            )}
+
+            <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 flex gap-3 items-start">
+               <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+               <p className="text-xs text-emerald-800 leading-relaxed font-medium">
+                 ¡Excelente trabajo! Tu caja ha sido cerrada correctamente. Puedes revisar el historial completo más abajo.
+               </p>
+            </div>
+
+            <Button
+              className="w-full h-12 text-base font-bold bg-slate-700 hover:bg-slate-800"
+              onClick={() => setActiveTab("dashboard")}
+            >
+              <History className="w-4 h-4 mr-2" /> Ver Historial
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Si tiene cierre pendiente de aprobación
   if (hasPendingClosing) {
