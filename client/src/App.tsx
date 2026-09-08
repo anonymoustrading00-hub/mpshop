@@ -30,6 +30,7 @@ import Suppliers from "@/pages/Suppliers";
 import Purchases from "@/pages/Purchases";
 import Finance from "@/pages/Finance";
 import RepartidorFinance from "@/pages/RepartidorFinance";
+import SellerCashRegister from "@/pages/SellerCashRegister";
 import DeliveryLoad from "@/pages/DeliveryLoad";
 import Sales from "@/pages/Sales";
 import Customers from "@/pages/Customers";
@@ -268,6 +269,7 @@ function Router() {
           <Route path={"/create-order"} component={CreateOrder} />
           <Route path={"/edit-order/:id"} component={EditOrder} />
           <Route path="/repartidor/finance" component={RepartidorFinance} />
+          <Route path="/vendedor/caja" component={SellerCashRegister} />
           <Route path="/delivery-load" component={DeliveryLoad} />
 
           {/* Ruta oculta de administración — Backup & Restauración */}
