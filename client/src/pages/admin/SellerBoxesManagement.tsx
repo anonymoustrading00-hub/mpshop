@@ -51,6 +51,7 @@ export default function SellerBoxesManagement() {
   const today = getLocalDateInputValue();
   const [filterDate, setFilterDate] = useState(today);
   const [activeTab, setActiveTab] = useState("pending");
+  const [expenseFilterStatus, setExpenseFilterStatus] = useState<"all" | "pending" | "approved" | "rejected">("all");
 
   // Diálogos de aprobación / rechazo
   const [approveDialog, setApproveDialog] = useState<{ open: boolean; type: string; id: number; sellerName: string } | null>(null);
@@ -73,6 +74,8 @@ export default function SellerBoxesManagement() {
 
   const { data: allBoxes, refetch: refetchBoxes } =
     trpc.sellerCash.admin_listAllBoxes.useQuery({ date: filterDate, status: "all" });
+
+  const { data: allExpenses } = trpc.sellerCash.admin_listAllExpenses.useQuery({ date: filterDate });
 
   const { data: sellers } = trpc.sellerCash.admin_listSellers.useQuery();
 
@@ -281,7 +284,7 @@ export default function SellerBoxesManagement() {
 
       {/* ── Tabs ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="pending" className="relative">
             Aprobaciones
             {totalPending > 0 && (
@@ -291,6 +294,7 @@ export default function SellerBoxesManagement() {
             )}
           </TabsTrigger>
           <TabsTrigger value="active">Cajas Activas ({activeBoxes.length})</TabsTrigger>
+          <TabsTrigger value="expenses">💰 Gastos</TabsTrigger>
           <TabsTrigger value="history">Historial ({closedBoxes.length})</TabsTrigger>
         </TabsList>
 
@@ -598,6 +602,113 @@ export default function SellerBoxesManagement() {
         </TabsContent>
 
         {/* ════════════════════════════════════════════════
+            TAB: GASTOS (Reporte Completo)
+        ════════════════════════════════════════════════ */}
+        <TabsContent value="expenses" className="pt-4">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Receipt className="w-5 h-5 text-orange-600" />
+                    Reporte de Gastos
+                  </CardTitle>
+                  <CardDescription>Control completo de gastos de vendedores</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    className="px-3 py-1.5 border rounded-lg text-sm font-medium"
+                    value={expenseFilterStatus}
+                    onChange={(e) => setExpenseFilterStatus(e.target.value as any)}
+                  >
+                    <option value="all">Todos</option>
+                    <option value="pending">Pendientes</option>
+                    <option value="approved">Aprobados</option>
+                    <option value="rejected">Rechazados</option>
+                  </select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!allExpenses ? (
+                <p className="text-center py-8 text-slate-400">Cargando gastos...</p>
+              ) : allExpenses.expenses.length === 0 ? (
+                <div className="text-center py-12">
+                  <Receipt className="w-16 h-16 text-slate-200 mx-auto mb-3" />
+                  <p className="text-slate-500 font-bold">No hay gastos para {filterDate}</p>
+                </div>
+              ) : (
+                <>
+                  {/* KPIs */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                    <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                      <p className="text-xs text-amber-600 font-bold uppercase">Pendientes</p>
+                      <p className="text-2xl font-black text-amber-700">{allExpenses.totals.pending}</p>
+                    </div>
+                    <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+                      <p className="text-xs text-emerald-600 font-bold uppercase">Aprobados</p>
+                      <p className="text-2xl font-black text-emerald-700">{allExpenses.totals.approved}</p>
+                    </div>
+                    <div className="bg-red-50 rounded-xl p-3 border border-red-100">
+                      <p className="text-xs text-red-600 font-bold uppercase">Rechazados</p>
+                      <p className="text-2xl font-black text-red-700">{allExpenses.totals.rejected}</p>
+                    </div>
+                    <div className="bg-slate-900 rounded-xl p-3">
+                      <p className="text-xs text-slate-300 font-bold uppercase">Total Gastado</p>
+                      <p className="text-2xl font-black text-emerald-400">{formatCurrency(allExpenses.totals.totalAmount)}</p>
+                    </div>
+                  </div>
+
+                  {/* Tabla */}
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>Vendedor</TableHead>
+                        <TableHead>Concepto</TableHead>
+                        <TableHead>Monto</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Aprobado Por</TableHead>
+                        <TableHead>Notas</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allExpenses.expenses
+                        .filter(({ expense }) => 
+                          expenseFilterStatus === "all" || expense.status === expenseFilterStatus
+                        )
+                        .map(({ expense, seller }) => (
+                        <TableRow key={expense.id}>
+                          <TableCell className="text-xs text-slate-400 font-mono">{expense.id}</TableCell>
+                          <TableCell className="font-bold">{seller?.name ?? "—"}</TableCell>
+                          <TableCell className="font-medium">{expense.concept}</TableCell>
+                          <TableCell className="font-mono font-bold text-orange-700">{formatCurrency(expense.amount ?? 0)}</TableCell>
+                          <TableCell>
+                            {expense.status === "approved" && <Badge className="bg-emerald-500">Aprobado</Badge>}
+                            {expense.status === "pending" && <Badge className="bg-amber-500">Pendiente</Badge>}
+                            {expense.status === "rejected" && <Badge variant="destructive">Rechazado</Badge>}
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-500">
+                            {expense.requestDate ? new Date(expense.requestDate).toLocaleString() : "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-500">
+                            {expense.approvedBy ? `Admin #${expense.approvedBy}` : "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-400 max-w-[200px] truncate">
+                            {expense.adminNotes || expense.notes || "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ════════════════════════════════════════════════
             TAB: HISTORIAL
         ════════════════════════════════════════════════ */}
         <TabsContent value="history" className="pt-4">
@@ -620,6 +731,8 @@ export default function SellerBoxesManagement() {
                       <TableHead>Efectivo</TableHead>
                       <TableHead>QR</TableHead>
                       <TableHead>Transfer.</TableHead>
+                      <TableHead>Entregas</TableHead>
+                      <TableHead>Gastos</TableHead>
                       <TableHead>Total Ventas</TableHead>
                       <TableHead>Estado Apertura</TableHead>
                       <TableHead>Estado Cierre</TableHead>
@@ -637,6 +750,8 @@ export default function SellerBoxesManagement() {
                           <TableCell className="font-mono text-sm">{formatCurrency(cr.salesCash ?? 0)}</TableCell>
                           <TableCell className="font-mono text-sm">{formatCurrency(cr.salesQr ?? 0)}</TableCell>
                           <TableCell className="font-mono text-sm">{formatCurrency(cr.salesTransfer ?? 0)}</TableCell>
+                          <TableCell className="font-mono text-sm text-red-600">−{formatCurrency(cr.partialDeliveriesCash ?? 0)}</TableCell>
+                          <TableCell className="font-mono text-sm text-orange-600 font-bold">−{formatCurrency(cr.totalExpenses ?? 0)}</TableCell>
                           <TableCell className="font-mono font-bold">{formatCurrency(total)}</TableCell>
                           <TableCell>{openingStatusBadge(cr.openingStatus ?? "pending")}</TableCell>
                           <TableCell>{closingStatusBadge(cr.closingStatus ?? "open")}</TableCell>

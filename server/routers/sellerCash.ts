@@ -886,4 +886,80 @@ export const sellerCashRouter = router({
       };
     }
   }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NUEVO: Endpoint para listar TODOS los gastos (con filtros)
+  // ═══════════════════════════════════════════════════════════════════════════
+  admin_listAllExpenses: protectedProcedure
+    .input(z.object({
+      date: z.string().optional(),
+      status: z.enum(["all", "pending", "approved", "rejected"]).optional(),
+      sellerId: z.number().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      const conditions = [];
+      
+      if (input.date) {
+        conditions.push(sql`DATE(${sellerCashExpenses.requestDate}) = ${input.date}`);
+      }
+      
+      if (input.status && input.status !== "all") {
+        conditions.push(eq(sellerCashExpenses.status, input.status));
+      }
+      
+      if (input.sellerId) {
+        // Buscar via cashRegisterId → sellerId
+        const sellerBoxIds = await db
+          .select({ id: sellerCashRegisters.id })
+          .from(sellerCashRegisters)
+          .where(eq(sellerCashRegisters.sellerId, input.sellerId));
+        const ids = sellerBoxIds.map(b => b.id);
+        if (ids.length > 0) {
+          conditions.push(sql`${sellerCashExpenses.cashRegisterId} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`);
+        } else {
+          // Sin boxes → sin gastos
+          return { expenses: [], totals: { pending: 0, approved: 0, rejected: 0, totalAmount: 0 } };
+        }
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const expenses = await db
+        .select({
+          expense: sellerCashExpenses,
+          cashRegister: sellerCashRegisters,
+        })
+        .from(sellerCashExpenses)
+        .leftJoin(sellerCashRegisters, eq(sellerCashExpenses.cashRegisterId, sellerCashRegisters.id))
+        .where(whereClause)
+        .orderBy(desc(sellerCashExpenses.requestDate));
+
+      // Obtener sellers
+      const sellerIds = [...new Set(expenses.map(e => e.cashRegister?.sellerId).filter(Boolean))];
+      const sellers = sellerIds.length > 0
+        ? await db.select().from(users).where(sql`${users.id} IN (${sql.join(sellerIds.map(id => sql`${id}`), sql`, `)})`)
+        : [];
+
+      const result = expenses.map(({ expense, cashRegister }) => ({
+        expense,
+        seller: sellers.find(s => s.id === cashRegister?.sellerId) || null,
+        cashRegister,
+      }));
+
+      // Calcular totales
+      const totals = {
+        pending: expenses.filter(e => e.expense.status === "pending").length,
+        approved: expenses.filter(e => e.expense.status === "approved").length,
+        rejected: expenses.filter(e => e.expense.status === "rejected").length,
+        totalAmount: expenses
+          .filter(e => e.expense.status === "approved")
+          .reduce((sum, e) => sum + (e.expense.amount || 0), 0),
+      };
+
+      return { expenses: result, totals };
+    }),
 });
