@@ -633,6 +633,7 @@ export const sellerCashRegisters = mysqlTable("seller_cash_registers", {
   sellerId: int("sellerId").notNull().references(() => users.id),
   branchId: int("branchId").notNull().references(() => branches.id),
   date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  turnNumber: int("turnNumber").default(1).notNull(), // Número de turno del día (1, 2, 3...)
   
   // Apertura
   openingStatus: mysqlEnum("openingStatus", ["pending", "approved", "rejected"]).default("pending").notNull(),

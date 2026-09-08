@@ -37,7 +37,9 @@ export const sellerCashRouter = router({
     
     const today = getLocalDateKey();
     
-    const [cashRegister] = await db
+    // Buscar la ÚLTIMA caja del día que NO esté cerrada (open o pending)
+    // O si todas están cerradas, retornar que no tiene caja activa
+    const cashRegisters = await db
       .select()
       .from(sellerCashRegisters)
       .where(
@@ -46,21 +48,26 @@ export const sellerCashRouter = router({
           eq(sellerCashRegisters.date, today)
         )
       )
-      .limit(1);
+      .orderBy(desc(sellerCashRegisters.turnNumber));
     
-    if (!cashRegister) {
+    // Buscar la primera caja que no esté cerrada (approved o forced_closed)
+    const activeCashRegister = cashRegisters.find(
+      cr => cr.closingStatus !== "approved" && cr.closingStatus !== "forced_closed"
+    );
+    
+    if (!activeCashRegister) {
       return { hasBox: false, box: null };
     }
     
     // Calcular totales esperados
-    const expectedCash = cashRegister.initialCash + cashRegister.salesCash - cashRegister.partialDeliveriesCash - cashRegister.totalExpenses;
-    const expectedQr = cashRegister.salesQr;
-    const expectedTransfer = cashRegister.salesTransfer;
+    const expectedCash = activeCashRegister.initialCash + activeCashRegister.salesCash - activeCashRegister.partialDeliveriesCash - activeCashRegister.totalExpenses;
+    const expectedQr = activeCashRegister.salesQr;
+    const expectedTransfer = activeCashRegister.salesTransfer;
     
     return toPlainObject({
       hasBox: true,
       box: {
-        ...cashRegister,
+        ...activeCashRegister,
         expectedCash,
         expectedQr,
         expectedTransfer,
@@ -91,8 +98,8 @@ export const sellerCashRouter = router({
       const today = getLocalDateKey();
       const branchId = ctx.branchId;
       
-      // Verificar si ya tiene caja hoy
-      const [existing] = await db
+      // Calcular el siguiente turnNumber para hoy
+      const existingBoxes = await db
         .select()
         .from(sellerCashRegisters)
         .where(
@@ -101,25 +108,37 @@ export const sellerCashRouter = router({
             eq(sellerCashRegisters.date, today)
           )
         )
-        .limit(1);
+        .orderBy(desc(sellerCashRegisters.turnNumber));
 
-      if (existing) {
-        // Si fue rechazada, eliminarla para permitir nueva solicitud
-        if (existing.openingStatus === "rejected") {
-          await db.delete(sellerCashRegisters).where(eq(sellerCashRegisters.id, existing.id));
+      // Verificar si hay alguna caja activa (no cerrada)
+      const activeBox = existingBoxes.find(
+        box => box.closingStatus !== "approved" && box.closingStatus !== "forced_closed"
+      );
+
+      if (activeBox) {
+        // Si hay una caja activa y fue rechazada, eliminarla para permitir nueva solicitud
+        if (activeBox.openingStatus === "rejected") {
+          await db.delete(sellerCashRegisters).where(eq(sellerCashRegisters.id, activeBox.id));
         } else {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Ya tienes una caja registrada para hoy"
+            message: `Ya tienes una caja activa (Turno #${activeBox.turnNumber}). Debes cerrarla antes de abrir una nueva.`
           });
         }
       }
+
+      // Calcular el siguiente número de turno
+      const maxTurnNumber = existingBoxes.length > 0 
+        ? Math.max(...existingBoxes.map(b => b.turnNumber || 1))
+        : 0;
+      const nextTurnNumber = maxTurnNumber + 1;
       
       // Crear solicitud de apertura
       const [result] = await db.insert(sellerCashRegisters).values({
         sellerId: userId,
         branchId: branchId,
         date: today,
+        turnNumber: nextTurnNumber,
         openingStatus: "pending",
         initialCash: Math.round(input.initialCash * 100), // Convertir a centavos
         openedAt: new Date(),
@@ -423,7 +442,7 @@ export const sellerCashRouter = router({
         .leftJoin(users, eq(sellerCashRegisters.sellerId, users.id))
         .leftJoin(branches, eq(sellerCashRegisters.branchId, branches.id))
         .where(and(...conditions))
-        .orderBy(desc(sellerCashRegisters.createdAt));
+        .orderBy(desc(sellerCashRegisters.turnNumber), desc(sellerCashRegisters.createdAt));
       
       return toPlainObject(boxes);
     }),
@@ -760,8 +779,8 @@ export const sellerCashRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Vendedor no encontrado" });
       }
 
-      // Verificar que no tenga ya una caja para ese día
-      const [existing] = await db
+      // Verificar que no tenga una caja activa para ese día
+      const existingBoxes = await db
         .select()
         .from(sellerCashRegisters)
         .where(
@@ -770,14 +789,24 @@ export const sellerCashRouter = router({
             eq(sellerCashRegisters.date, today)
           )
         )
-        .limit(1);
+        .orderBy(desc(sellerCashRegisters.turnNumber));
 
-      if (existing) {
+      const activeBox = existingBoxes.find(
+        box => box.closingStatus !== "approved" && box.closingStatus !== "forced_closed"
+      );
+
+      if (activeBox) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `El vendedor ya tiene una caja registrada para el ${today}`
+          message: `El vendedor ya tiene una caja activa (Turno #${activeBox.turnNumber}) para el ${today}. Debe cerrarla primero.`
         });
       }
+
+      // Calcular el siguiente número de turno
+      const maxTurnNumber = existingBoxes.length > 0 
+        ? Math.max(...existingBoxes.map(b => b.turnNumber || 1))
+        : 0;
+      const nextTurnNumber = maxTurnNumber + 1;
 
       // Obtener branchId del vendedor (o usar la del contexto del admin)
       const [sellerBranch] = await db
@@ -792,6 +821,8 @@ export const sellerCashRouter = router({
       await db.insert(sellerCashRegisters).values({
         sellerId: input.sellerId,
         branchId,
+        date: today,
+        turnNumber: nextTurnNumber,
         date: today,
         openingStatus: "approved",          // ya aprobada — el admin la abre directamente
         openingApprovedBy: ctx.user.id,

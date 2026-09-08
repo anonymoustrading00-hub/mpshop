@@ -223,7 +223,7 @@ export default function SellerCashRegister() {
             </div>
             <CardTitle className="text-2xl font-black text-slate-800">Caja Cerrada</CardTitle>
             <CardDescription className="text-slate-500 font-medium">
-              Tu caja del {today} ha sido cerrada y aprobada por el administrador.
+              Tu caja del {today} {currentBox?.turnNumber && `(Turno #${currentBox.turnNumber})`} ha sido cerrada y aprobada por el administrador.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 pt-6">
@@ -314,7 +314,7 @@ export default function SellerCashRegister() {
             </div>
             <CardTitle className="text-2xl font-black text-slate-800">Cierre en Revisión</CardTitle>
             <CardDescription className="text-slate-500 font-medium">
-              Tu solicitud de cierre del {today} está siendo revisada por el administrador.
+              Tu solicitud de cierre del {today} {currentBox?.turnNumber && `(Turno #${currentBox.turnNumber})`} está siendo revisada por el administrador.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 pt-6">
@@ -477,7 +477,7 @@ export default function SellerCashRegister() {
             </div>
             <CardTitle className="text-2xl font-black text-slate-800">Apertura Pendiente</CardTitle>
             <CardDescription className="text-slate-500 font-medium">
-              Tu solicitud de apertura está siendo revisada.
+              Tu solicitud de apertura {currentBox?.turnNumber && currentBox.turnNumber > 1 && `(Turno #${currentBox.turnNumber})`} está siendo revisada.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 pt-6">
@@ -623,7 +623,11 @@ export default function SellerCashRegister() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Mi Caja</h1>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+            Mi Caja {currentBox?.turnNumber && currentBox.turnNumber > 1 && (
+              <span className="text-emerald-600">· Turno #{currentBox.turnNumber}</span>
+            )}
+          </h1>
           <p className="text-slate-500 font-medium">{today}</p>
         </div>
         <Badge

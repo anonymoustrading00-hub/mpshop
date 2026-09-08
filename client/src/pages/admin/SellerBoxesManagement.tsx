@@ -327,6 +327,7 @@ export default function SellerBoxesManagement() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Vendedor</TableHead>
+                      <TableHead>Turno</TableHead>
                       <TableHead>Efectivo Inicial</TableHead>
                       <TableHead>Notas</TableHead>
                       <TableHead>Hora</TableHead>
@@ -337,6 +338,9 @@ export default function SellerBoxesManagement() {
                     {pending!.pendingOpenings.map(({ cashRegister: cr, seller }) => (
                       <TableRow key={cr.id}>
                         <TableCell className="font-bold">{seller?.name ?? "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="font-bold text-xs">T{cr.turnNumber || 1}</Badge>
+                        </TableCell>
                         <TableCell className="font-mono font-bold text-emerald-700">{formatCurrency(cr.initialCash ?? 0)}</TableCell>
                         <TableCell className="text-sm text-slate-500 max-w-[180px] truncate">{cr.openingNotes ?? "—"}</TableCell>
                         <TableCell className="text-xs text-slate-400">
@@ -543,7 +547,12 @@ export default function SellerBoxesManagement() {
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <CardTitle className="text-base font-black">{seller?.name ?? "—"}</CardTitle>
+                          <CardTitle className="text-base font-black">
+                            {seller?.name ?? "—"}
+                            {cr.turnNumber && cr.turnNumber > 1 && (
+                              <span className="text-emerald-600 ml-1">· T{cr.turnNumber}</span>
+                            )}
+                          </CardTitle>
                           <CardDescription className="text-xs">{branch?.name ?? "—"} · Caja #{cr.id}</CardDescription>
                         </div>
                         {openingStatusBadge(cr.openingStatus ?? "pending")}
@@ -726,6 +735,7 @@ export default function SellerBoxesManagement() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>#</TableHead>
+                      <TableHead>Turno</TableHead>
                       <TableHead>Vendedor</TableHead>
                       <TableHead>Sucursal</TableHead>
                       <TableHead>Efectivo</TableHead>
@@ -745,6 +755,11 @@ export default function SellerBoxesManagement() {
                       return (
                         <TableRow key={cr.id}>
                           <TableCell className="text-xs text-slate-400 font-mono">{cr.id}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="font-bold">
+                              T{cr.turnNumber || 1}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="font-bold">{seller?.name ?? "—"}</TableCell>
                           <TableCell className="text-sm text-slate-500">{branch?.name ?? "—"}</TableCell>
                           <TableCell className="font-mono text-sm">{formatCurrency(cr.salesCash ?? 0)}</TableCell>
