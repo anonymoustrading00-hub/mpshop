@@ -24,6 +24,9 @@ import {
 } from "../db";
 import { getLocalDateKey, pad2 } from "../_core/date_utils";
 import { TRPCError } from "@trpc/server";
+import { getDb } from "../db";
+import { sellerCashRegisters } from "../../drizzle/schema";
+import { and, eq } from "drizzle-orm";
 
 
 export const financeRouter = router({
@@ -568,12 +571,33 @@ export const financeRouter = router({
     .query(async ({ ctx, input }) => {
     const userId = ctx.user?.id;
     if (!userId) return { hasActive: false };
-    
+
+    // Para vendedores: verificar en seller_cash_registers en lugar de cash_openings
+    if (ctx.user?.role === "seller") {
+      const db = await getDb();
+      if (!db) return { hasActive: true }; // en modo demo, permitir ventas
+
+      const today = getLocalDateKey();
+      const [sellerBox] = await db
+        .select({ id: sellerCashRegisters.id, openingStatus: sellerCashRegisters.openingStatus, closingStatus: sellerCashRegisters.closingStatus })
+        .from(sellerCashRegisters)
+        .where(
+          and(
+            eq(sellerCashRegisters.sellerId, userId),
+            eq(sellerCashRegisters.date, today),
+            eq(sellerCashRegisters.openingStatus, "approved"),
+            eq(sellerCashRegisters.closingStatus, "open")
+          )
+        )
+        .limit(1);
+
+      return { hasActive: !!sellerBox, activeOpening: sellerBox || null };
+    }
+
     const method = input?.paymentMethod || "cash";
     let activeOpening = await getActiveCashOpeningByUserIdAndMethod(userId, method);
     
     // Fallback de compatibilidad: Si pidió QR o Transferencia y no está, verificamos si la de Efectivo está abierta.
-    // Esto pasa porque antes solo se abría una caja global (efectivo).
     if (!activeOpening && method !== "cash") {
       activeOpening = await getActiveCashOpeningByUserIdAndMethod(userId, "cash");
     }
