@@ -513,27 +513,16 @@ export const sellerCashRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-      
-      if (ctx.user?.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-      
-      await db
-        .update(sellerCashRegisters)
-        .set({
-          openingStatus: "approved",
-          openingApprovedBy: ctx.user.id,
-          openingApprovedAt: new Date(),
-          closingNotes: input.notes || null,
-        })
-        .where(eq(sellerCashRegisters.id, input.cashRegisterId));
-      
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      await db.execute(sql`
+        UPDATE seller_cash_registers
+        SET openingStatus='approved', openingApprovedBy=${ctx.user.id}, openingApprovedAt=NOW(), closingNotes=${input.notes || null}
+        WHERE id=${input.cashRegisterId}
+      `);
       return { success: true, message: "Apertura aprobada correctamente" };
     }),
-  
-  /**
-   * Rechazar apertura de caja
-   */
+
   admin_rejectOpening: protectedProcedure
     .input(z.object({
       cashRegisterId: z.number(),
@@ -542,27 +531,16 @@ export const sellerCashRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-      
-      if (ctx.user?.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-      
-      await db
-        .update(sellerCashRegisters)
-        .set({
-          openingStatus: "rejected",
-          openingApprovedBy: ctx.user.id,
-          openingApprovedAt: new Date(),
-          closingNotes: input.notes,
-        })
-        .where(eq(sellerCashRegisters.id, input.cashRegisterId));
-      
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      await db.execute(sql`
+        UPDATE seller_cash_registers
+        SET openingStatus='rejected', openingApprovedBy=${ctx.user.id}, openingApprovedAt=NOW(), closingNotes=${input.notes}
+        WHERE id=${input.cashRegisterId}
+      `);
       return { success: true, message: "Apertura rechazada" };
     }),
-  
-  /**
-   * Aprobar cierre de caja
-   */
+
   admin_approveClosing: protectedProcedure
     .input(z.object({
       cashRegisterId: z.number(),
@@ -571,27 +549,16 @@ export const sellerCashRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-      
-      if (ctx.user?.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-      
-      await db
-        .update(sellerCashRegisters)
-        .set({
-          closingStatus: "approved",
-          closingApprovedBy: ctx.user.id,
-          closingApprovedAt: new Date(),
-          closingNotes: input.notes || null,
-        })
-        .where(eq(sellerCashRegisters.id, input.cashRegisterId));
-      
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      await db.execute(sql`
+        UPDATE seller_cash_registers
+        SET closingStatus='approved', closingApprovedBy=${ctx.user.id}, closingApprovedAt=NOW(), closedAt=NOW(), closingNotes=${input.notes || null}
+        WHERE id=${input.cashRegisterId}
+      `);
       return { success: true, message: "Cierre aprobado correctamente" };
     }),
-  
-  /**
-   * Rechazar cierre de caja
-   */
+
   admin_rejectClosing: protectedProcedure
     .input(z.object({
       cashRegisterId: z.number(),
@@ -600,25 +567,16 @@ export const sellerCashRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-      
-      if (ctx.user?.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-      
-      await db
-        .update(sellerCashRegisters)
-        .set({
-          closingStatus: "open", // Volver a abrir para que el vendedor corrija
-          closingNotes: input.notes,
-        })
-        .where(eq(sellerCashRegisters.id, input.cashRegisterId));
-      
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      await db.execute(sql`
+        UPDATE seller_cash_registers
+        SET closingStatus='open', closingNotes=${input.notes}
+        WHERE id=${input.cashRegisterId}
+      `);
       return { success: true, message: "Cierre rechazado. El vendedor debe corregir." };
     }),
-  
-  /**
-   * Aprobar entrega parcial
-   */
+
   admin_approvePartialDelivery: protectedProcedure
     .input(z.object({
       deliveryId: z.number(),
@@ -627,47 +585,24 @@ export const sellerCashRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-      
-      if (ctx.user?.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-      
-      // Obtener la entrega
-      const [delivery] = await db
-        .select()
-        .from(sellerPartialDeliveries)
-        .where(eq(sellerPartialDeliveries.id, input.deliveryId))
-        .limit(1);
-      
-      if (!delivery) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Entrega no encontrada" });
-      }
-      
-      // Aprobar entrega
-      await db
-        .update(sellerPartialDeliveries)
-        .set({
-          status: "approved",
-          approvedBy: ctx.user.id,
-          approvedAt: new Date(),
-          adminNotes: input.notes || null,
-        })
-        .where(eq(sellerPartialDeliveries.id, input.deliveryId));
-      
-      // Actualizar el total de entregas parciales en la caja
-      await db
-        .update(sellerCashRegisters)
-        .set({
-          partialDeliveriesCash: sql`${sellerCashRegisters.partialDeliveriesCash} + ${delivery.amount}`,
-        })
-        .where(eq(sellerCashRegisters.id, delivery.cashRegisterId));
-      
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      const [delivery] = await db.select().from(sellerPartialDeliveries).where(eq(sellerPartialDeliveries.id, input.deliveryId)).limit(1);
+      if (!delivery) throw new TRPCError({ code: "NOT_FOUND", message: "Entrega no encontrada" });
+
+      await db.execute(sql`
+        UPDATE seller_partial_deliveries
+        SET status='approved', approvedBy=${ctx.user.id}, approvedAt=NOW(), adminNotes=${input.notes || null}
+        WHERE id=${input.deliveryId}
+      `);
+      await db.execute(sql`
+        UPDATE seller_cash_registers
+        SET partialDeliveriesCash = partialDeliveriesCash + ${delivery.amount}
+        WHERE id=${delivery.cashRegisterId}
+      `);
       return { success: true, message: "Entrega parcial aprobada" };
     }),
-  
-  /**
-   * Rechazar entrega parcial
-   */
+
   admin_rejectPartialDelivery: protectedProcedure
     .input(z.object({
       deliveryId: z.number(),
@@ -676,27 +611,16 @@ export const sellerCashRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-      
-      if (ctx.user?.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-      
-      await db
-        .update(sellerPartialDeliveries)
-        .set({
-          status: "rejected",
-          approvedBy: ctx.user.id,
-          approvedAt: new Date(),
-          adminNotes: input.notes,
-        })
-        .where(eq(sellerPartialDeliveries.id, input.deliveryId));
-      
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      await db.execute(sql`
+        UPDATE seller_partial_deliveries
+        SET status='rejected', approvedBy=${ctx.user.id}, approvedAt=NOW(), adminNotes=${input.notes}
+        WHERE id=${input.deliveryId}
+      `);
       return { success: true, message: "Entrega parcial rechazada" };
     }),
-  
-  /**
-   * Aprobar gasto
-   */
+
   admin_approveExpense: protectedProcedure
     .input(z.object({
       expenseId: z.number(),
@@ -705,47 +629,24 @@ export const sellerCashRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-      
-      if (ctx.user?.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-      
-      // Obtener el gasto
-      const [expense] = await db
-        .select()
-        .from(sellerCashExpenses)
-        .where(eq(sellerCashExpenses.id, input.expenseId))
-        .limit(1);
-      
-      if (!expense) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Gasto no encontrado" });
-      }
-      
-      // Aprobar gasto
-      await db
-        .update(sellerCashExpenses)
-        .set({
-          status: "approved",
-          approvedBy: ctx.user.id,
-          approvedAt: new Date(),
-          adminNotes: input.notes || null,
-        })
-        .where(eq(sellerCashExpenses.id, input.expenseId));
-      
-      // Actualizar el total de gastos en la caja
-      await db
-        .update(sellerCashRegisters)
-        .set({
-          totalExpenses: sql`${sellerCashRegisters.totalExpenses} + ${expense.amount}`,
-        })
-        .where(eq(sellerCashRegisters.id, expense.cashRegisterId));
-      
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      const [expense] = await db.select().from(sellerCashExpenses).where(eq(sellerCashExpenses.id, input.expenseId)).limit(1);
+      if (!expense) throw new TRPCError({ code: "NOT_FOUND", message: "Gasto no encontrado" });
+
+      await db.execute(sql`
+        UPDATE seller_cash_expenses
+        SET status='approved', approvedBy=${ctx.user.id}, approvedAt=NOW(), adminNotes=${input.notes || null}
+        WHERE id=${input.expenseId}
+      `);
+      await db.execute(sql`
+        UPDATE seller_cash_registers
+        SET totalExpenses = totalExpenses + ${expense.amount}
+        WHERE id=${expense.cashRegisterId}
+      `);
       return { success: true, message: "Gasto aprobado" };
     }),
-  
-  /**
-   * Rechazar gasto
-   */
+
   admin_rejectExpense: protectedProcedure
     .input(z.object({
       expenseId: z.number(),
@@ -754,27 +655,16 @@ export const sellerCashRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-      
-      if (ctx.user?.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-      
-      await db
-        .update(sellerCashExpenses)
-        .set({
-          status: "rejected",
-          approvedBy: ctx.user.id,
-          approvedAt: new Date(),
-          adminNotes: input.notes,
-        })
-        .where(eq(sellerCashExpenses.id, input.expenseId));
-      
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      await db.execute(sql`
+        UPDATE seller_cash_expenses
+        SET status='rejected', approvedBy=${ctx.user.id}, approvedAt=NOW(), adminNotes=${input.notes}
+        WHERE id=${input.expenseId}
+      `);
       return { success: true, message: "Gasto rechazado" };
     }),
-  
-  /**
-   * Cerrar caja forzosamente (admin)
-   */
+
   admin_forceClose: protectedProcedure
     .input(z.object({
       cashRegisterId: z.number(),
@@ -783,25 +673,17 @@ export const sellerCashRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-      
-      if (ctx.user?.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-      
-      await db
-        .update(sellerCashRegisters)
-        .set({
-          closingStatus: "forced_closed",
-          closingApprovedBy: ctx.user.id,
-          closingApprovedAt: new Date(),
-          closedAt: new Date(),
-          closingNotes: `CIERRE FORZOSO: ${input.notes}`,
-        })
-        .where(eq(sellerCashRegisters.id, input.cashRegisterId));
-      
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      await db.execute(sql`
+        UPDATE seller_cash_registers
+        SET closingStatus='forced_closed', closingApprovedBy=${ctx.user.id}, closingApprovedAt=NOW(), closedAt=NOW(),
+            closingNotes=${`CIERRE FORZOSO: ${input.notes}`}
+        WHERE id=${input.cashRegisterId}
+      `);
       return { success: true, message: "Caja cerrada forzosamente" };
     }),
-  
+
   /**
    * Editar montos de caja (admin)
    */
