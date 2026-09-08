@@ -49,6 +49,7 @@ import { BranchProvider } from "./contexts/BranchContext";
 import MobileBottomNav from "@/components/MobileBottomNav";
 
 import AdminBackup from "@/pages/AdminBackup";
+import SellerBoxesManagement from "@/pages/admin/SellerBoxesManagement";
 
 function ProtectedRoute({
   component: Component,
@@ -270,6 +271,9 @@ function Router() {
           <Route path={"/edit-order/:id"} component={EditOrder} />
           <Route path="/repartidor/finance" component={RepartidorFinance} />
           <Route path="/vendedor/caja" component={SellerCashRegister} />
+          <Route path="/admin/cajas-vendedores">
+            <ProtectedRoute component={SellerBoxesManagement} adminOnly={true} />
+          </Route>
           <Route path="/delivery-load" component={DeliveryLoad} />
 
           {/* Ruta oculta de administración — Backup & Restauración */}
