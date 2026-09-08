@@ -123,6 +123,7 @@ import {
   unitEvents,
   InsertUnit,
   InsertUnitEvent,
+  sellerCashRegisters,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { getSession } from "./auth";
@@ -2614,6 +2615,26 @@ export async function checkCashRegisterOpening(dbOrTx: any, userId: number, paym
   }
 
   if (!hasOpen) {
+    // Fallback: verificar si el usuario tiene una caja de vendedor aprobada
+    try {
+      const today = getLocalDateKey(new Date());
+      const sellerBox = await dbOrTx
+        .select({ id: sellerCashRegisters.id })
+        .from(sellerCashRegisters)
+        .where(
+          and(
+            eq(sellerCashRegisters.sellerId, userId),
+            eq(sellerCashRegisters.date, today),
+            eq(sellerCashRegisters.openingStatus, "approved"),
+            eq(sellerCashRegisters.closingStatus, "open")
+          )
+        )
+        .limit(1);
+      if (sellerBox.length > 0) return; // Tiene caja de vendedor activa — permitir
+    } catch {
+      // Si falla el check de seller (ej: tabla no existe aún), no bloquear
+    }
+
     const methodName = paymentMethod === 'cash' ? 'Efectivo' : paymentMethod === 'qr' ? 'QR' : paymentMethod === 'transfer' ? 'Transferencia' : paymentMethod.toUpperCase();
     throw new Error(`Abre la caja: La caja de ${methodName} se encuentra cerrada. Por favor, realice la apertura de caja en Finanzas primero.`);
   }
