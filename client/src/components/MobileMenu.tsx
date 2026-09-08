@@ -20,6 +20,8 @@ import {
   X,
   CreditCard,
   Landmark,
+  Wallet,
+  Store,
 } from "lucide-react";
 
 /* ─── admin sections with categories ───────────────────────────── */
@@ -60,11 +62,12 @@ const ADMIN_SECTIONS = [
   {
     title: "Finanzas",
     items: [
-      { href: "/purchases",        label: "Compras",      icon: ShoppingCart },
-      { href: "/finance",          label: "Finanzas & Caja", icon: DollarSign },
-      { href: "/accounts-receivable", label: "C. por Cobrar", icon: CreditCard },
-      { href: "/accounts-payable", label: "C. por Pagar", icon: Landmark },
-      { href: "/expenses",         label: "Gastos",       icon: Receipt },
+      { href: "/purchases",              label: "Compras",            icon: ShoppingCart },
+      { href: "/finance",                label: "Finanzas & Caja",    icon: DollarSign },
+      { href: "/admin/cajas-vendedores", label: "Cajas Vendedores",   icon: Store },
+      { href: "/accounts-receivable",    label: "C. por Cobrar",      icon: CreditCard },
+      { href: "/accounts-payable",       label: "C. por Pagar",       icon: Landmark },
+      { href: "/expenses",               label: "Gastos",             icon: Receipt },
     ],
   },
 ];
@@ -77,6 +80,14 @@ const DELIVERY_ITEMS = [
   { href: "/repartidor/finance", label: "Cierre de caja",icon: DollarSign },
 ];
 
+const SELLER_ITEMS = [
+  { href: "/",                label: "Inicio",        icon: Home },
+  { href: "/sales",           label: "Ventas",        icon: ShoppingBag },
+  { href: "/catalog",         label: "Catalogo",      icon: Package },
+  { href: "/customers",       label: "Clientes",      icon: Users },
+  { href: "/vendedor/caja",   label: "Mi Caja",       icon: Wallet },
+];
+
 /* ─── component ─────────────────────────────────────────────────── */
 export default function MobileMenu({ triggerClassName }: { triggerClassName?: string }) {
   const { user, logout } = useAuth();
@@ -86,7 +97,10 @@ export default function MobileMenu({ triggerClassName }: { triggerClassName?: st
   const isActive = (path: string) => location === path;
   const close = () => setOpen(false);
 
-  const roleLabel = user?.role === "admin" ? "Administrador" : "Repartidor";
+  const roleLabel = user?.role === "admin" ? "Administrador" : 
+                    user?.role === "seller" ? "Vendedor" :
+                    user?.role === "delivery" ? "Repartidor" :
+                    user?.role === "technician" ? "Tecnico" : "Usuario";
   const initial = user?.name?.charAt(0).toUpperCase() ?? "U";
 
   return (
@@ -205,7 +219,7 @@ export default function MobileMenu({ triggerClassName }: { triggerClassName?: st
               ))
             ) : (
               <div className="space-y-0.5">
-                {DELIVERY_ITEMS.map((item) => {
+                {(user?.role === "seller" ? SELLER_ITEMS : DELIVERY_ITEMS).map((item) => {
                   const active = isActive(item.href);
                   const Icon = item.icon;
                   return (

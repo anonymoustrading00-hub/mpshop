@@ -76,7 +76,7 @@ export const ADMIN_NAV_ROW2: NavItem[] = [
   { href: "/finance",                label: "Finanzas",           icon: DollarSign, moduleKey: "finance" },
   { href: "/admin/cajas-vendedores", label: "🏪 Cajas Vendedores", icon: Store,    moduleKey: "seller-boxes-admin", adminOnly: true },
   { href: "/repartidor/finance",     label: "Caja Reparto",       icon: DollarSign, moduleKey: "repartidor-finance" },
-  { href: "/vendedor/caja",          label: "Mi Caja",            icon: Wallet,     moduleKey: "seller-cash" },
+  { href: "/vendedor/caja",          label: "Mi Caja",            icon: Wallet,     moduleKey: "seller-cash",  sellerOnly: true },
   { href: "/accounts-receivable",    label: "C. por Cobrar",      icon: CreditCard, moduleKey: "accounts-receivable" },
   { href: "/accounts-payable",       label: "C. por Pagar",       icon: Landmark,   moduleKey: "accounts-payable" },
   { href: "/expenses",               label: "Gastos",             icon: Receipt,    moduleKey: "expenses" },
@@ -286,8 +286,10 @@ export default function AppHeader() {
   // Cada empleado ve exactamente los módulos que tiene asignados en allowedModules
   const visibleRow1 = ADMIN_NAV_ROW1.filter(item => isModuleAllowed(item.moduleKey));
   const visibleRow2 = ADMIN_NAV_ROW2.filter(item => {
+    // adminOnly: solo admins lo ven
     if (item.adminOnly && !isAdmin) return false;
-    if (item.sellerOnly && user?.role !== "seller") return false;
+    // sellerOnly: solo sellers lo ven, y siempre aparece sin importar allowedModules
+    if (item.sellerOnly) return user?.role === "seller";
     return isModuleAllowed(item.moduleKey);
   });
 
