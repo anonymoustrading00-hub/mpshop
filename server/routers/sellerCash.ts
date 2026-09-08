@@ -831,4 +831,43 @@ export const sellerCashRouter = router({
       
       return { success: true, message: "Montos actualizados correctamente" };
     }),
+
+  // ═══════════════════════════════════════════════════════════════
+  // ENDPOINT DE PRUEBA (TEMPORAL - REMOVER EN PRODUCCIÓN)
+  // ═══════════════════════════════════════════════════════════════
+  
+  test_checkTables: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return { error: "Database not available" };
+    
+    try {
+      // Verificar si las tablas existen
+      const tables = await db.execute(sql`SHOW TABLES LIKE 'seller_%'`);
+      
+      // Contar registros en cada tabla
+      const [cashRegistersCount] = await db.execute(sql`SELECT COUNT(*) as count FROM seller_cash_registers`) as any;
+      const [deliveriesCount] = await db.execute(sql`SELECT COUNT(*) as count FROM seller_partial_deliveries`) as any;
+      const [expensesCount] = await db.execute(sql`SELECT COUNT(*) as count FROM seller_cash_expenses`) as any;
+      
+      return {
+        success: true,
+        tablesFound: tables,
+        counts: {
+          cashRegisters: cashRegistersCount?.[0]?.count || 0,
+          deliveries: deliveriesCount?.[0]?.count || 0,
+          expenses: expensesCount?.[0]?.count || 0,
+        },
+        user: {
+          id: ctx.user?.id,
+          role: ctx.user?.role,
+          username: ctx.user?.username,
+        },
+      };
+    } catch (error: any) {
+      return {
+        error: error.message,
+        errorCode: error.code,
+      };
+    }
+  }),
 });
