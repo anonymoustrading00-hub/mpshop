@@ -7,29 +7,18 @@ export function pad2(value: number) {
  * forced to Bolivia timezone (UTC-4) to ensure consistency
  * between server (UTC) and local business operations.
  */
-export function getLocalDateKey(value: unknown): string | null {
-  if (!value) return null;
-  
-  let date: Date;
-  if (value instanceof Date) {
-    date = value;
-  } else {
-    date = new Date(value as any);
-  }
-
-  if (Number.isNaN(date.getTime())) return null;
+export function getLocalDateKey(value?: unknown): string {
+  const d = value ? new Date(value as any) : new Date();
 
   // Bolivia is UTC-4. 
-  // We adjust the UTC time by -4 hours to get the local date components correctly
-  // even if the server is in a different timezone.
   const BOLIVIA_OFFSET_HOURS = -4;
-  const boDate = new Date(date.getTime() + (BOLIVIA_OFFSET_HOURS * 60 * 60 * 1000));
+  const boDate = new Date(d.getTime() + (BOLIVIA_OFFSET_HOURS * 60 * 60 * 1000));
   
   const y = boDate.getUTCFullYear();
   const m = pad2(boDate.getUTCMonth() + 1);
-  const d = pad2(boDate.getUTCDate());
+  const day = pad2(boDate.getUTCDate());
   
-  return `${y}-${m}-${d}`;
+  return `${y}-${m}-${day}`;
 }
 
 export function toValidDate(value: unknown): Date | null {
