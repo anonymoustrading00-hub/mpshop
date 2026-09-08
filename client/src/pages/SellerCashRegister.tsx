@@ -121,7 +121,7 @@ export default function SellerCashRegister() {
     setIsSubmitting(true);
     try {
       await requestOpeningMutation.mutateAsync({
-        initialCash: Math.round((parseFloat(openingForm.initialCash) || 0) * 100),
+        initialCash: parseFloat(openingForm.initialCash) || 0,
         notes: openingForm.notes || undefined
       });
     } finally {
