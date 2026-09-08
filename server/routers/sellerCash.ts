@@ -515,9 +515,10 @@ export const sellerCashRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
       if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
+      const now = new Date();
       await db.execute(sql`
         UPDATE seller_cash_registers
-        SET openingStatus='approved', openingApprovedBy=${ctx.user.id}, openingApprovedAt=NOW(), closingNotes=${input.notes || null}
+        SET openingStatus='approved', openingApprovedBy=${ctx.user.id}, openingApprovedAt=${now}, closingNotes=${input.notes || null}
         WHERE id=${input.cashRegisterId}
       `);
       return { success: true, message: "Apertura aprobada correctamente" };
@@ -533,9 +534,10 @@ export const sellerCashRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
       if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
+      const now = new Date();
       await db.execute(sql`
         UPDATE seller_cash_registers
-        SET openingStatus='rejected', openingApprovedBy=${ctx.user.id}, openingApprovedAt=NOW(), closingNotes=${input.notes}
+        SET openingStatus='rejected', openingApprovedBy=${ctx.user.id}, openingApprovedAt=${now}, closingNotes=${input.notes}
         WHERE id=${input.cashRegisterId}
       `);
       return { success: true, message: "Apertura rechazada" };
@@ -551,9 +553,10 @@ export const sellerCashRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
       if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
+      const now = new Date();
       await db.execute(sql`
         UPDATE seller_cash_registers
-        SET closingStatus='approved', closingApprovedBy=${ctx.user.id}, closingApprovedAt=NOW(), closedAt=NOW(), closingNotes=${input.notes || null}
+        SET closingStatus='approved', closingApprovedBy=${ctx.user.id}, closingApprovedAt=${now}, closedAt=${now}, closingNotes=${input.notes || null}
         WHERE id=${input.cashRegisterId}
       `);
       return { success: true, message: "Cierre aprobado correctamente" };
@@ -590,9 +593,10 @@ export const sellerCashRouter = router({
       const [delivery] = await db.select().from(sellerPartialDeliveries).where(eq(sellerPartialDeliveries.id, input.deliveryId)).limit(1);
       if (!delivery) throw new TRPCError({ code: "NOT_FOUND", message: "Entrega no encontrada" });
 
+      const now = new Date();
       await db.execute(sql`
         UPDATE seller_partial_deliveries
-        SET status='approved', approvedBy=${ctx.user.id}, approvedAt=NOW(), adminNotes=${input.notes || null}
+        SET status='approved', approvedBy=${ctx.user.id}, approvedAt=${now}, adminNotes=${input.notes || null}
         WHERE id=${input.deliveryId}
       `);
       await db.execute(sql`
@@ -613,9 +617,10 @@ export const sellerCashRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
       if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
+      const now = new Date();
       await db.execute(sql`
         UPDATE seller_partial_deliveries
-        SET status='rejected', approvedBy=${ctx.user.id}, approvedAt=NOW(), adminNotes=${input.notes}
+        SET status='rejected', approvedBy=${ctx.user.id}, approvedAt=${now}, adminNotes=${input.notes}
         WHERE id=${input.deliveryId}
       `);
       return { success: true, message: "Entrega parcial rechazada" };
@@ -634,9 +639,10 @@ export const sellerCashRouter = router({
       const [expense] = await db.select().from(sellerCashExpenses).where(eq(sellerCashExpenses.id, input.expenseId)).limit(1);
       if (!expense) throw new TRPCError({ code: "NOT_FOUND", message: "Gasto no encontrado" });
 
+      const now = new Date();
       await db.execute(sql`
         UPDATE seller_cash_expenses
-        SET status='approved', approvedBy=${ctx.user.id}, approvedAt=NOW(), adminNotes=${input.notes || null}
+        SET status='approved', approvedBy=${ctx.user.id}, approvedAt=${now}, adminNotes=${input.notes || null}
         WHERE id=${input.expenseId}
       `);
       await db.execute(sql`
@@ -657,9 +663,10 @@ export const sellerCashRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
       if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
+      const now = new Date();
       await db.execute(sql`
         UPDATE seller_cash_expenses
-        SET status='rejected', approvedBy=${ctx.user.id}, approvedAt=NOW(), adminNotes=${input.notes}
+        SET status='rejected', approvedBy=${ctx.user.id}, approvedAt=${now}, adminNotes=${input.notes}
         WHERE id=${input.expenseId}
       `);
       return { success: true, message: "Gasto rechazado" };
@@ -675,9 +682,10 @@ export const sellerCashRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
       if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
+      const now = new Date();
       await db.execute(sql`
         UPDATE seller_cash_registers
-        SET closingStatus='forced_closed', closingApprovedBy=${ctx.user.id}, closingApprovedAt=NOW(), closedAt=NOW(),
+        SET closingStatus='forced_closed', closingApprovedBy=${ctx.user.id}, closingApprovedAt=${now}, closedAt=${now},
             closingNotes=${`CIERRE FORZOSO: ${input.notes}`}
         WHERE id=${input.cashRegisterId}
       `);
