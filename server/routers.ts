@@ -34,6 +34,7 @@ import { transfersRouter } from "./routers/transfers";
 import { deviceCatalogsRouter } from "./routers/deviceCatalogs";
 import { adminMigrationRouter } from "./routers/admin-migration";
 import { sellerCashRouter } from "./routers/sellerCash";
+import { adminMigrationSellerCashRouter } from "./routers/admin-migration-seller-cash";
 import { authenticateUser, createSession } from "./auth";
 
 export const appRouter = router({
@@ -150,6 +151,7 @@ export const appRouter = router({
   deviceCatalogs: deviceCatalogsRouter,
   adminMigration: adminMigrationRouter,
   sellerCash: sellerCashRouter,
+  adminMigrationSellerCash: adminMigrationSellerCashRouter,
 });
 
 export type AppRouter = typeof appRouter;
