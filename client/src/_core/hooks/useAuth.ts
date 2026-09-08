@@ -51,9 +51,9 @@ export function useAuth(options?: UseAuthOptions) {
         console.warn("Failed to clear localStorage", e);
       }
       
-      // Redirigir al login
+      // Forzar recarga para que React Router renderice el componente Login
       if (typeof window !== "undefined") {
-        window.location.href = getLoginUrl();
+        window.location.href = "/";
       }
     }
   }, [logoutMutation, utils]);
