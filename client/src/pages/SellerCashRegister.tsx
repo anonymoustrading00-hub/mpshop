@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { 
   Wallet, QrCode, Landmark, Receipt, AlertCircle, CheckCircle2, 
   Lock, ShieldAlert, History, DollarSign, TrendingUp, Clock,
-  Package, Send, FileText, Store
+  Package, Send, FileText, Store, XCircle
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -206,8 +206,10 @@ export default function SellerCashRegister() {
   const canOperate = hasBox && isOpen && isApproved;
 
   // Detectar apertura o cierre pendiente directamente del estado de la caja
-  const hasPendingOpening = hasBox && currentBox?.openingStatus === "pending";
-  const hasPendingClosing = hasBox && currentBox?.closingStatus === "pending";
+  const hasPendingOpening  = hasBox && currentBox?.openingStatus === "pending";
+  const hasRejectedOpening = hasBox && currentBox?.openingStatus === "rejected";
+  const hasPendingClosing  = hasBox && currentBox?.closingStatus === "pending";
+  const hasRejectedClosing = hasBox && currentBox?.closingStatus === "rejected";
 
   // Si tiene cierre pendiente de aprobación
   if (hasPendingClosing) {
@@ -266,6 +268,106 @@ export default function SellerCashRegister() {
               onClick={() => refetchStatus()}
             >
               <History className="w-4 h-4 mr-2" /> Verificar Estado Nuevamente
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Apertura RECHAZADA — mostrar mensaje y opción de solicitar nueva
+  if (hasRejectedOpening) {
+    return (
+      <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6 mb-10">
+        <Card className="border-t-4 border-t-red-500 shadow-xl overflow-hidden">
+          <CardHeader className="text-center pb-2 bg-red-50/50">
+            <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm">
+              <XCircle className="w-8 h-8 text-red-600" />
+            </div>
+            <CardTitle className="text-2xl font-black text-slate-800">Apertura Rechazada</CardTitle>
+            <CardDescription className="text-slate-500 font-medium">
+              El administrador rechazó tu solicitud de apertura.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-6">
+            {currentBox?.openingNotes && (
+              <div className="p-4 bg-red-50 rounded-xl border border-red-200 flex gap-3 items-start">
+                <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-red-700 uppercase mb-1">Motivo del rechazo</p>
+                  <p className="text-sm text-red-800">{currentBox.openingNotes}</p>
+                </div>
+              </div>
+            )}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex gap-3 items-start">
+              <AlertCircle className="w-5 h-5 text-slate-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Puedes solicitar una nueva apertura de caja con el monto correcto.
+                El administrador deberá aprobarla nuevamente.
+              </p>
+            </div>
+            <form onSubmit={handleRequestOpening} className="space-y-4">
+              <div>
+                <Label>Nuevo Efectivo Inicial (cambio)</Label>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-lg font-bold text-slate-400">Bs.</span>
+                  <Input
+                    type="number" step="0.01" placeholder="0.00"
+                    value={openingForm.initialCash}
+                    onChange={(e) => setOpeningForm({...openingForm, initialCash: e.target.value})}
+                    className="text-xl font-bold" required
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Notas (opcional)</Label>
+                <Textarea
+                  placeholder="Observaciones..."
+                  value={openingForm.notes}
+                  onChange={(e) => setOpeningForm({...openingForm, notes: e.target.value})}
+                  rows={2}
+                />
+              </div>
+              <Button type="submit" className="w-full h-14 text-lg font-bold bg-emerald-600 hover:bg-emerald-700" disabled={isSubmitting}>
+                {isSubmitting ? "Enviando..." : "Solicitar Nueva Apertura"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Cierre RECHAZADO — volver al dashboard para que el vendedor corrija
+  // (closingStatus vuelve a "open" cuando se rechaza, así que esto es por si acaso)
+  if (hasRejectedClosing) {
+    return (
+      <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6 mb-10">
+        <Card className="border-t-4 border-t-red-500 shadow-xl overflow-hidden">
+          <CardHeader className="text-center pb-2 bg-red-50/50">
+            <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm">
+              <XCircle className="w-8 h-8 text-red-600" />
+            </div>
+            <CardTitle className="text-2xl font-black text-slate-800">Cierre Rechazado</CardTitle>
+            <CardDescription className="text-slate-500 font-medium">
+              El administrador rechazó tu solicitud de cierre.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-6">
+            {currentBox?.closingNotes && (
+              <div className="p-4 bg-red-50 rounded-xl border border-red-200 flex gap-3 items-start">
+                <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-red-700 uppercase mb-1">Motivo del rechazo</p>
+                  <p className="text-sm text-red-800">{currentBox.closingNotes}</p>
+                </div>
+              </div>
+            )}
+            <Button
+              className="w-full h-14 text-lg font-bold bg-slate-700 hover:bg-slate-800"
+              onClick={() => refetchStatus()}
+            >
+              <History className="w-4 h-4 mr-2" /> Volver a Mi Caja
             </Button>
           </CardContent>
         </Card>

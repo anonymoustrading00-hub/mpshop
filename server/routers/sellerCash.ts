@@ -91,7 +91,7 @@ export const sellerCashRouter = router({
       const today = getLocalDateKey();
       const branchId = ctx.branchId;
       
-      // Verificar que no tenga ya una caja abierta hoy
+      // Verificar si ya tiene caja hoy
       const [existing] = await db
         .select()
         .from(sellerCashRegisters)
@@ -102,12 +102,17 @@ export const sellerCashRouter = router({
           )
         )
         .limit(1);
-      
+
       if (existing) {
-        throw new TRPCError({ 
-          code: "BAD_REQUEST", 
-          message: "Ya tienes una caja registrada para hoy" 
-        });
+        // Si fue rechazada, eliminarla para permitir nueva solicitud
+        if (existing.openingStatus === "rejected") {
+          await db.delete(sellerCashRegisters).where(eq(sellerCashRegisters.id, existing.id));
+        } else {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Ya tienes una caja registrada para hoy"
+          });
+        }
       }
       
       // Crear solicitud de apertura
