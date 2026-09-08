@@ -623,6 +623,95 @@ export const cashOpenings = mysqlTable("cash_openings", {
 export type CashOpening = typeof cashOpenings.$inferSelect;
 export type InsertCashOpening = typeof cashOpenings.$inferInsert;
 
+// ═══════════════════════════════════════════════════════════════
+// SISTEMA DE CAJAS PARA VENDEDORES
+// ═══════════════════════════════════════════════════════════════
+
+// Registros de Cajas de Vendedores
+export const sellerCashRegisters = mysqlTable("seller_cash_registers", {
+  id: int("id").autoincrement().primaryKey(),
+  sellerId: int("sellerId").notNull().references(() => users.id),
+  branchId: int("branchId").notNull().references(() => branches.id),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  
+  // Apertura
+  openingStatus: mysqlEnum("openingStatus", ["pending", "approved", "rejected"]).default("pending").notNull(),
+  initialCash: int("initialCash").default(0).notNull(), // Monto inicial declarado
+  openedAt: timestamp("openedAt"),
+  openingApprovedBy: int("openingApprovedBy").references(() => users.id),
+  openingApprovedAt: timestamp("openingApprovedAt"),
+  openingNotes: text("openingNotes"),
+  
+  // Ventas registradas (se actualiza automáticamente con cada venta)
+  salesCash: int("salesCash").default(0).notNull(),
+  salesQr: int("salesQr").default(0).notNull(),
+  salesTransfer: int("salesTransfer").default(0).notNull(),
+  
+  // Entregas parciales (suma de todas las entregas aprobadas)
+  partialDeliveriesCash: int("partialDeliveriesCash").default(0).notNull(),
+  
+  // Gastos (suma de todos los gastos aprobados)
+  totalExpenses: int("totalExpenses").default(0).notNull(),
+  
+  // Cierre
+  closingStatus: mysqlEnum("closingStatus", ["open", "pending", "approved", "rejected", "forced_closed"]).default("open").notNull(),
+  reportedCash: int("reportedCash").default(0),
+  reportedQr: int("reportedQr").default(0),
+  reportedTransfer: int("reportedTransfer").default(0),
+  differenceCash: int("differenceCash").default(0), // Diferencia = reportado - esperado
+  differenceJustification: text("differenceJustification"),
+  closedAt: timestamp("closedAt"),
+  closingApprovedBy: int("closingApprovedBy").references(() => users.id),
+  closingApprovedAt: timestamp("closingApprovedAt"),
+  closingNotes: text("closingNotes"), // Notas del admin al aprobar/rechazar
+  
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SellerCashRegister = typeof sellerCashRegisters.$inferSelect;
+export type InsertSellerCashRegister = typeof sellerCashRegisters.$inferInsert;
+
+// Entregas Parciales de Efectivo
+export const sellerPartialDeliveries = mysqlTable("seller_partial_deliveries", {
+  id: int("id").autoincrement().primaryKey(),
+  cashRegisterId: int("cashRegisterId").notNull().references(() => sellerCashRegisters.id),
+  sellerId: int("sellerId").notNull().references(() => users.id),
+  amount: int("amount").notNull(), // Monto a entregar
+  status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
+  requestedAt: timestamp("requestedAt").defaultNow().notNull(),
+  approvedBy: int("approvedBy").references(() => users.id),
+  approvedAt: timestamp("approvedAt"),
+  notes: text("notes"), // Notas del vendedor
+  adminNotes: text("adminNotes"), // Notas del admin
+});
+
+export type SellerPartialDelivery = typeof sellerPartialDeliveries.$inferSelect;
+export type InsertSellerPartialDelivery = typeof sellerPartialDeliveries.$inferInsert;
+
+// Gastos desde Caja de Vendedor
+export const sellerCashExpenses = mysqlTable("seller_cash_expenses", {
+  id: int("id").autoincrement().primaryKey(),
+  cashRegisterId: int("cashRegisterId").notNull().references(() => sellerCashRegisters.id),
+  sellerId: int("sellerId").notNull().references(() => users.id),
+  amount: int("amount").notNull(),
+  concept: varchar("concept", { length: 255 }).notNull(), // Descripción del gasto
+  status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
+  requestedAt: timestamp("requestedAt").defaultNow().notNull(),
+  approvedBy: int("approvedBy").references(() => users.id),
+  approvedAt: timestamp("approvedAt"),
+  notes: text("notes"), // Notas del vendedor
+  adminNotes: text("adminNotes"), // Notas del admin
+  receiptUrl: text("receiptUrl"), // URL de comprobante (opcional)
+});
+
+export type SellerCashExpense = typeof sellerCashExpenses.$inferSelect;
+export type InsertSellerCashExpense = typeof sellerCashExpenses.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════
+// FIN SISTEMA DE CAJAS PARA VENDEDORES
+// ═══════════════════════════════════════════════════════════════
+
 // Audit Log
 export const auditLog = mysqlTable("auditLog", {
   id: int("id").autoincrement().primaryKey(),
