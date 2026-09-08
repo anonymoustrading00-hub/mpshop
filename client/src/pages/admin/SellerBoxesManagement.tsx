@@ -58,6 +58,8 @@ export default function SellerBoxesManagement() {
   const [forceCloseDialog, setForceCloseDialog] = useState<{ open: boolean; id: number; sellerName: string } | null>(null);
   const [editDialog, setEditDialog] = useState<{ open: boolean; box: any } | null>(null);
   const [detailDialog, setDetailDialog] = useState<{ open: boolean; box: any; sellerName: string } | null>(null);
+  const [openBoxDialog, setOpenBoxDialog] = useState(false);
+  const [openBoxForm, setOpenBoxForm] = useState({ sellerId: "", initialCash: "", notes: "", date: today });
 
   const [actionNotes, setActionNotes]     = useState("");
   const [editAmounts, setEditAmounts]     = useState({ initialCash: "", reportedCash: "", reportedQr: "", reportedTransfer: "", notes: "" });
@@ -71,6 +73,8 @@ export default function SellerBoxesManagement() {
 
   const { data: allBoxes, refetch: refetchBoxes } =
     trpc.sellerCash.admin_listAllBoxes.useQuery({ date: filterDate, status: "all" });
+
+  const { data: sellers } = trpc.sellerCash.admin_listSellers.useQuery();
 
   const invalidateAll = () => {
     utils.sellerCash.admin_getPendingRequests.invalidate();
@@ -88,6 +92,15 @@ export default function SellerBoxesManagement() {
   const rejectExpenseMut    = trpc.sellerCash.admin_rejectExpense.useMutation({  onSuccess: () => { toast.success("Gasto rechazado"); invalidateAll(); }, onError: e => toast.error(e.message) });
   const forceCloseMut       = trpc.sellerCash.admin_forceClose.useMutation({     onSuccess: () => { toast.success("Caja cerrada forzosamente"); invalidateAll(); setForceCloseDialog(null); }, onError: e => toast.error(e.message) });
   const editAmountsMut      = trpc.sellerCash.admin_editAmounts.useMutation({    onSuccess: () => { toast.success("Montos actualizados"); invalidateAll(); setEditDialog(null); }, onError: e => toast.error(e.message) });
+  const openBoxForSellerMut = trpc.sellerCash.admin_openBoxForSeller.useMutation({
+    onSuccess: () => {
+      toast.success("Caja abierta correctamente para el vendedor");
+      invalidateAll();
+      setOpenBoxDialog(false);
+      setOpenBoxForm({ sellerId: "", initialCash: "", notes: "", date: today });
+    },
+    onError: e => toast.error(e.message),
+  });
 
   // ─── Action handlers ───────────────────────────────────────────────────────
 
@@ -131,6 +144,20 @@ export default function SellerBoxesManagement() {
     try {
       await forceCloseMut.mutateAsync({ cashRegisterId: forceCloseDialog.id, notes: actionNotes });
       setActionNotes("");
+    } finally { setIsSubmitting(false); }
+  };
+
+  const handleOpenBoxForSeller = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!openBoxForm.sellerId) { toast.error("Selecciona un vendedor"); return; }
+    setIsSubmitting(true);
+    try {
+      await openBoxForSellerMut.mutateAsync({
+        sellerId:    parseInt(openBoxForm.sellerId),
+        initialCash: parseFloat(openBoxForm.initialCash) || 0,
+        notes:       openBoxForm.notes || undefined,
+        date:        openBoxForm.date || undefined,
+      });
     } finally { setIsSubmitting(false); }
   };
 
@@ -188,6 +215,12 @@ export default function SellerBoxesManagement() {
             onChange={e => setFilterDate(e.target.value)}
             className="w-auto font-bold"
           />
+          <Button
+            className="bg-emerald-600 hover:bg-emerald-700 font-bold gap-2"
+            onClick={() => setOpenBoxDialog(true)}
+          >
+            <Wallet className="w-4 h-4" /> Abrir Caja a Vendedor
+          </Button>
           <Button variant="outline" size="icon" onClick={() => { refetchPending(); refetchBoxes(); }}>
             <RefreshCw className="w-4 h-4" />
           </Button>
@@ -820,6 +853,91 @@ export default function SellerBoxesManagement() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailDialog(null)}>Cerrar</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Abrir Caja directamente a Vendedor ── */}
+      <Dialog open={openBoxDialog} onOpenChange={v => { if (!v) { setOpenBoxDialog(false); setOpenBoxForm({ sellerId: "", initialCash: "", notes: "", date: today }); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wallet className="w-5 h-5 text-emerald-600" /> Abrir Caja a Vendedor
+            </DialogTitle>
+            <DialogDescription>
+              La caja quedará aprobada inmediatamente sin necesidad de que el vendedor la solicite.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleOpenBoxForSeller} className="space-y-4">
+            {/* Selector de vendedor */}
+            <div className="space-y-1.5">
+              <Label>Vendedor *</Label>
+              <select
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                value={openBoxForm.sellerId}
+                onChange={e => setOpenBoxForm(p => ({ ...p, sellerId: e.target.value }))}
+                required
+              >
+                <option value="">— Selecciona un vendedor —</option>
+                {(sellers ?? []).map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.name} (@{s.username})</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Fecha */}
+            <div className="space-y-1.5">
+              <Label>Fecha de apertura</Label>
+              <Input
+                type="date"
+                value={openBoxForm.date}
+                onChange={e => setOpenBoxForm(p => ({ ...p, date: e.target.value }))}
+                className="font-bold"
+              />
+            </div>
+
+            {/* Efectivo inicial */}
+            <div className="space-y-1.5">
+              <Label>Efectivo Inicial (cambio)</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400 font-bold">Bs.</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={openBoxForm.initialCash}
+                  onChange={e => setOpenBoxForm(p => ({ ...p, initialCash: e.target.value }))}
+                  className="font-bold text-lg"
+                />
+              </div>
+            </div>
+
+            {/* Notas */}
+            <div className="space-y-1.5">
+              <Label>Notas (opcional)</Label>
+              <Textarea
+                placeholder="Observaciones sobre la apertura..."
+                value={openBoxForm.notes}
+                onChange={e => setOpenBoxForm(p => ({ ...p, notes: e.target.value }))}
+                rows={2}
+              />
+            </div>
+
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex gap-2 items-start">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+              <p className="text-xs text-emerald-800 font-medium">
+                La caja se creará con estado <strong>Aprobada</strong> y el vendedor podrá operar inmediatamente.
+              </p>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpenBoxDialog(false)}>Cancelar</Button>
+              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700" disabled={isSubmitting || !openBoxForm.sellerId}>
+                {isSubmitting ? "Abriendo..." : "Abrir Caja"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

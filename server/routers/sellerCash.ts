@@ -834,6 +834,103 @@ export const sellerCashRouter = router({
       return { success: true, message: "Montos actualizados correctamente" };
     }),
 
+  /**
+   * Apertura directa de caja por admin (sin solicitud previa del vendedor)
+   */
+  admin_openBoxForSeller: protectedProcedure
+    .input(z.object({
+      sellerId: z.number(),
+      initialCash: z.number().min(0).default(0),
+      notes: z.string().optional(),
+      date: z.string().optional(), // YYYY-MM-DD, default hoy
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+      if (ctx.user?.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Solo administradores pueden abrir cajas directamente" });
+      }
+
+      const today = input.date || getLocalDateKey();
+
+      // Verificar que el vendedor existe
+      const [seller] = await db
+        .select({ id: users.id, name: users.name, role: users.role, branchId: users.id })
+        .from(users)
+        .where(eq(users.id, input.sellerId))
+        .limit(1);
+
+      if (!seller) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Vendedor no encontrado" });
+      }
+
+      // Verificar que no tenga ya una caja para ese día
+      const [existing] = await db
+        .select()
+        .from(sellerCashRegisters)
+        .where(
+          and(
+            eq(sellerCashRegisters.sellerId, input.sellerId),
+            eq(sellerCashRegisters.date, today)
+          )
+        )
+        .limit(1);
+
+      if (existing) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `El vendedor ya tiene una caja registrada para el ${today}`
+        });
+      }
+
+      // Obtener branchId del vendedor (o usar la del contexto del admin)
+      const [sellerBranch] = await db
+        .select({ branchId: users.id }) // placeholder — usamos ctx.branchId
+        .from(users)
+        .where(eq(users.id, input.sellerId))
+        .limit(1);
+
+      const branchId = ctx.branchId || 1;
+
+      // Crear caja directamente aprobada
+      await db.insert(sellerCashRegisters).values({
+        sellerId: input.sellerId,
+        branchId,
+        date: today,
+        openingStatus: "approved",          // ya aprobada — el admin la abre directamente
+        openingApprovedBy: ctx.user.id,
+        openingApprovedAt: new Date(),
+        initialCash: Math.round(input.initialCash * 100),
+        openedAt: new Date(),
+        openingNotes: input.notes
+          ? `Apertura directa por admin: ${input.notes}`
+          : `Apertura directa realizada por administrador`,
+        closingStatus: "open",
+      });
+
+      return { success: true, message: `Caja abierta correctamente para el vendedor` };
+    }),
+
+  /**
+   * Obtener lista de vendedores (para el selector del admin)
+   */
+  admin_listSellers: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+    if (ctx.user?.role !== "admin") {
+      throw new TRPCError({ code: "FORBIDDEN" });
+    }
+
+    const sellers = await db
+      .select({ id: users.id, name: users.name, username: users.username })
+      .from(users)
+      .where(eq(users.role, "seller"));
+
+    return toPlainObject(sellers);
+  }),
+
   // ═══════════════════════════════════════════════════════════════
   // ENDPOINT DE PRUEBA (TEMPORAL - REMOVER EN PRODUCCIÓN)
   // ═══════════════════════════════════════════════════════════════
