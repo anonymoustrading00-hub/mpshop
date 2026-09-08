@@ -198,18 +198,19 @@ export default function SellerCashRegister() {
     }
   };
 
-  // Estado de la caja
+  // Estado de la caja — el backend devuelve { hasBox, box: { openingStatus, closingStatus, ... } }
   const hasBox = boxStatus?.hasBox || false;
-  const isOpen = boxStatus?.status === "open";
-  const isApproved = boxStatus?.approvalStatus === "approved";
+  const currentBox = boxStatus?.box;
+  const isOpen = currentBox?.closingStatus === "open";
+  const isApproved = currentBox?.openingStatus === "approved";
   const canOperate = hasBox && isOpen && isApproved;
-  
-  const hasPendingOpening = pendingRequests?.some(r => r.type === "opening" && r.status === "pending");
-  const hasPendingClosing = pendingRequests?.some(r => r.type === "closing" && r.status === "pending");
+
+  // Detectar apertura o cierre pendiente directamente del estado de la caja
+  const hasPendingOpening = hasBox && currentBox?.openingStatus === "pending";
+  const hasPendingClosing = hasBox && currentBox?.closingStatus === "pending";
 
   // Si tiene cierre pendiente de aprobación
   if (hasPendingClosing) {
-    const closingRequest = pendingRequests?.find(r => r.type === "closing" && r.status === "pending");
     
     return (
       <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6 mb-10">
@@ -235,19 +236,19 @@ export default function SellerCashRegister() {
               <Card className="bg-slate-50/50 border-none shadow-none">
                 <CardContent className="p-4 text-center">
                   <p className="text-[10px] text-slate-400 font-black uppercase mb-1">Efectivo Declarado</p>
-                  <p className="text-2xl font-black text-slate-700">{formatCurrency(closingRequest?.amount || 0)}</p>
+                  <p className="text-2xl font-black text-slate-700">{formatCurrency(currentBox?.reportedCash || 0)}</p>
                 </CardContent>
               </Card>
               <Card className="bg-slate-50/50 border-none shadow-none">
                 <CardContent className="p-4 text-center">
                   <p className="text-[10px] text-slate-400 font-black uppercase mb-1">QR Declarado</p>
-                  <p className="text-2xl font-black text-slate-700">Bs. 0.00</p>
+                  <p className="text-2xl font-black text-slate-700">{formatCurrency(currentBox?.reportedQr || 0)}</p>
                 </CardContent>
               </Card>
               <Card className="bg-slate-50/50 border-none shadow-none">
                 <CardContent className="p-4 text-center">
                   <p className="text-[10px] text-slate-400 font-black uppercase mb-1">Transf. Declarada</p>
-                  <p className="text-2xl font-black text-slate-700">Bs. 0.00</p>
+                  <p className="text-2xl font-black text-slate-700">{formatCurrency(currentBox?.reportedTransfer || 0)}</p>
                 </CardContent>
               </Card>
             </div>
@@ -399,24 +400,30 @@ export default function SellerCashRegister() {
   }
 
   // Dashboard principal - Caja Activa
-  const currentBox = boxStatus?.currentBox;
+  // currentBox ya está definido arriba como boxStatus?.box
   const totalCash = (currentBox?.salesCash || 0) + (currentBox?.initialCash || 0);
   const totalQr = currentBox?.salesQr || 0;
   const totalTransfer = currentBox?.salesTransfer || 0;
   const totalSales = totalCash + totalQr + totalTransfer - (currentBox?.initialCash || 0);
-  
-  const deliveries = currentBox?.deliveries || [];
-  const expenses = currentBox?.expenses || [];
-  
+
+  // Las entregas y gastos vienen de pendingRequests (objeto con pendingDeliveries y pendingExpenses)
+  const deliveries = (pendingRequests as any)?.pendingDeliveries || [];
+  const expenses   = (pendingRequests as any)?.pendingExpenses   || [];
+
   const totalDelivered = deliveries
-    .filter((d: any) => d.approvalStatus === "approved")
+    .filter((d: any) => d.status === "approved")
     .reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
-  
+
   const totalExpenses = expenses
-    .filter((e: any) => e.approvalStatus === "approved")
+    .filter((e: any) => e.status === "approved")
     .reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
 
-  const cashInBox = totalCash - totalDelivered - totalExpenses;
+  // El efectivo en caja = inicial + ventas efectivo - entregas aprobadas - gastos aprobados
+  // El backend ya guarda partialDeliveriesCash y totalExpenses acumulados
+  const cashInBox = (currentBox?.initialCash || 0)
+    + (currentBox?.salesCash || 0)
+    - (currentBox?.partialDeliveriesCash || 0)
+    - (currentBox?.totalExpenses || 0);
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-8 mb-20 md:mb-10">
@@ -542,8 +549,8 @@ export default function SellerCashRegister() {
                             {new Date(d.requestDate).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
                           </p>
                         </div>
-                        <Badge variant={d.approvalStatus === "approved" ? "default" : d.approvalStatus === "rejected" ? "destructive" : "secondary"}>
-                          {d.approvalStatus === "approved" ? "Aprobada" : d.approvalStatus === "rejected" ? "Rechazada" : "Pendiente"}
+                        <Badge variant={d.status === "approved" ? "default" : d.status === "rejected" ? "destructive" : "secondary"}>
+                          {d.status === "approved" ? "Aprobada" : d.status === "rejected" ? "Rechazada" : "Pendiente"}
                         </Badge>
                       </div>
                     ))}
@@ -576,8 +583,8 @@ export default function SellerCashRegister() {
                       <div key={e.id} className="p-3 bg-slate-50 rounded-lg">
                         <div className="flex items-center justify-between mb-1">
                           <p className="font-bold text-sm">{e.concept}</p>
-                          <Badge variant={e.approvalStatus === "approved" ? "default" : e.approvalStatus === "rejected" ? "destructive" : "secondary"}>
-                            {e.approvalStatus === "approved" ? "Aprobado" : e.approvalStatus === "rejected" ? "Rechazado" : "Pendiente"}
+                          <Badge variant={e.status === "approved" ? "default" : e.status === "rejected" ? "destructive" : "secondary"}>
+                            {e.status === "approved" ? "Aprobado" : e.status === "rejected" ? "Rechazado" : "Pendiente"}
                           </Badge>
                         </div>
                         <div className="flex items-center justify-between">
@@ -875,10 +882,10 @@ function HistoryList({ history }: { history: any[] }) {
     <div className="space-y-2">
       {history.slice(0, 10).map((box: any) => {
         const total = (box.salesCash || 0) + (box.salesQr || 0) + (box.salesTransfer || 0);
-        const statusLabel = box.status === "open" ? "Abierta" : "Cerrada";
-        const approvalLabel = 
-          box.approvalStatus === "approved" ? "Aprobada" :
-          box.approvalStatus === "rejected" ? "Rechazada" : "Pendiente";
+        const statusLabel = box.closingStatus === "open" ? "Abierta" : "Cerrada";
+        const approvalLabel =
+          box.openingStatus === "approved" ? "Aprobada" :
+          box.openingStatus === "rejected" ? "Rechazada" : "Pendiente";
 
         return (
           <div key={box.id} className="p-4 border rounded-lg hover:bg-slate-50 transition-colors">
@@ -888,13 +895,13 @@ function HistoryList({ history }: { history: any[] }) {
                 <p className="text-xs text-slate-500">{new Date(box.openedAt).toLocaleDateString()}</p>
               </div>
               <div className="flex gap-2">
-                <Badge variant={box.status === "open" ? "default" : "secondary"}>
+                <Badge variant={box.closingStatus === "open" ? "default" : "secondary"}>
                   {statusLabel}
                 </Badge>
-                <Badge 
+                <Badge
                   variant={
-                    box.approvalStatus === "approved" ? "default" :
-                    box.approvalStatus === "rejected" ? "destructive" : "secondary"
+                    box.openingStatus === "approved" ? "default" :
+                    box.openingStatus === "rejected" ? "destructive" : "secondary"
                   }
                 >
                   {approvalLabel}
