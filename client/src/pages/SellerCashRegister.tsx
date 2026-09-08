@@ -272,16 +272,30 @@ export default function SellerCashRegister() {
             <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 flex gap-3 items-start">
                <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
                <p className="text-xs text-emerald-800 leading-relaxed font-medium">
-                 ¡Excelente trabajo! Tu caja ha sido cerrada correctamente. Puedes revisar el historial completo más abajo.
+                 ¡Excelente trabajo! Tu caja del <strong>{currentBox?.date}</strong> ha sido cerrada correctamente. 
+                 {currentBox?.date !== today && <span> Para trabajar hoy ({today}), solicita una nueva apertura.</span>}
                </p>
             </div>
 
-            <Button
-              className="w-full h-12 text-base font-bold bg-slate-700 hover:bg-slate-800"
-              onClick={() => setActiveTab("dashboard")}
-            >
-              <History className="w-4 h-4 mr-2" /> Ver Historial
-            </Button>
+            <div className="flex gap-3">
+              <Button
+                className="flex-1 h-12 text-base font-bold bg-slate-700 hover:bg-slate-800"
+                onClick={() => setActiveTab("dashboard")}
+              >
+                <History className="w-4 h-4 mr-2" /> Ver Historial
+              </Button>
+              {currentBox?.date !== today && (
+                <Button
+                  className="flex-1 h-12 text-base font-bold bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => {
+                    refetchStatus();
+                    window.location.reload();
+                  }}
+                >
+                  <Wallet className="w-4 h-4 mr-2" /> Abrir Caja Hoy
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
