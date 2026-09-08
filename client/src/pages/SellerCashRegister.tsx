@@ -143,9 +143,9 @@ export default function SellerCashRegister() {
     setIsSubmitting(true);
     try {
       await requestClosingMutation.mutateAsync({
-        reportedCash: Math.round((parseFloat(closingForm.reportedCash) || 0) * 100),
-        reportedQr: Math.round((parseFloat(closingForm.reportedQr) || 0) * 100),
-        reportedTransfer: Math.round((parseFloat(closingForm.reportedTransfer) || 0) * 100),
+        reportedCash:     parseFloat(closingForm.reportedCash)     || 0,
+        reportedQr:       parseFloat(closingForm.reportedQr)       || 0,
+        reportedTransfer: parseFloat(closingForm.reportedTransfer) || 0,
         differenceJustification: closingForm.differenceJustification || undefined
       });
     } finally {
@@ -165,7 +165,7 @@ export default function SellerCashRegister() {
     setIsSubmitting(true);
     try {
       await requestDeliveryMutation.mutateAsync({
-        amount: Math.round(amount * 100),
+        amount: amount,
         notes: deliveryForm.notes || undefined
       });
     } finally {
@@ -189,7 +189,7 @@ export default function SellerCashRegister() {
     setIsSubmitting(true);
     try {
       await requestExpenseMutation.mutateAsync({
-        amount: Math.round(amount * 100),
+        amount: amount,
         concept: expenseForm.concept,
         notes: expenseForm.notes || undefined
       });

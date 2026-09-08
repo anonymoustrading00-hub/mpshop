@@ -92,6 +92,7 @@ export default function SellerBoxesManagement() {
   const rejectExpenseMut    = trpc.sellerCash.admin_rejectExpense.useMutation({  onSuccess: () => { toast.success("Gasto rechazado"); invalidateAll(); }, onError: e => toast.error(e.message) });
   const forceCloseMut       = trpc.sellerCash.admin_forceClose.useMutation({     onSuccess: () => { toast.success("Caja cerrada forzosamente"); invalidateAll(); setForceCloseDialog(null); }, onError: e => toast.error(e.message) });
   const editAmountsMut      = trpc.sellerCash.admin_editAmounts.useMutation({    onSuccess: () => { toast.success("Montos actualizados"); invalidateAll(); setEditDialog(null); }, onError: e => toast.error(e.message) });
+  const deleteBoxMut        = trpc.sellerCash.admin_deleteBox.useMutation({      onSuccess: () => { toast.success("Registro eliminado"); invalidateAll(); }, onError: e => toast.error(e.message) });
   const openBoxForSellerMut = trpc.sellerCash.admin_openBoxForSeller.useMutation({
     onSuccess: () => {
       toast.success("Caja abierta correctamente para el vendedor");
@@ -344,6 +345,10 @@ export default function SellerBoxesManagement() {
                             </Button>
                             <Button size="sm" variant="destructive" className="h-8 px-3" onClick={() => openReject("opening", cr.id, seller?.name ?? "")}>
                               <XCircle className="w-3.5 h-3.5 mr-1" /> Rechazar
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-8 px-2 text-red-600 border-red-200 hover:bg-red-50"
+                              onClick={() => { if (confirm(`¿Eliminar este registro de caja de ${seller?.name}? (monto incorrecto)`)) deleteBoxMut.mutate({ cashRegisterId: cr.id }); }}>
+                              🗑
                             </Button>
                           </div>
                         </TableCell>

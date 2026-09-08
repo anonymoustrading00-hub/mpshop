@@ -934,7 +934,21 @@ export const sellerCashRouter = router({
   // ═══════════════════════════════════════════════════════════════
   // ENDPOINT DE PRUEBA (TEMPORAL - REMOVER EN PRODUCCIÓN)
   // ═══════════════════════════════════════════════════════════════
-  
+
+  /**
+   * Eliminar caja incorrecta por ID (admin) — para limpiar registros con montos erróneos
+   */
+  admin_deleteBox: protectedProcedure
+    .input(z.object({ cashRegisterId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      await db.delete(sellerCashRegisters).where(eq(sellerCashRegisters.id, input.cashRegisterId));
+      return { success: true, message: "Registro eliminado" };
+    }),
+
   test_checkTables: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return { error: "Database not available" };
