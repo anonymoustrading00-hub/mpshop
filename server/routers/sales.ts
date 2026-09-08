@@ -11,7 +11,7 @@ import {
   markSalePaymentCompleted,
   getDb,
 } from "../db";
-import { units } from "../../drizzle/schema";
+import { units, sellerCashRegisters } from "../../drizzle/schema";
 import { eq, inArray, and, sql } from "drizzle-orm";
 import { ensureCustomerRecord } from "./customer_utils";
 
@@ -282,7 +282,57 @@ export const salesRouter = router({
           items: normalizedItems as any,
         });
 
-        return { success: true, saleId: (result as any).insertId, saleNumber };
+        const saleId = (result as any).insertId;
+
+        // ═══════════════════════════════════════════════════════════════
+        // REGISTRAR VENTA EN CAJA DEL VENDEDOR (SI TIENE CAJA ABIERTA)
+        // ═══════════════════════════════════════════════════════════════
+        if (db && input.paymentMethod !== "credit" && ctx.user?.role === "seller") {
+          try {
+            const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+            
+            // Buscar caja abierta del vendedor
+            const [cashRegister] = await db
+              .select()
+              .from(sellerCashRegisters)
+              .where(
+                and(
+                  eq(sellerCashRegisters.sellerId, ctx.user.id),
+                  eq(sellerCashRegisters.date, today),
+                  eq(sellerCashRegisters.openingStatus, "approved"),
+                  eq(sellerCashRegisters.closingStatus, "open")
+                )
+              )
+              .limit(1);
+            
+            if (cashRegister) {
+              // Actualizar ventas según método de pago
+              const updateData: any = {};
+              
+              if (input.paymentMethod === "cash") {
+                updateData.salesCash = sql`${sellerCashRegisters.salesCash} + ${total}`;
+              } else if (input.paymentMethod === "qr") {
+                updateData.salesQr = sql`${sellerCashRegisters.salesQr} + ${total}`;
+              } else if (input.paymentMethod === "transfer") {
+                updateData.salesTransfer = sql`${sellerCashRegisters.salesTransfer} + ${total}`;
+              }
+              
+              if (Object.keys(updateData).length > 0) {
+                await db
+                  .update(sellerCashRegisters)
+                  .set(updateData)
+                  .where(eq(sellerCashRegisters.id, cashRegister.id));
+              }
+            }
+            // Si no tiene caja abierta, la venta se registra normalmente pero no en la caja personal
+          } catch (cashError) {
+            // No fallar la venta si hay error al registrar en caja
+            console.error("[Sales] Error registrando en caja de vendedor:", cashError);
+          }
+        }
+        // ═══════════════════════════════════════════════════════════════
+
+        return { success: true, saleId, saleNumber };
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
