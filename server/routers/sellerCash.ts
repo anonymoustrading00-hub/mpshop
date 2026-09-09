@@ -535,11 +535,18 @@ export const sellerCashRouter = router({
       if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
       const now = new Date();
-      await db.execute(sql`
-        UPDATE seller_cash_registers
-        SET openingStatus='approved', openingApprovedBy=${ctx.user.id}, openingApprovedAt=${now}, closingNotes=${input.notes || null}
-        WHERE id=${input.cashRegisterId}
-      `);
+      
+      // Actualizar con query builder de Drizzle
+      await db
+        .update(sellerCashRegisters)
+        .set({
+          openingStatus: "approved",
+          openingApprovedBy: ctx.user.id,
+          openingApprovedAt: now,
+          openingNotes: input.notes || null,
+        })
+        .where(eq(sellerCashRegisters.id, input.cashRegisterId));
+      
       return { success: true, message: "Apertura aprobada correctamente" };
     }),
 
@@ -554,11 +561,17 @@ export const sellerCashRouter = router({
       if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
       const now = new Date();
-      await db.execute(sql`
-        UPDATE seller_cash_registers
-        SET openingStatus='rejected', openingApprovedBy=${ctx.user.id}, openingApprovedAt=${now}, closingNotes=${input.notes}
-        WHERE id=${input.cashRegisterId}
-      `);
+      
+      await db
+        .update(sellerCashRegisters)
+        .set({
+          openingStatus: "rejected",
+          openingApprovedBy: ctx.user.id,
+          openingApprovedAt: now,
+          closingNotes: input.notes,
+        })
+        .where(eq(sellerCashRegisters.id, input.cashRegisterId));
+      
       return { success: true, message: "Apertura rechazada" };
     }),
 
@@ -573,11 +586,18 @@ export const sellerCashRouter = router({
       if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
       const now = new Date();
-      await db.execute(sql`
-        UPDATE seller_cash_registers
-        SET closingStatus='approved', closingApprovedBy=${ctx.user.id}, closingApprovedAt=${now}, closedAt=${now}, closingNotes=${input.notes || null}
-        WHERE id=${input.cashRegisterId}
-      `);
+      
+      await db
+        .update(sellerCashRegisters)
+        .set({
+          closingStatus: "approved",
+          closingApprovedBy: ctx.user.id,
+          closingApprovedAt: now,
+          closedAt: now,
+          closingNotes: input.notes || null,
+        })
+        .where(eq(sellerCashRegisters.id, input.cashRegisterId));
+      
       return { success: true, message: "Cierre aprobado correctamente" };
     }),
 
@@ -591,11 +611,14 @@ export const sellerCashRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
       if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
-      await db.execute(sql`
-        UPDATE seller_cash_registers
-        SET closingStatus='open', closingNotes=${input.notes}
-        WHERE id=${input.cashRegisterId}
-      `);
+      await db
+        .update(sellerCashRegisters)
+        .set({
+          closingStatus: "open",
+          closingNotes: input.notes,
+        })
+        .where(eq(sellerCashRegisters.id, input.cashRegisterId));
+      
       return { success: true, message: "Cierre rechazado. El vendedor debe corregir." };
     }),
 
@@ -702,12 +725,18 @@ export const sellerCashRouter = router({
       if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
       const now = new Date();
-      await db.execute(sql`
-        UPDATE seller_cash_registers
-        SET closingStatus='forced_closed', closingApprovedBy=${ctx.user.id}, closingApprovedAt=${now}, closedAt=${now},
-            closingNotes=${`CIERRE FORZOSO: ${input.notes}`}
-        WHERE id=${input.cashRegisterId}
-      `);
+      
+      await db
+        .update(sellerCashRegisters)
+        .set({
+          closingStatus: "forced_closed",
+          closingApprovedBy: ctx.user.id,
+          closingApprovedAt: now,
+          closedAt: now,
+          closingNotes: `CIERRE FORZOSO: ${input.notes}`,
+        })
+        .where(eq(sellerCashRegisters.id, input.cashRegisterId));
+      
       return { success: true, message: "Caja cerrada forzosamente" };
     }),
 
