@@ -903,6 +903,28 @@ export const sellerCashRouter = router({
       return { success: true, message: "Registro eliminado" };
     }),
 
+  /**
+   * Resetear montos de ventas de una caja a 0 (para corregir datos mal sincronizados)
+   */
+  admin_resetBoxSales: protectedProcedure
+    .input(z.object({ cashRegisterId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      await db
+        .update(sellerCashRegisters)
+        .set({
+          salesCash: 0,
+          salesQr: 0,
+          salesTransfer: 0,
+        })
+        .where(eq(sellerCashRegisters.id, input.cashRegisterId));
+
+      return { success: true, message: "Montos reseteados a 0. Ahora ejecuta Sincronizar Ventas." };
+    }),
+
   test_checkTables: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return { error: "Database not available" };
