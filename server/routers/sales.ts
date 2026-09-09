@@ -12,8 +12,9 @@ import {
   getDb,
 } from "../db";
 import { units, sellerCashRegisters } from "../../drizzle/schema";
-import { eq, inArray, and, sql } from "drizzle-orm";
+import { eq, inArray, and, sql, desc } from "drizzle-orm";
 import { ensureCustomerRecord } from "./customer_utils";
+import { getLocalDateKey } from "../_core/date_utils";
 
 const discountTypeSchema = z.enum(["none", "percentage", "fixed"]);
 const paymentMethodSchema = z.enum(["cash", "qr", "transfer", "credit"]);
@@ -292,7 +293,7 @@ export const salesRouter = router({
         // Registrar SIEMPRE si la venta tiene soldBy y no es crédito
         if (db && input.paymentMethod !== "credit") {
           try {
-            const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+            const today = getLocalDateKey(); // Usar fecha de Bolivia
             const sellerId = ctx.user!.id; // El vendedor es quien está logueado (ya sea seller o admin vendiendo)
             
             // Buscar la ÚLTIMA caja abierta del vendedor (puede tener múltiples turnos)
