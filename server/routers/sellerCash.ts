@@ -1046,9 +1046,10 @@ export const sellerCashRouter = router({
             SELECT 
               COALESCE(SUM(CASE WHEN paymentMethod = 'cash' THEN total ELSE 0 END), 0) as totalCash,
               COALESCE(SUM(CASE WHEN paymentMethod = 'qr' THEN total ELSE 0 END), 0) as totalQr,
-              COALESCE(SUM(CASE WHEN paymentMethod = 'transfer' THEN total ELSE 0 END), 0) as totalTransfer
+              COALESCE(SUM(CASE WHEN paymentMethod = 'transfer' THEN total ELSE 0 END), 0) as totalTransfer,
+              COUNT(*) as ventasCount
             FROM sales
-            WHERE userId = ${box.sellerId}
+            WHERE soldBy = ${box.sellerId}
               AND DATE(createdAt) = ${box.date}
               AND status != 'cancelled'
           `) as any;
@@ -1058,17 +1059,21 @@ export const sellerCashRouter = router({
             const totalCash = Number(row.totalCash || 0);
             const totalQr = Number(row.totalQr || 0);
             const totalTransfer = Number(row.totalTransfer || 0);
+            const ventasCount = Number(row.ventasCount || 0);
             
-            await db
-              .update(sellerCashRegisters)
-              .set({
-                salesCash: totalCash,
-                salesQr: totalQr,
-                salesTransfer: totalTransfer,
-              })
-              .where(eq(sellerCashRegisters.id, box.id));
+            if (ventasCount > 0) {
+              await db
+                .update(sellerCashRegisters)
+                .set({
+                  salesCash: totalCash,
+                  salesQr: totalQr,
+                  salesTransfer: totalTransfer,
+                })
+                .where(eq(sellerCashRegisters.id, box.id));
 
-            updated++;
+              updated++;
+              console.log(`[Sync] Caja #${box.id} - ${ventasCount} ventas: Efectivo=${totalCash}, QR=${totalQr}, Transfer=${totalTransfer}`);
+            }
           }
         }
 
