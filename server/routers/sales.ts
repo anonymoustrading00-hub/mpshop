@@ -289,9 +289,11 @@ export const salesRouter = router({
         // ═══════════════════════════════════════════════════════════════
         // REGISTRAR VENTA EN CAJA DEL VENDEDOR (SI TIENE CAJA ABIERTA)
         // ═══════════════════════════════════════════════════════════════
-        if (db && input.paymentMethod !== "credit" && ctx.user?.role === "seller") {
+        // Registrar SIEMPRE si la venta tiene soldBy y no es crédito
+        if (db && input.paymentMethod !== "credit") {
           try {
             const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+            const sellerId = ctx.user!.id; // El vendedor es quien está logueado (ya sea seller o admin vendiendo)
             
             // Buscar la ÚLTIMA caja abierta del vendedor (puede tener múltiples turnos)
             const cashRegisters = await db
@@ -299,7 +301,7 @@ export const salesRouter = router({
               .from(sellerCashRegisters)
               .where(
                 and(
-                  eq(sellerCashRegisters.sellerId, ctx.user.id),
+                  eq(sellerCashRegisters.sellerId, sellerId),
                   eq(sellerCashRegisters.date, today)
                 )
               )
@@ -327,15 +329,17 @@ export const salesRouter = router({
                   .update(sellerCashRegisters)
                   .set(updateData)
                   .where(eq(sellerCashRegisters.id, cashRegister.id));
+                
+                console.log(`[Sale->Box] Registrada venta ${saleNumber} en caja #${cashRegister.id} - ${input.paymentMethod}: Bs.${(total/100).toFixed(2)}`);
               }
+            } else {
+              console.log(`[Sale->Box] Vendedor ${sellerId} no tiene caja abierta hoy ${today}`);
             }
-            // Si no tiene caja abierta, la venta se registra normalmente pero no en la caja personal
-          } catch (cashError) {
-            // No fallar la venta si hay error al registrar en caja
-            console.error("[Sales] Error registrando en caja de vendedor:", cashError);
+          } catch (boxError) {
+            console.error("[Sale->Box] Error registrando venta en caja:", boxError);
+            // No fallar la venta si hay error en caja
           }
         }
-        // ═══════════════════════════════════════════════════════════════
 
         return { success: true, saleId, saleNumber };
       } catch (error) {
