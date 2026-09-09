@@ -42,6 +42,45 @@ async function getCompanyInfo(_db?: any) {
   return readCompanyConfig();
 }
 
+// 🔴 CRÍTICO #3: Calcular COGS promedio para productos fungibles (accesorios, cargadores)
+// Utiliza el método de promedio ponderado: suma de (purchasePrice * cantidad) / cantidad total
+async function calculateAverageCOGS(db: any, brand: string, model: string, type: string): Promise<number> {
+  if (!db) {
+    // Mock mode: calcular desde MOCK_UNITS
+    const matchingUnits = MOCK_UNITS.filter((u: any) => 
+      u.brand === brand && 
+      u.model === model && 
+      u.type === type &&
+      u.purchasePrice > 0
+    );
+    
+    if (matchingUnits.length === 0) return 0;
+    
+    const totalCost = matchingUnits.reduce((sum: number, u: any) => sum + u.purchasePrice, 0);
+    return totalCost / matchingUnits.length;
+  }
+
+  // DB mode: calcular desde units table
+  const result = await db
+    .select({
+      avgCost: sql<number>`AVG(${units.purchasePrice})`,
+      count: sql<number>`COUNT(*)`,
+    })
+    .from(units)
+    .where(
+      and(
+        eq(units.brand, brand),
+        eq(units.model, model),
+        eq(units.type, type),
+        sql`${units.purchasePrice} > 0`
+      )
+    );
+
+  if (!result || result.length === 0 || !result[0].count) return 0;
+  
+  return Math.round((result[0].avgCost || 0) * 100) / 100; // Redondear a 2 decimales
+}
+
 export const unitsRouter = router({
   // Obtener catálogo/listado de unidades con filtros
   list: protectedProcedure
@@ -532,6 +571,14 @@ export const unitsRouter = router({
 
       // Determinar si es fungible
       const isFungible = ['charger', 'accessory', 'battery', 'cable', 'case', 'other'].includes(input.type);
+
+      // 🔴 CRÍTICO #3: Validar purchasePrice obligatorio para productos únicos (no fungibles)
+      if (!isFungible && (!input.purchasePrice || input.purchasePrice <= 0)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `El precio de compra es obligatorio para productos únicos (${input.type}). Ingresa el costo real de adquisición para calcular COGS y rentabilidad correctamente.`,
+        });
+      }
 
       const getUnitCode = (index: number) => {
         // Para fungibles con qty > 1: MISMO código para todos

@@ -1044,3 +1044,19 @@ export const screenSizes = mysqlTable("screen_sizes", {
 
 export type ScreenSize = typeof screenSizes.$inferSelect;
 export type InsertScreenSize = typeof screenSizes.$inferInsert;
+
+// 🔴 CRÍTICO #4: Tabla de KPIs agregados para dashboards rápidos
+// Almacena snapshots diarios de métricas para evitar cálculos costosos en tiempo real
+export const kpiSnapshots = mysqlTable("kpi_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD formato local Bolivia
+  branchId: int("branchId").notNull().default(1).references(() => branches.id),
+  metricName: varchar("metricName", { length: 100 }).notNull(), // ej: "daily_revenue", "daily_cogs", "daily_gross_profit"
+  metricValue: int("metricValue").notNull().default(0), // Valor en centavos o cantidad entera
+  metricMetadata: text("metricMetadata"), // JSON opcional con desglose adicional
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type KpiSnapshot = typeof kpiSnapshots.$inferSelect;
+export type InsertKpiSnapshot = typeof kpiSnapshots.$inferInsert;

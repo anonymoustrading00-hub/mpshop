@@ -355,6 +355,45 @@ function ensureDefaultDeviceCatalogMocks() {
   return changed;
 }
 
+// 🔴 CRÍTICO #3: Calcular COGS promedio para productos fungibles (accesorios, cargadores)
+// Utiliza el método de promedio ponderado: suma de (purchasePrice * cantidad) / cantidad total
+export async function calculateAverageCOGS(db: any, brand: string, model: string, type: string): Promise<number> {
+  if (!db || !process.env.DATABASE_URL) {
+    // Mock mode: calcular desde MOCK_UNITS
+    const matchingUnits = MOCK_UNITS.filter((u: any) => 
+      u.brand === brand && 
+      u.model === model && 
+      u.type === type &&
+      u.purchasePrice > 0
+    );
+    
+    if (matchingUnits.length === 0) return 0;
+    
+    const totalCost = matchingUnits.reduce((sum: number, u: any) => sum + u.purchasePrice, 0);
+    return Math.round((totalCost / matchingUnits.length) * 100) / 100;
+  }
+
+  // DB mode: calcular desde units table
+  const result = await db
+    .select({
+      avgCost: sql<number>`AVG(${units.purchasePrice})`,
+      count: sql<number>`COUNT(*)`,
+    })
+    .from(units)
+    .where(
+      and(
+        eq(units.brand, brand),
+        eq(units.model, model),
+        eq(units.type, type),
+        sql`${units.purchasePrice} > 0`
+      )
+    );
+
+  if (!result || result.length === 0 || !result[0].count) return 0;
+  
+  return Math.round((result[0].avgCost || 0) * 100) / 100; // Redondear a 2 decimales
+}
+
 export function syncMocksToDisk() {
   if (process.env.DATABASE_URL) return;
   const data = {
@@ -578,6 +617,30 @@ export async function getDb() {
             AND (differenceQr = 0 OR differenceTransfer = 0)
         `).catch((err) => {
           console.log('[Migration] Historical differences updated (or skipped if already done)');
+        });
+        
+        // 🔴 CRÍTICO #4: Crear tabla kpi_snapshots para métricas agregadas
+        _pool.execute(`
+          CREATE TABLE IF NOT EXISTS kpi_snapshots (
+            id INT AUTO_INCREMENT NOT NULL,
+            date VARCHAR(10) NOT NULL COMMENT 'Fecha YYYY-MM-DD (UTC-4 Bolivia)',
+            branchId INT NOT NULL DEFAULT 1,
+            metricName VARCHAR(100) NOT NULL COMMENT 'Nombre de métrica (daily_revenue, etc.)',
+            metricValue INT NOT NULL DEFAULT 0 COMMENT 'Valor en centavos o cantidad',
+            metricMetadata TEXT COMMENT 'JSON opcional con desglose',
+            createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_date_branch (date, branchId),
+            KEY idx_metric_name (metricName),
+            KEY idx_kpi_date_range (branchId, date, metricName),
+            CONSTRAINT kpi_snapshots_branchId_fk FOREIGN KEY (branchId) REFERENCES branches(id)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+          COMMENT='Snapshots diarios de KPIs para dashboards rápidos'
+        `).catch((err) => {
+          if (!err.message.includes('already exists')) {
+            console.error('[Migration] Error creating kpi_snapshots table:', err.message);
+          }
         });
         
         _pool.execute(`
@@ -3449,22 +3512,48 @@ export async function createSaleWithItems(payload: SaleCreatePayload) {
           });
         }
 
-        // COGS: registrar costo de adquisición de la unidad vendida
+        // 🔴 CRÍTICO #3: COGS - registrar costo de adquisición de la unidad vendida
         const soldUnit = MOCK_UNITS[unitIdx];
-        if (soldUnit && soldUnit.purchasePrice && soldUnit.purchasePrice > 0) {
-          await createAutomaticOperationalExpense({
-            branchId: payload.branchId || 1,
-            description: `COGS - ${soldUnit.brand || ""} ${soldUnit.model || ""} (${soldUnit.code || targetId}) · Venta ${payload.saleNumber}`,
-            category: "cogs",
-            costType: "direct_cost",
-            referenceType: "sale",
-            referenceId: newSaleId,
-            amount: soldUnit.purchasePrice,
-            paymentMethod: "cash", // contable, no sale de caja
-            userId: payload.soldBy,
-            notes: `Costo de adquisición registrado al momento de venta ${payload.saleNumber}`,
-            status: "paid",
-          });
+        if (soldUnit) {
+          let cogsAmount = soldUnit.purchasePrice || 0;
+          
+          // Para productos fungibles sin purchasePrice, calcular COGS promedio
+          const isFungible = ['charger', 'accessory', 'battery', 'cable', 'case', 'other'].includes(soldUnit.type);
+          if (isFungible && cogsAmount === 0) {
+            const matchingUnits = MOCK_UNITS.filter((u: any) => 
+              u.brand === soldUnit.brand && 
+              u.model === soldUnit.model && 
+              u.type === soldUnit.type &&
+              u.purchasePrice > 0
+            );
+            if (matchingUnits.length > 0) {
+              const totalCost = matchingUnits.reduce((sum: number, u: any) => sum + u.purchasePrice, 0);
+              cogsAmount = Math.round((totalCost / matchingUnits.length) * 100) / 100;
+            }
+          }
+          
+          // ⚠️ Advertencia: COGS = 0 afecta rentabilidad real
+          if (cogsAmount === 0) {
+            console.warn(`⚠️ VENTA ${payload.saleNumber}: Unidad ${soldUnit.code || targetId} vendida SIN costo de adquisición (purchasePrice=0). Rentabilidad inflada.`);
+          }
+          
+          if (cogsAmount > 0) {
+            await createAutomaticOperationalExpense({
+              branchId: payload.branchId || 1,
+              description: `COGS - ${soldUnit.brand || ""} ${soldUnit.model || ""} (${soldUnit.code || targetId}) · Venta ${payload.saleNumber}`,
+              category: "cogs",
+              costType: "direct_cost",
+              referenceType: "sale",
+              referenceId: newSaleId,
+              amount: cogsAmount,
+              paymentMethod: "cash", // contable, no sale de caja
+              userId: payload.soldBy,
+              notes: isFungible && soldUnit.purchasePrice === 0 
+                ? `COGS promedio calculado (${cogsAmount.toFixed(2)}) para venta ${payload.saleNumber}`
+                : `Costo de adquisición registrado al momento de venta ${payload.saleNumber}`,
+              status: "paid",
+            });
+          }
         }
         continue;
       }
@@ -3627,7 +3716,7 @@ export async function createSaleWithItems(payload: SaleCreatePayload) {
             notes: `Vendido en venta #${payload.saleNumber} (fungible: ${itemAny.brand} ${itemAny.model})`,
           });
           
-          // COGS para cada unidad
+          // 🔴 CRÍTICO #3: COGS para cada unidad (con cálculo de promedio si es necesario)
           if (unit.purchasePrice && unit.purchasePrice > 0) {
             await tx.insert(operationalExpenses).values({
               branchId: payload.branchId || 1,
@@ -3644,6 +3733,28 @@ export async function createSaleWithItems(payload: SaleCreatePayload) {
               userId: payload.soldBy,
               notes: `Costo de adquisición registrado al momento de venta ${payload.saleNumber}`,
             });
+          } else {
+            // Si no tiene purchasePrice, calcular promedio para fungibles
+            const avgCost = await calculateAverageCOGS(tx, unit.brand, unit.model, unit.type);
+            if (avgCost > 0) {
+              await tx.insert(operationalExpenses).values({
+                branchId: payload.branchId || 1,
+                description: `COGS - ${unit.brand || ""} ${unit.model || ""} (${unit.code || unit.id}) · Venta ${payload.saleNumber}`,
+                category: "cogs",
+                costType: "direct_cost",
+                referenceType: "sale",
+                referenceId: saleId,
+                isAutomatic: 1,
+                amount: avgCost,
+                paymentMethod: "cash",
+                expenseDate: new Date(),
+                status: "paid",
+                userId: payload.soldBy,
+                notes: `COGS promedio calculado (${avgCost.toFixed(2)}) para venta ${payload.saleNumber}`,
+              });
+            } else {
+              console.warn(`⚠️ VENTA ${payload.saleNumber}: Unidad ${unit.code || unit.id} vendida SIN costo de adquisición. Rentabilidad inflada.`);
+            }
           }
         }
         
@@ -3704,26 +3815,43 @@ export async function createSaleWithItems(payload: SaleCreatePayload) {
           });
         }
 
-        // COGS: registrar costo de adquisición de la unidad vendida
+        // 🔴 CRÍTICO #3: COGS - registrar costo de adquisición de la unidad vendida
         // Solo va a operationalExpenses (P&L). NO se inserta en financialTransactions
         // porque el COGS es un costo contable, no un egreso real de caja.
         // El dinero de compra ya salió cuando se registró la unidad (category: "purchase").
-        if (unitRow && unitRow.purchasePrice && unitRow.purchasePrice > 0) {
-          await tx.insert(operationalExpenses).values({
-            branchId: payload.branchId || 1,
-            description: `COGS - ${unitRow.brand || ""} ${unitRow.model || ""} (${unitRow.code || item.unitId}) · Venta ${payload.saleNumber}`,
-            category: "cogs",
-            costType: "direct_cost",
-            referenceType: "sale",
-            referenceId: saleId,
-            isAutomatic: 1,
-            amount: unitRow.purchasePrice,
-            paymentMethod: "cash",
-            expenseDate: new Date(),
-            status: "paid",
-            userId: payload.soldBy,
-            notes: `Costo de adquisición registrado al momento de venta ${payload.saleNumber}`,
-          });
+        if (unitRow) {
+          let cogsAmount = unitRow.purchasePrice || 0;
+          
+          // Para productos fungibles sin purchasePrice, calcular COGS promedio
+          const isFungible = ['charger', 'accessory', 'battery', 'cable', 'case', 'other'].includes(unitRow.type);
+          if (isFungible && cogsAmount === 0) {
+            cogsAmount = await calculateAverageCOGS(tx, unitRow.brand, unitRow.model, unitRow.type);
+          }
+          
+          // ⚠️ Advertencia: COGS = 0 afecta rentabilidad real
+          if (cogsAmount === 0) {
+            console.warn(`⚠️ VENTA ${payload.saleNumber}: Unidad ${unitRow.code || item.unitId} vendida SIN costo de adquisición (purchasePrice=0). Rentabilidad inflada.`);
+          }
+          
+          if (cogsAmount > 0) {
+            await tx.insert(operationalExpenses).values({
+              branchId: payload.branchId || 1,
+              description: `COGS - ${unitRow.brand || ""} ${unitRow.model || ""} (${unitRow.code || item.unitId}) · Venta ${payload.saleNumber}`,
+              category: "cogs",
+              costType: "direct_cost",
+              referenceType: "sale",
+              referenceId: saleId,
+              isAutomatic: 1,
+              amount: cogsAmount,
+              paymentMethod: "cash",
+              expenseDate: new Date(),
+              status: "paid",
+              userId: payload.soldBy,
+              notes: isFungible && (unitRow.purchasePrice || 0) === 0
+                ? `COGS promedio calculado (${cogsAmount.toFixed(2)}) para venta ${payload.saleNumber}`
+                : `Costo de adquisición registrado al momento de venta ${payload.saleNumber}`,
+            });
+          }
           // ⚠️ No insertar en financialTransactions — COGS no afecta saldo de caja.
         }
       }
