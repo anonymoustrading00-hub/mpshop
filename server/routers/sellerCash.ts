@@ -1107,29 +1107,32 @@ export const sellerCashRouter = router({
           .where(eq(sellerCashRegisters.openingStatus, "approved"));
 
         let updated = 0;
+        const errors: string[] = [];
 
         for (const box of boxes) {
-          // Calcular ventas del día para ese vendedor
-          const [salesData] = await db.execute(sql`
-            SELECT 
-              COALESCE(SUM(CASE WHEN paymentMethod = 'cash' THEN total ELSE 0 END), 0) as totalCash,
-              COALESCE(SUM(CASE WHEN paymentMethod = 'qr' THEN total ELSE 0 END), 0) as totalQr,
-              COALESCE(SUM(CASE WHEN paymentMethod = 'transfer' THEN total ELSE 0 END), 0) as totalTransfer,
-              COUNT(*) as ventasCount
-            FROM sales
-            WHERE soldBy = ${box.sellerId}
-              AND DATE(createdAt) = ${box.date}
-              AND status != 'cancelled'
-          `) as any;
+          try {
+            // Calcular ventas del día para ese vendedor
+            // IMPORTANTE: total en sales ya está en centavos
+            const [salesData] = await db.execute(sql`
+              SELECT 
+                COALESCE(SUM(CASE WHEN paymentMethod = 'cash' AND status != 'cancelled' THEN total ELSE 0 END), 0) as totalCash,
+                COALESCE(SUM(CASE WHEN paymentMethod = 'qr' AND status != 'cancelled' THEN total ELSE 0 END), 0) as totalQr,
+                COALESCE(SUM(CASE WHEN paymentMethod = 'transfer' AND status != 'cancelled' THEN total ELSE 0 END), 0) as totalTransfer,
+                COUNT(*) as ventasCount
+              FROM sales
+              WHERE soldBy = ${box.sellerId}
+                AND DATE(createdAt) = ${box.date}
+            `) as any;
 
-          if (salesData && Array.isArray(salesData) && salesData[0]) {
-            const row = salesData[0];
-            const totalCash = Number(row.totalCash || 0);
-            const totalQr = Number(row.totalQr || 0);
-            const totalTransfer = Number(row.totalTransfer || 0);
-            const ventasCount = Number(row.ventasCount || 0);
-            
-            if (ventasCount > 0) {
+            if (salesData && Array.isArray(salesData) && salesData[0]) {
+              const row = salesData[0];
+              // Los totales YA están en centavos, solo convertir a número
+              const totalCash = Number(row.totalCash || 0);
+              const totalQr = Number(row.totalQr || 0);
+              const totalTransfer = Number(row.totalTransfer || 0);
+              const ventasCount = Number(row.ventasCount || 0);
+              
+              // Actualizar siempre (incluso si es 0 para limpiar datos incorrectos)
               await db
                 .update(sellerCashRegisters)
                 .set({
@@ -1140,15 +1143,21 @@ export const sellerCashRouter = router({
                 .where(eq(sellerCashRegisters.id, box.id));
 
               updated++;
-              console.log(`[Sync] Caja #${box.id} - ${ventasCount} ventas: Efectivo=${totalCash}, QR=${totalQr}, Transfer=${totalTransfer}`);
+              console.log(`[Sync] Caja #${box.id} Vendedor=${box.sellerId} Fecha=${box.date} - ${ventasCount} ventas: Efectivo=${totalCash/100}, QR=${totalQr/100}, Transfer=${totalTransfer/100}`);
             }
+          } catch (boxError: any) {
+            errors.push(`Caja #${box.id}: ${boxError.message}`);
+            console.error(`[Sync Error] Caja #${box.id}:`, boxError);
           }
         }
 
         return { 
           success: true, 
-          message: `${updated} cajas sincronizadas con ventas existentes`,
-          boxesUpdated: updated 
+          message: errors.length > 0 
+            ? `${updated} cajas sincronizadas. ${errors.length} errores.`
+            : `${updated} cajas sincronizadas con ventas existentes`,
+          boxesUpdated: updated,
+          errors: errors.length > 0 ? errors : undefined
         };
       } catch (error: any) {
         throw new TRPCError({ 
