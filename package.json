@@ -16,6 +16,7 @@
     "db:ensure-tables": "tsx scripts/ensure_tables.ts",
     "db:migrate": "drizzle-kit migrate",
     "db:clean-data": "tsx scripts/clean_all_data.ts",
+    "db:force-reset": "tsx scripts/force_reset.ts",
     "db:seed-admin": "tsx scripts/seed_railway_admin.ts",
     "db:seed-dashboard": "tsx scripts/seed_dashboard_demo_data.ts",
     "db:seed-products": "tsx seed_all_required_products.ts",
@@ -25,7 +26,7 @@
     "db:remove-code-unique": "tsx scripts/remove-code-unique-constraint.ts",
     "db:unify-codes": "tsx scripts/unify-fungible-codes.ts",
     "db:fix-sale-subtotals": "tsx scripts/fix-sale-subtotals.ts",
-    "railway:predeploy": "pnpm run db:ensure-tables && pnpm run db:fix-columns && pnpm run db:clean-data && pnpm run db:seed-admin && pnpm run db:remove-code-unique && pnpm run db:unify-codes && pnpm run db:fix-sale-subtotals",
+    "railway:predeploy": "pnpm run db:ensure-tables && pnpm run db:fix-columns && pnpm run db:force-reset && pnpm run db:remove-code-unique && pnpm run db:unify-codes && pnpm run db:fix-sale-subtotals",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {
