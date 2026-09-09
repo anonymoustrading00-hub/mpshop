@@ -62,12 +62,15 @@ const ADMIN_SECTIONS = [
   {
     title: "Finanzas",
     items: [
-      { href: "/purchases",              label: "Compras",            icon: ShoppingCart },
-      { href: "/finance",                label: "Finanzas & Caja",    icon: DollarSign },
-      { href: "/admin/cajas-vendedores", label: "Cajas Vendedores",   icon: Store },
-      { href: "/accounts-receivable",    label: "C. por Cobrar",      icon: CreditCard },
-      { href: "/accounts-payable",       label: "C. por Pagar",       icon: Landmark },
-      { href: "/expenses",               label: "Gastos",             icon: Receipt },
+      { href: "/purchases",                 label: "Compras",             icon: ShoppingCart },
+      { href: "/finance",                   label: "Finanzas & Caja",     icon: DollarSign },
+      { href: "/admin/cajas-vendedores",    label: "Cajas Vendedores",    icon: Store },
+      { href: "/accounts-receivable",       label: "C. por Cobrar",       icon: CreditCard },
+      { href: "/accounts-payable",          label: "C. por Pagar",        icon: Landmark },
+      { href: "/expenses",                  label: "Gastos",              icon: Receipt },
+      { href: "/admin/rentabilidad",        label: "💰 Rentabilidad",     icon: TrendingUp },
+      { href: "/admin/control-financiero",  label: "🔔 Control Financiero", icon: DollarSign },
+      { href: "/admin/auditoria-datos",     label: "🔍 Auditoría Datos",  icon: Receipt },
     ],
   },
 ];

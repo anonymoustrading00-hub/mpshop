@@ -322,6 +322,25 @@ export default function Reports() {
     XLSX.writeFile(wb, `reporte-auditoria-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
   };
 
+  // 🟡 MEDIO #5: Descarga Excel de Rentabilidad por Producto (via backend)
+  const profitabilityExcelMut = (trpc.reportsExcel as any).profitabilityExcel.useMutation();
+  const downloadProfitabilityExcel = async () => {
+    try {
+      const result = await profitabilityExcelMut.mutateAsync({
+        from: dateRange.startDate,
+        to: dateRange.endDate,
+      });
+      if (result?.base64) {
+        const link = document.createElement("a");
+        link.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${result.base64}`;
+        link.download = result.filename ?? `Rentabilidad_${dateRange.startDate}_${dateRange.endDate}.xlsx`;
+        link.click();
+      }
+    } catch (err) {
+      console.error("Error generando Excel de rentabilidad:", err);
+    }
+  };
+
   const reportTypes = [
     {
       id: "orders",
@@ -395,6 +414,16 @@ export default function Reports() {
       onDownloadExcel: downloadAuditExcel,
       dataCount: auditQuery.data?.length || 0,
     },
+    // 🟡 MEDIO #5: Reporte de rentabilidad por producto
+    {
+      id: "profitability",
+      name: "💰 Rentabilidad por Producto",
+      icon: FileSpreadsheet,
+      description: "Margen bruto por producto, categoría y marca con alertas",
+      onDownloadPDF: null,
+      onDownloadExcel: downloadProfitabilityExcel,
+      dataCount: salesQuery.data?.length || 0,
+    },
   ];
 
   return (
@@ -466,18 +495,22 @@ export default function Reports() {
 
             {/* BOTONES UNO AL LADO DE OTRO */}
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  report.onDownloadPDF();
-                }}
-                disabled={isLoading || report.dataCount === 0}
-                className="flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 disabled:pointer-events-none"
-                title="Descargar reporte en formato PDF"
-              >
-                <Download size={14} />
-                <span>PDF</span>
-              </button>
+              {report.onDownloadPDF ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    (report.onDownloadPDF as () => void)();
+                  }}
+                  disabled={isLoading || report.dataCount === 0}
+                  className="flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 disabled:pointer-events-none"
+                  title="Descargar reporte en formato PDF"
+                >
+                  <Download size={14} />
+                  <span>PDF</span>
+                </button>
+              ) : (
+                <div />
+              )}
 
               <button
                 onClick={(e) => {

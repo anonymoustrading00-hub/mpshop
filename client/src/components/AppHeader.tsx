@@ -27,6 +27,7 @@ import {
   CheckCircle2,
   XCircle,
   Wallet,
+  Bell,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
@@ -69,21 +70,23 @@ export const ADMIN_NAV_ROW1: NavItem[] = [
 ];
 
 export const ADMIN_NAV_ROW2: NavItem[] = [
-  { href: "/dashboard-kpis",         label: "📊 KPIs",           icon: BarChart3,  moduleKey: "dashboard-kpis" },
-  { href: "/reports",                 label: "📈 Reportes",       icon: BarChart3,  moduleKey: "reports" },
-  { href: "/analytics",              label: "Analítica",          icon: TrendingUp, moduleKey: "analytics" },
-  { href: "/rentabilidad",           label: "💰 Rentabilidad",   icon: TrendingUp, moduleKey: "finance" },
-  { href: "/finance",                label: "Finanzas",           icon: DollarSign, moduleKey: "finance" },
-  { href: "/admin/cajas-vendedores", label: "🏪 Cajas Vendedores", icon: Store,    moduleKey: "seller-boxes-admin", adminOnly: true },
-  { href: "/repartidor/finance",     label: "Caja Reparto",       icon: DollarSign, moduleKey: "repartidor-finance" },
-  { href: "/vendedor/caja",          label: "Mi Caja",            icon: Wallet,     moduleKey: "seller-cash",  sellerOnly: true },
-  { href: "/accounts-receivable",    label: "C. por Cobrar",      icon: CreditCard, moduleKey: "accounts-receivable" },
-  { href: "/accounts-payable",       label: "C. por Pagar",       icon: Landmark,   moduleKey: "accounts-payable" },
-  { href: "/expenses",               label: "Gastos",             icon: Receipt,    moduleKey: "expenses" },
-  { href: "/branches",               label: "Sucursales",         icon: Store,      moduleKey: "branches" },
-  { href: "/users",                  label: "👥 Usuarios",        icon: Users,      moduleKey: "users" },
-  { href: "/delivery-persons",       label: "Repartidores",       icon: Truck,      moduleKey: "delivery-persons" },
-  { href: "/settings",               label: "⚙️ Config.",         icon: Settings,   moduleKey: "settings-admin" },
+  { href: "/dashboard-kpis",              label: "📊 KPIs",             icon: BarChart3,  moduleKey: "dashboard-kpis" },
+  { href: "/reports",                      label: "📈 Reportes",         icon: BarChart3,  moduleKey: "reports" },
+  { href: "/analytics",                   label: "Analítica",            icon: TrendingUp, moduleKey: "analytics" },
+  { href: "/admin/rentabilidad",          label: "💰 Rentabilidad",     icon: TrendingUp, moduleKey: "finance", adminOnly: true },
+  { href: "/admin/control-financiero",    label: "🔔 Control Financiero", icon: DollarSign, moduleKey: "finance", adminOnly: true },
+  { href: "/finance",                     label: "Finanzas",             icon: DollarSign, moduleKey: "finance" },
+  { href: "/admin/cajas-vendedores",      label: "🏪 Cajas Vendedores",  icon: Store,      moduleKey: "seller-boxes-admin", adminOnly: true },
+  { href: "/admin/auditoria-datos",       label: "🔍 Auditoría Datos",   icon: BarChart3,  moduleKey: "seller-boxes-admin", adminOnly: true },
+  { href: "/repartidor/finance",          label: "Caja Reparto",         icon: DollarSign, moduleKey: "repartidor-finance" },
+  { href: "/vendedor/caja",               label: "Mi Caja",              icon: Wallet,     moduleKey: "seller-cash",  sellerOnly: true },
+  { href: "/accounts-receivable",         label: "C. por Cobrar",        icon: CreditCard, moduleKey: "accounts-receivable" },
+  { href: "/accounts-payable",            label: "C. por Pagar",         icon: Landmark,   moduleKey: "accounts-payable" },
+  { href: "/expenses",                    label: "Gastos",               icon: Receipt,    moduleKey: "expenses" },
+  { href: "/branches",                    label: "Sucursales",           icon: Store,      moduleKey: "branches" },
+  { href: "/users",                       label: "👥 Usuarios",          icon: Users,      moduleKey: "users" },
+  { href: "/delivery-persons",            label: "Repartidores",         icon: Truck,      moduleKey: "delivery-persons" },
+  { href: "/settings",                    label: "⚙️ Config.",           icon: Settings,   moduleKey: "settings-admin" },
 ];
 
 // Flat list for mobile / command menu
@@ -258,6 +261,34 @@ function TabLink({ item, active }: { item: NavItem; active: boolean }) {
   );
 }
 
+/* ─── Notification Bell ─────────────────────────────────────────── */
+function NotificationBell() {
+  const { data } = trpc.notifications.getAll.useQuery({}, {
+    refetchInterval: 60_000, // refresca cada 60s
+    staleTime: 30_000,
+  });
+
+  const criticalCount = data?.criticalCount ?? 0;
+  const warningCount  = data?.warningCount  ?? 0;
+  const total = criticalCount + warningCount;
+
+  return (
+    <Link href="/admin/control-financiero">
+      <button
+        title={total > 0 ? `${total} alerta(s) activa(s)` : "Sin alertas"}
+        className="relative flex items-center justify-center h-9 w-9 rounded-full border border-slate-200 bg-slate-50 hover:bg-white hover:border-primary/40 hover:shadow-sm transition-all"
+      >
+        <Bell className={`h-4 w-4 ${criticalCount > 0 ? "text-red-500" : warningCount > 0 ? "text-amber-500" : "text-slate-400"}`} />
+        {total > 0 && (
+          <span className={`absolute -top-1 -right-1 flex items-center justify-center h-4 w-4 rounded-full text-[10px] font-bold text-white ${criticalCount > 0 ? "bg-red-500" : "bg-amber-500"}`}>
+            {total > 9 ? "9+" : total}
+          </span>
+        )}
+      </button>
+    </Link>
+  );
+}
+
 /* ─── main header ───────────────────────────────────────────────── */
 export default function AppHeader() {
   const { user, logout } = useAuth();
@@ -359,6 +390,11 @@ export default function AppHeader() {
             {/* Campo de Escáner Rápido */}
             {user?.role === "admin" && (
               <QuickScannerInput />
+            )}
+
+            {/* 🔔 Notificaciones — Badge de alertas para admin */}
+            {user?.role === "admin" && (
+              <NotificationBell />
             )}
 
             {/* Ctrl+K Search Trigger */}
