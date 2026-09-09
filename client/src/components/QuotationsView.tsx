@@ -463,7 +463,8 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
       {/* CREATION DIALOG */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent
-          className="flex flex-col max-h-[94vh] md:h-[88vh] w-[min(98vw,98vw)] md:w-[min(1200px,96vw)] md:max-w-[min(1200px,96vw)] overflow-y-auto md:overflow-hidden rounded-[1.6rem] md:rounded-[1.8rem] border-white/70 bg-white/95 p-4 sm:p-6 md:p-0"
+          style={{ "--dialog-max-width": "min(1200px, 96vw)" } as React.CSSProperties}
+          className="flex flex-col max-h-[94vh] md:h-[88vh] w-full overflow-y-auto md:overflow-hidden rounded-[1.6rem] md:rounded-[1.8rem] border-white/70 bg-white/95 p-4 sm:p-6 md:p-0"
         >
           <DialogHeader className="border-b border-border/70 px-6 pt-6 pb-4 shrink-0 md:block hidden">
             <DialogTitle className="flex items-center gap-2">

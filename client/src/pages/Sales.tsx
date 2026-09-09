@@ -1912,7 +1912,8 @@ export default function Sales() {
 
       <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) resetForm(); }}>
         <DialogContent
-          className="flex flex-col max-h-[96vh] md:h-[90vh] md:max-h-[880px] w-[min(98vw,98vw)] md:w-[min(1380px,96vw)] md:max-w-[min(1380px,96vw)] overflow-y-auto md:overflow-hidden rounded-3xl border-slate-200 md:border-slate-200/90 bg-white md:bg-slate-100/70 shadow-2xl p-3 sm:p-4 md:p-0"
+          style={{ "--dialog-max-width": "min(1380px, 96vw)" } as React.CSSProperties}
+          className="flex flex-col max-h-[96vh] md:h-[90vh] md:max-h-[880px] w-full overflow-y-auto md:overflow-hidden rounded-3xl border-slate-200 md:border-slate-200/90 bg-white md:bg-slate-100/70 shadow-2xl p-3 sm:p-4 md:p-0"
         >
           {/* Success overlay */}
           {showSuccess && (

@@ -788,7 +788,8 @@ export default function Purchases() {
       {/* Modal AMPLIADO de Formulario de Nueva Compra (Estilo Modal de Ventas Amplio) */}
       <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) resetCreateForm(); }}>
         <DialogContent
-          className="flex flex-col max-h-[94vh] md:h-[92vh] w-[min(98vw,98vw)] md:w-[min(1360px,96vw)] md:max-w-[min(1360px,96vw)] overflow-y-auto md:overflow-hidden rounded-[1.6rem] md:rounded-[1.8rem] border-white/70 md:border-slate-200/60 bg-white shadow-2xl shadow-slate-900/10 p-4 sm:p-6 md:p-0"
+          style={{ "--dialog-max-width": "min(1360px, 96vw)" } as React.CSSProperties}
+          className="flex flex-col max-h-[94vh] md:h-[92vh] w-full overflow-y-auto md:overflow-hidden rounded-[1.6rem] md:rounded-[1.8rem] border-white/70 md:border-slate-200/60 bg-white shadow-2xl shadow-slate-900/10 p-4 sm:p-6 md:p-0"
         >
           <DialogHeader className="border-b border-slate-100 px-8 pt-6 pb-4 bg-gradient-to-r from-slate-50/80 to-white shrink-0">
             <DialogTitle className="flex items-center gap-3 text-xl">
