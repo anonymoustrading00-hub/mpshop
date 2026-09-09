@@ -94,6 +94,7 @@ function DialogContent({
   children,
   showCloseButton = true,
   onEscapeKeyDown,
+  style,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
@@ -102,44 +103,43 @@ function DialogContent({
 
   const handleEscapeKeyDown = React.useCallback(
     (e: KeyboardEvent) => {
-      // Check both the native isComposing property and our context state
-      // This handles Safari's timing issues with composition events
       const isCurrentlyComposing = (e as any).isComposing || isComposing();
-
-      // If IME is composing, prevent dialog from closing
       if (isCurrentlyComposing) {
         e.preventDefault();
         return;
       }
-
-      // Call user's onEscapeKeyDown if provided
       onEscapeKeyDown?.(e);
     },
     [isComposing, onEscapeKeyDown]
   );
+
+  // Extract --dialog-max-width from the passed style if present, so callers can override the maxWidth
+  const customMaxWidth = style && (style as any)["--dialog-max-width"];
+  const mergedStyle: React.CSSProperties = {
+    maxWidth: customMaxWidth
+      ? `min(100% - 2rem, ${customMaxWidth})`
+      : "min(100% - 2rem, var(--dialog-max-width, 32rem))",
+    ...style,
+  };
 
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
-        style={{ maxWidth: "min(100% - 2rem, var(--dialog-max-width, 32rem))" }}
+        style={mergedStyle}
         className={cn(
-          // Base: centrado con scroll en móvil
           "bg-white/90 backdrop-blur-2xl dark:bg-slate-900/90 dark:backdrop-blur-2xl",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-          // Posición centrada
           "fixed left-[50%] top-[50%] z-50",
           "translate-x-[-50%] translate-y-[-50%]",
-          // Ancho: toma el ancho de max-w-* que venga en className, con margen lateral garantizado por style
           "w-full",
-          // Altura máxima con scroll para pantallas pequeñas
           "max-h-[calc(100dvh-2rem)] overflow-y-auto",
           "grid gap-4 rounded-[1.5rem] border border-white/60 p-6 shadow-2xl duration-200",
-          // Default max-width si no se especifica
-          "sm:max-w-lg",
+          // Default max-width solo si el caller no pasa --dialog-max-width
+          !customMaxWidth && "sm:max-w-lg",
           className
         )}
         onEscapeKeyDown={handleEscapeKeyDown}
