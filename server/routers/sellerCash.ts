@@ -1111,8 +1111,10 @@ export const sellerCashRouter = router({
 
         for (const box of boxes) {
           try {
-            // Calcular ventas del día para ese vendedor
+            // Calcular ventas SOLO desde la apertura de la caja (openedAt)
             // IMPORTANTE: total en sales ya está en centavos
+            const openedAtStr = box.openedAt ? box.openedAt.toISOString().slice(0, 19).replace('T', ' ') : null;
+            
             const [salesData] = await db.execute(sql`
               SELECT 
                 COALESCE(SUM(CASE WHEN paymentMethod = 'cash' AND status != 'cancelled' THEN total ELSE 0 END), 0) as totalCash,
@@ -1122,6 +1124,7 @@ export const sellerCashRouter = router({
               FROM sales
               WHERE soldBy = ${box.sellerId}
                 AND DATE(createdAt) = ${box.date}
+                ${openedAtStr ? sql`AND createdAt >= ${openedAtStr}` : sql``}
             `) as any;
 
             if (salesData && Array.isArray(salesData) && salesData[0]) {
@@ -1143,7 +1146,7 @@ export const sellerCashRouter = router({
                 .where(eq(sellerCashRegisters.id, box.id));
 
               updated++;
-              console.log(`[Sync] Caja #${box.id} Vendedor=${box.sellerId} Fecha=${box.date} - ${ventasCount} ventas: Efectivo=${totalCash/100}, QR=${totalQr/100}, Transfer=${totalTransfer/100}`);
+              console.log(`[Sync] Caja #${box.id} Vendedor=${box.sellerId} Fecha=${box.date} AbiertaEn=${openedAtStr} - ${ventasCount} ventas: Efectivo=${totalCash/100}, QR=${totalQr/100}, Transfer=${totalTransfer/100}`);
             }
           } catch (boxError: any) {
             errors.push(`Caja #${box.id}: ${boxError.message}`);
