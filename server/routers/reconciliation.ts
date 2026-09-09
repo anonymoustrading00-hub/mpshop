@@ -26,7 +26,7 @@ import {
   operationalExpenses,
   users,
 } from "../../drizzle/schema";
-import { eq, and, sql, gte, lte, inArray, ne, or } from "drizzle-orm";
+import { eq, and, sql, gte, lte, ne } from "drizzle-orm";
 import { getLocalDateKey } from "../_core/date_utils";
 
 export const reconciliationRouter = router({
@@ -51,6 +51,7 @@ export const reconciliationRouter = router({
       const toTs   = new Date(input.endDate   + "T23:59:59");
       const bid    = input.branchId ?? 1;
 
+      try {
       // ── 1. Ventas completadas que NO tienen financialTransaction ────────────
       const completedSales = await db
         .select({ id: sales.id, saleNumber: sales.saleNumber, total: sales.total,
@@ -186,6 +187,17 @@ export const reconciliationRouter = router({
           pendingExpenses,
         },
       };
+      } catch (err: any) {
+        console.error('[reconciliation.analyzeInconsistencies] Error:', err?.message);
+        return {
+          period: { startDate: input.startDate, endDate: input.endDate },
+          summary: { salesWithoutTransaction: 0, cashRegisterDiscrepancies: 0,
+                     overdueReceivable: 0, overduePayable: 0, pendingExpenses: 0, totalIssues: 0 },
+          details: { salesWithoutTransaction: [], cashRegisterDiscrepancies: [],
+                     overdueReceivable: [], overduePayable: [], pendingExpenses: [] },
+          error: err?.message,
+        };
+      }
     }),
 
   /**
@@ -216,6 +228,7 @@ export const reconciliationRouter = router({
       const log: string[] = [];
       let fixed = 0;
 
+      try {
       // ── FIX 1: Crear financialTransactions para ventas sin registro ─────────
       if (input.fixSalesWithoutTx) {
         const fromTs = new Date(input.startDate + "T00:00:00");
@@ -350,5 +363,9 @@ export const reconciliationRouter = router({
           ? `Reconciliación completada: ${fixed} elementos corregidos.`
           : "Todo estaba en orden. Sin cambios necesarios.",
       };
+      } catch (err: any) {
+        console.error('[reconciliation.applyFixes] Error:', err?.message);
+        return { success: false, fixed: 0, log, message: `Error: ${err?.message}` };
+      }
     }),
 });

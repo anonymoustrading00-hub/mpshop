@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { trpc } from "../../lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, Package, Tag, BarChart3 } from "lucide-react";
+import { DollarSign, TrendingUp, AlertTriangle, Package, Tag, BarChart3 } from "lucide-react";
 
 /**
  * 🔴 CRÍTICO #5: Dashboard de Rentabilidad Completa
@@ -28,46 +27,34 @@ export default function ProfitabilityDashboard() {
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0]);
 
   // Query: Rentabilidad completa
-  const { data: profitability, isLoading: loadingProfit } = useQuery({
-    queryKey: ["profitability", "complete", startDate, endDate],
-    queryFn: () =>
-      trpc.profitability.getCompleteProfitability.query({
-        startDate,
-        endDate,
-      }),
-  });
+  const { data: profitability, isLoading: loadingProfit } =
+    trpc.profitability.getCompleteProfitability.useQuery({
+      startDate,
+      endDate,
+    });
 
   // Query: Rentabilidad por producto
-  const { data: productData } = useQuery({
-    queryKey: ["profitability", "products", startDate, endDate],
-    queryFn: () =>
-      trpc.profitability.getProductProfitability.query({
-        startDate,
-        endDate,
-        limit: 10,
-      }),
-  });
+  const { data: productData } =
+    trpc.profitability.getProductProfitability.useQuery({
+      startDate,
+      endDate,
+      limit: 10,
+    });
 
   // Query: Rentabilidad por categoría
-  const { data: categoryData } = useQuery({
-    queryKey: ["profitability", "categories", startDate, endDate],
-    queryFn: () =>
-      trpc.profitability.getCategoryProfitability.query({
-        startDate,
-        endDate,
-      }),
-  });
+  const { data: categoryData } =
+    trpc.profitability.getCategoryProfitability.useQuery({
+      startDate,
+      endDate,
+    });
 
   // Query: Productos con margen bajo
-  const { data: lowMarginData } = useQuery({
-    queryKey: ["profitability", "lowMargin", startDate, endDate],
-    queryFn: () =>
-      trpc.profitability.getLowMarginProducts.query({
-        startDate,
-        endDate,
-        marginThreshold: 20,
-      }),
-  });
+  const { data: lowMarginData } =
+    trpc.profitability.getLowMarginProducts.useQuery({
+      startDate,
+      endDate,
+      marginThreshold: 20,
+    });
 
   const formatCurrency = (cents: number) => {
     return `Bs. ${(cents / 100).toLocaleString("es-BO", {
@@ -239,7 +226,7 @@ export default function ProfitabilityDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {productData.products.map((product, idx) => (
+                      {productData.products.map((product: any, idx: number) => (
                         <tr key={idx} className="border-b hover:bg-gray-50">
                           <td className="p-2">
                             <div className="font-medium">{product.brand} {product.model}</div>
@@ -288,7 +275,7 @@ export default function ProfitabilityDashboard() {
             <CardContent>
               {categoryData && categoryData.categories.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {categoryData.categories.map((cat, idx) => (
+                  {categoryData.categories.map((cat: any, idx: number) => (
                     <Card key={idx}>
                       <CardHeader>
                         <CardTitle className="text-lg capitalize">{cat.category}</CardTitle>
@@ -358,7 +345,7 @@ export default function ProfitabilityDashboard() {
             <CardContent>
               {lowMarginData && lowMarginData.products.length > 0 ? (
                 <div className="space-y-2">
-                  {lowMarginData.products.map((product, idx) => (
+                  {lowMarginData.products.map((product: any, idx: number) => (
                     <div
                       key={idx}
                       className="flex items-center justify-between p-3 border rounded-lg bg-amber-50"

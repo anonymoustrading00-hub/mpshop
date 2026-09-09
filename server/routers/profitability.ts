@@ -207,7 +207,7 @@ export const profitabilityRouter = router({
         .limit(input.limit)
         .catch(() => [] as any[]);
 
-      const products = results.map((row) => {
+      const products = results.map((row: any) => {
         const revenue = row.revenue || 0;
         const totalCost = row.totalCost || 0;
         const grossProfit = revenue - totalCost;
@@ -283,7 +283,7 @@ export const profitabilityRouter = router({
         .orderBy(desc(sql`SUM(${saleItems.subtotal})`))
         .catch(() => [] as any[]);
 
-      const categories = results.map((row) => {
+      const categories = results.map((row: any) => {
         const revenue = row.revenue || 0;
         const totalCost = row.totalCost || 0;
         const grossProfit = revenue - totalCost;
@@ -358,7 +358,7 @@ export const profitabilityRouter = router({
         .limit(input.limit)
         .catch(() => [] as any[]);
 
-      const brands = results.map((row) => {
+      const brands = results.map((row: any) => {
         const revenue = row.revenue || 0;
         const totalCost = row.totalCost || 0;
         const grossProfit = revenue - totalCost;
@@ -433,7 +433,7 @@ export const profitabilityRouter = router({
         .catch(() => [] as any[]);
 
       const lowMarginProducts = results
-        .map((row) => {
+        .map((row: any) => {
           const revenue = row.revenue || 0;
           const totalCost = row.totalCost || 0;
           const grossProfit = revenue - totalCost;
@@ -450,8 +450,8 @@ export const profitabilityRouter = router({
             marginPercent: Math.round(marginPercent * 100) / 100,
           };
         })
-        .filter((product) => product.marginPercent < input.marginThreshold && product.marginPercent > 0)
-        .sort((a, b) => a.marginPercent - b.marginPercent);
+        .filter((product: any) => product.marginPercent < input.marginThreshold && product.marginPercent > 0)
+        .sort((a: any, b: any) => a.marginPercent - b.marginPercent);
 
       return {
         period: {

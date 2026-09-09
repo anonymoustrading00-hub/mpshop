@@ -19,10 +19,8 @@ import {
   accountsPayable,
   operationalExpenses,
   sales,
-  financialTransactions,
   customers,
   suppliers,
-  purchases,
 } from "../../drizzle/schema";
 import { eq, and, sql, gte, lte, ne } from "drizzle-orm";
 import { getLocalDateKey } from "../_core/date_utils";
@@ -68,6 +66,10 @@ export const cashflowRouter = router({
       const todayStr = getLocalDateKey(today) ?? toDateStr(today);
       const endDate  = addDays(today, horizon);
       const endStr   = toDateStr(endDate);
+
+      const fallbackDate = todayStr;
+
+      try {
 
       // ── 1. CXC con dueDate dentro del horizonte ────────────────────────────
       const cxcRows = await db
@@ -275,5 +277,17 @@ export const cashflowRouter = router({
             ? [`🟡 ${cxcRows.filter((r: any) => r.status === "overdue").length} CXC vencidas sin cobrar`] : []),
         ],
       };
+      } catch (err: any) {
+        console.error('[cashflow.getForecast] Error:', err?.message);
+        return {
+          horizon: input.horizonDays,
+          period: { startDate: fallbackDate, endDate: fallbackDate },
+          kpis: { totalProjectedInflows: 0, totalProjectedOutflows: 0, netCashflow: 0,
+                  lowestProjectedBalance: 0, criticalDaysCount: 0, avgDailySalesUsed: 0,
+                  pendingCxcTotal: 0, pendingCxpTotal: 0 },
+          timeline: [], weekSummary: {}, criticalDays: [],
+          warnings: [`Error al calcular proyección: ${err?.message}`],
+        };
+      }
     }),
 });

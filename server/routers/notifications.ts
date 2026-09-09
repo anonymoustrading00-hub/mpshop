@@ -23,7 +23,6 @@ import {
   units,
   customers,
   suppliers,
-  sales,
   users,
 } from "../../drizzle/schema";
 import { eq, and, sql, gte, lte, ne } from "drizzle-orm";
@@ -57,11 +56,13 @@ export const notificationsRouter = router({
       const db = await getDb();
       if (!db) {
         // Modo mock: retornar demo
-        return { notifications: [], unreadCount: 0 };
+        return { notifications: [], unreadCount: 0, criticalCount: 0, warningCount: 0, infoCount: 0 };
       }
 
       const bid    = input?.branchId ?? 1;
       const today  = getLocalDateKey(new Date()) ?? new Date().toISOString().split("T")[0];
+
+      try {
       const in7    = new Date(); in7.setDate(in7.getDate() + 7);
       const in7Str = in7.toISOString().split("T")[0];
       const isAdmin = ctx.user?.role === "admin";
@@ -353,6 +354,10 @@ export const notificationsRouter = router({
         warningCount: warning,
         infoCount: notifications.length - critical - warning,
       };
+      } catch (err: any) {
+        console.error('[notifications.getAll] Error:', err?.message);
+        return { notifications: [], unreadCount: 0, criticalCount: 0, warningCount: 0, infoCount: 0 };
+      }
     }),
 
   /**
