@@ -437,21 +437,11 @@ function printSaleTicket(detail: any, companyConfig?: any, action: "print" | "do
       const unitType = item.unitType || "PZA";
       const name = item.productName || "PRODUCTO GENERAL";
       
-      // Parsear y construir especificaciones técnicas como en cotizaciones
+      // Parsear y construir especificaciones técnicas
       let parsedSpecs: Record<string, any> = {};
       if (item.specs) {
         try {
           parsedSpecs = typeof item.specs === 'string' ? JSON.parse(item.specs) : item.specs;
-          // DEBUG TEMPORAL: Ver qué specs llegan
-          if (item.productName?.toLowerCase().includes('asus') || item.productName?.toLowerCase().includes('vivobook')) {
-            console.log('🔍 SPECS DEBUG:', {
-              producto: item.productName,
-              specsRaw: item.specs,
-              specsParsed: parsedSpecs,
-              cantidadCampos: Object.keys(parsedSpecs).length,
-              campos: Object.keys(parsedSpecs)
-            });
-          }
         } catch {
           parsedSpecs = {};
         }
@@ -497,7 +487,12 @@ function printSaleTicket(detail: any, companyConfig?: any, action: "print" | "do
       
       let specsText = "";
       if (specsList.length > 0) {
-        specsText = `\n  ${specsList.join("  ·  ")}`;
+        // Mostrar máx 6 specs, una por línea para mantener celdas compactas en el PDF
+        const visibleSpecs = specsList.slice(0, 6);
+        specsText = "\n  " + visibleSpecs.join("\n  ");
+        if (specsList.length > 6) {
+          specsText += `\n  (+${specsList.length - 6} más)`;
+        }
       }
       
       // Agregar condición si no es 10/10
@@ -2822,9 +2817,10 @@ export default function Sales() {
                               <td className="py-2 px-2">
                                 <div className="font-bold text-slate-900">{item.productName}</div>
                                 {specsList.length > 0 && (
-                                  <div className="mt-1.5 text-[11px] text-slate-600 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200 leading-relaxed">
-                                    <span className="font-bold text-slate-800">Especificaciones: </span>
-                                    <span className="text-slate-600">{specsList.join(" · ")}</span>
+                                  <div className="mt-1 text-[9px] text-slate-500 leading-tight">
+                                    <span className="font-semibold text-slate-600">Especif.: </span>
+                                    {specsList.slice(0, 6).join(" · ")}
+                                    {specsList.length > 6 && <span className="text-slate-400"> +{specsList.length - 6} más</span>}
                                   </div>
                                 )}
                                 {item.condition && item.condition < 10 && (
