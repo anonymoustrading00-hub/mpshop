@@ -96,6 +96,13 @@ export default function SellerBoxesManagement() {
   const forceCloseMut       = trpc.sellerCash.admin_forceClose.useMutation({     onSuccess: () => { toast.success("Caja cerrada forzosamente"); invalidateAll(); setForceCloseDialog(null); }, onError: e => toast.error(e.message) });
   const editAmountsMut      = trpc.sellerCash.admin_editAmounts.useMutation({    onSuccess: () => { toast.success("Montos actualizados"); invalidateAll(); setEditDialog(null); }, onError: e => toast.error(e.message) });
   const deleteBoxMut        = trpc.sellerCash.admin_deleteBox.useMutation({      onSuccess: () => { toast.success("Registro eliminado"); invalidateAll(); }, onError: e => toast.error(e.message) });
+  const syncSalesMut        = trpc.sellerCash.admin_syncSalesWithBoxes.useMutation({ 
+    onSuccess: (data) => { 
+      toast.success(data.message); 
+      invalidateAll(); 
+    }, 
+    onError: e => toast.error(e.message) 
+  });
   const openBoxForSellerMut = trpc.sellerCash.admin_openBoxForSeller.useMutation({
     onSuccess: () => {
       toast.success("Caja abierta correctamente para el vendedor");
@@ -219,6 +226,15 @@ export default function SellerBoxesManagement() {
             onChange={e => setFilterDate(e.target.value)}
             className="w-auto font-bold"
           />
+          <Button
+            variant="outline"
+            onClick={() => syncSalesMut.mutate()}
+            disabled={syncSalesMut.isPending}
+            title="Sincronizar ventas antiguas con cajas"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${syncSalesMut.isPending ? 'animate-spin' : ''}`} />
+            Sincronizar
+          </Button>
           <Button
             className="bg-emerald-600 hover:bg-emerald-700 font-bold gap-2"
             onClick={() => setOpenBoxDialog(true)}

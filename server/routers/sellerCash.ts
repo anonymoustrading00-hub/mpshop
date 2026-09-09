@@ -1021,4 +1021,67 @@ export const sellerCashRouter = router({
 
       return { expenses: result, totals };
     }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TEMPORAL: Sincronizar ventas antiguas con seller_cash_registers
+  // ═══════════════════════════════════════════════════════════════════════════
+  admin_syncSalesWithBoxes: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      try {
+        // Obtener todas las cajas aprobadas
+        const boxes = await db
+          .select()
+          .from(sellerCashRegisters)
+          .where(eq(sellerCashRegisters.openingStatus, "approved"));
+
+        let updated = 0;
+
+        for (const box of boxes) {
+          // Calcular ventas del día para ese vendedor
+          const [salesData] = await db.execute(sql`
+            SELECT 
+              COALESCE(SUM(CASE WHEN paymentMethod = 'cash' THEN total ELSE 0 END), 0) as totalCash,
+              COALESCE(SUM(CASE WHEN paymentMethod = 'qr' THEN total ELSE 0 END), 0) as totalQr,
+              COALESCE(SUM(CASE WHEN paymentMethod = 'transfer' THEN total ELSE 0 END), 0) as totalTransfer
+            FROM sales
+            WHERE userId = ${box.sellerId}
+              AND DATE(createdAt) = ${box.date}
+              AND status != 'cancelled'
+          `) as any;
+
+          if (salesData && Array.isArray(salesData) && salesData[0]) {
+            const row = salesData[0];
+            const totalCash = Number(row.totalCash || 0);
+            const totalQr = Number(row.totalQr || 0);
+            const totalTransfer = Number(row.totalTransfer || 0);
+            
+            await db
+              .update(sellerCashRegisters)
+              .set({
+                salesCash: totalCash,
+                salesQr: totalQr,
+                salesTransfer: totalTransfer,
+              })
+              .where(eq(sellerCashRegisters.id, box.id));
+
+            updated++;
+          }
+        }
+
+        return { 
+          success: true, 
+          message: `${updated} cajas sincronizadas con ventas existentes`,
+          boxesUpdated: updated 
+        };
+      } catch (error: any) {
+        throw new TRPCError({ 
+          code: "INTERNAL_SERVER_ERROR", 
+          message: `Error sincronizando: ${error.message}` 
+        });
+      }
+    }),
 });
