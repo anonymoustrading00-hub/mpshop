@@ -521,6 +521,14 @@ export const operationalExpenses = mysqlTable("operationalExpenses", {
     "fuel",
     "subsistence",
     "logistics",
+    // 🟡 MEDIO #2: Categorías nuevas normalizadas
+    "tiktok_ads",
+    "print_advertising",
+    "packaging",
+    "cleaning",
+    "equipment_depreciation",
+    "loan_interest",
+    "commissions",
     // Costos directos del negocio (se crean automáticamente)
     "repair_cost",
     "warranty_repair_cost",

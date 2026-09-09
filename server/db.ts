@@ -619,6 +619,24 @@ export async function getDb() {
           console.log('[Migration] Historical differences updated (or skipped if already done)');
         });
         
+        // 🟡 MEDIO #2: Agregar categorías nuevas al enum de operationalExpenses
+        _pool.execute(`
+          ALTER TABLE operationalExpenses 
+          MODIFY COLUMN category ENUM(
+            'facebook_ads','google_ads','electricity','water','internet','telephone',
+            'rent','salaries','maintenance','supplies','taxes','insurance','bank_fees',
+            'fuel','subsistence','logistics',
+            'tiktok_ads','print_advertising','packaging','cleaning',
+            'equipment_depreciation','loan_interest','commissions',
+            'repair_cost','warranty_repair_cost','warranty_replacement_cost',
+            'cogs','other'
+          ) NOT NULL
+        `).catch((err) => {
+          if (!err.message.includes('Duplicate') && !err.message.includes('already exists')) {
+            console.log('[Migration] operationalExpenses category enum updated (or already up to date)');
+          }
+        });
+
         // 🔴 CRÍTICO #4: Crear tabla kpi_snapshots para métricas agregadas
         _pool.execute(`
           CREATE TABLE IF NOT EXISTS kpi_snapshots (

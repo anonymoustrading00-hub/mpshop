@@ -37,6 +37,9 @@ import { sellerCashRouter } from "./routers/sellerCash";
 import { adminMigrationSellerCashRouter } from "./routers/admin-migration-seller-cash";
 import { kpisRouter } from "./routers/kpis";
 import { profitabilityRouter } from "./routers/profitability";
+import { reconciliationRouter } from "./routers/reconciliation";
+import { cashflowRouter } from "./routers/cashflow";
+import { notificationsRouter } from "./routers/notifications";
 import { authenticateUser, createSession } from "./auth";
 
 export const appRouter = router({
@@ -156,6 +159,9 @@ export const appRouter = router({
   adminMigrationSellerCash: adminMigrationSellerCashRouter,
   kpis: kpisRouter,
   profitability: profitabilityRouter,
+  reconciliation: reconciliationRouter,
+  cashflow: cashflowRouter,
+  notifications: notificationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

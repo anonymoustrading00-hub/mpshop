@@ -8,54 +8,11 @@ import {
   deleteOperationalExpense,
 } from "../db";
 import { TRPCError } from "@trpc/server";
+import { ALL_CATEGORY_KEYS, MANUAL_CATEGORY_KEYS, getCategoryLabel, getCategoryGroup, EXPENSE_CATEGORIES, getCategoriesByGroup } from "../../shared/expenseCategories";
 
-// Todas las categorías válidas incluyendo los nuevos costos automáticos
-const EXPENSE_CATEGORY_ENUM = z.enum([
-  // Gastos operativos (ingreso manual)
-  "facebook_ads",
-  "google_ads",
-  "electricity",
-  "water",
-  "internet",
-  "telephone",
-  "rent",
-  "salaries",
-  "maintenance",
-  "supplies",
-  "taxes",
-  "insurance",
-  "bank_fees",
-  "fuel",
-  "subsistence",
-  "logistics",
-  // Costos directos (generados automáticamente por el sistema)
-  "repair_cost",
-  "warranty_repair_cost",
-  "warranty_replacement_cost",
-  "cogs",
-  "other",
-]);
-
-// Solo categorías editables manualmente (excluye los costos automáticos)
-const MANUAL_CATEGORY_ENUM = z.enum([
-  "facebook_ads",
-  "google_ads",
-  "electricity",
-  "water",
-  "internet",
-  "telephone",
-  "rent",
-  "salaries",
-  "maintenance",
-  "supplies",
-  "taxes",
-  "insurance",
-  "bank_fees",
-  "fuel",
-  "subsistence",
-  "logistics",
-  "other",
-]);
+// 🟡 MEDIO #2: Categorías normalizadas desde catálogo centralizado (shared/expenseCategories.ts)
+const EXPENSE_CATEGORY_ENUM = z.enum(ALL_CATEGORY_KEYS);
+const MANUAL_CATEGORY_ENUM  = z.enum(MANUAL_CATEGORY_KEYS);
 
 
 // Schema de filtros compartidos
@@ -380,6 +337,14 @@ export const expensesRouter = router({
         byType,
       };
     }),
+
+  // 🟡 MEDIO #2: Endpoint que expone el catálogo normalizado al frontend
+  getCatalog: protectedProcedure.query(() => {
+    return {
+      categories: EXPENSE_CATEGORIES,
+      byGroup: getCategoriesByGroup(),
+    };
+  }),
 });
 
 /** Infiere el costType de una categoría cuando no está explícito */

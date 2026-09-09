@@ -1014,4 +1014,189 @@ export const reportsExcelRouter = router({
 
       return { base64, filename: `Compras_${input.from}_${input.to}.xlsx` };
     }),
+
+  /**
+   * 🟡 MEDIO #5: Reporte de rentabilidad por producto con exportación Excel
+   * Hoja 1: Detalle por producto (brand + model) con costo, revenue, margen
+   * Hoja 2: Agrupado por categoría
+   * Hoja 3: Agrupado por marca
+   * Hoja 4: Alertas — productos con margen < 20%
+   * Hoja 5: Resumen ejecutivo del período
+   */
+  profitabilityExcel: protectedProcedure
+    .input(z.object({ from: z.string(), to: z.string(), branchId: z.number().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "BD no disponible en modo mock" });
+
+      const fromDate = new Date(input.from + "T00:00:00");
+      const toDate   = new Date(input.to   + "T23:59:59");
+      const bid      = input.branchId ?? 1;
+
+      // Ventas completadas del período con datos de unidades
+      const saleData = await db
+        .select({
+          saleId:   sales.id,
+          saleNumber: sales.saleNumber,
+          saleDate: sales.createdAt,
+          paymentMethod: sales.paymentMethod,
+          brand:    units.brand,
+          model:    units.model,
+          type:     units.type,
+          quantity: saleItems.quantity,
+          revenue:  saleItems.subtotal,
+          purchasePrice: units.purchasePrice,
+        })
+        .from(saleItems)
+        .leftJoin(sales, eq(saleItems.saleId, sales.id))
+        .leftJoin(units, eq(saleItems.unitId, units.id))
+        .where(and(
+          eq(sales.status, "completed"),
+          eq(sales.branchId, bid),
+          gte(sales.createdAt, fromDate),
+          lte(sales.createdAt, toDate),
+        ))
+        .orderBy(desc(sales.createdAt));
+
+      // ── Hoja 1: Detalle por venta ──────────────────────────────────────
+      const detailHeaders = [
+        "Nº Venta", "Fecha", "Marca", "Modelo", "Tipo",
+        "Cant.", "Precio Venta (Bs)", "Costo Unit. (Bs)",
+        "Costo Total (Bs)", "Margen (Bs)", "Margen %", "Método Pago",
+      ];
+      const detailRows = saleData.map((r: any) => {
+        const rev    = r.revenue    ?? 0;
+        const cost   = (r.purchasePrice ?? 0) * (r.quantity ?? 1);
+        const margin = rev - cost;
+        const pct    = rev > 0 ? ((margin / rev) * 100).toFixed(2) : "0.00";
+        return [
+          r.saleNumber,
+          new Date(r.saleDate).toLocaleDateString("es-BO"),
+          r.brand ?? "—",
+          r.model ?? "—",
+          r.type  ?? "—",
+          r.quantity ?? 1,
+          fmtCents(rev),
+          fmtCents(r.purchasePrice ?? 0),
+          fmtCents(cost),
+          fmtCents(margin),
+          pct + "%",
+          r.paymentMethod ?? "cash",
+        ];
+      });
+
+      // ── Hoja 2: Agrupado por producto (brand+model) ───────────────────
+      const productMap = new Map<string, { brand: string; model: string; type: string; units: number; revenue: number; cost: number }>();
+      for (const r of saleData as any[]) {
+        const key = `${r.brand}|${r.model}`;
+        const curr = productMap.get(key) ?? { brand: r.brand ?? "—", model: r.model ?? "—", type: r.type ?? "—", units: 0, revenue: 0, cost: 0 };
+        curr.units   += r.quantity ?? 1;
+        curr.revenue += r.revenue ?? 0;
+        curr.cost    += (r.purchasePrice ?? 0) * (r.quantity ?? 1);
+        productMap.set(key, curr);
+      }
+      const productHeaders = ["Marca", "Modelo", "Tipo", "Unidades", "Ingresos (Bs)", "Costo (Bs)", "Margen (Bs)", "Margen %"];
+      const productRows = Array.from(productMap.values())
+        .sort((a, b) => b.revenue - a.revenue)
+        .map((p) => {
+          const margin = p.revenue - p.cost;
+          const pct    = p.revenue > 0 ? ((margin / p.revenue) * 100).toFixed(2) : "0.00";
+          return [p.brand, p.model, p.type, p.units, fmtCents(p.revenue), fmtCents(p.cost), fmtCents(margin), pct + "%"];
+        });
+
+      // ── Hoja 3: Agrupado por categoría ───────────────────────────────
+      const categoryMap = new Map<string, { units: number; revenue: number; cost: number }>();
+      for (const r of saleData as any[]) {
+        const key  = r.type ?? "other";
+        const curr = categoryMap.get(key) ?? { units: 0, revenue: 0, cost: 0 };
+        curr.units   += r.quantity ?? 1;
+        curr.revenue += r.revenue ?? 0;
+        curr.cost    += (r.purchasePrice ?? 0) * (r.quantity ?? 1);
+        categoryMap.set(key, curr);
+      }
+      const catHeaders  = ["Categoría", "Unidades", "Ingresos (Bs)", "Costo (Bs)", "Margen (Bs)", "Margen %"];
+      const catRows = Array.from(categoryMap.entries())
+        .sort(([, a], [, b]) => b.revenue - a.revenue)
+        .map(([cat, v]) => {
+          const margin = v.revenue - v.cost;
+          const pct    = v.revenue > 0 ? ((margin / v.revenue) * 100).toFixed(2) : "0.00";
+          return [cat, v.units, fmtCents(v.revenue), fmtCents(v.cost), fmtCents(margin), pct + "%"];
+        });
+
+      // ── Hoja 4: Agrupado por marca ────────────────────────────────────
+      const brandMap2 = new Map<string, { units: number; revenue: number; cost: number }>();
+      for (const r of saleData as any[]) {
+        const key  = r.brand ?? "Sin Marca";
+        const curr = brandMap2.get(key) ?? { units: 0, revenue: 0, cost: 0 };
+        curr.units   += r.quantity ?? 1;
+        curr.revenue += r.revenue ?? 0;
+        curr.cost    += (r.purchasePrice ?? 0) * (r.quantity ?? 1);
+        brandMap2.set(key, curr);
+      }
+      const brandHeaders = ["Marca", "Unidades", "Ingresos (Bs)", "Costo (Bs)", "Margen (Bs)", "Margen %"];
+      const brandRows = Array.from(brandMap2.entries())
+        .sort(([, a], [, b]) => b.revenue - a.revenue)
+        .map(([brand, v]) => {
+          const margin = v.revenue - v.cost;
+          const pct    = v.revenue > 0 ? ((margin / v.revenue) * 100).toFixed(2) : "0.00";
+          return [brand, v.units, fmtCents(v.revenue), fmtCents(v.cost), fmtCents(margin), pct + "%"];
+        });
+
+      // ── Hoja 5: Alertas — margen < 20% ───────────────────────────────
+      const alertHeaders = ["Marca", "Modelo", "Tipo", "Unidades", "Margen %", "Margen (Bs)", "Acción Recomendada"];
+      const alertRows = Array.from(productMap.values())
+        .map((p) => {
+          const margin = p.revenue - p.cost;
+          const pct    = p.revenue > 0 ? (margin / p.revenue) * 100 : 0;
+          return { ...p, margin, pct };
+        })
+        .filter((p) => p.pct < 20 && p.pct > -100)
+        .sort((a, b) => a.pct - b.pct)
+        .map((p) => [
+          p.brand, p.model, p.type, p.units,
+          p.pct.toFixed(2) + "%",
+          fmtCents(p.margin),
+          p.pct < 0 ? "Revisar precio — se está vendiendo a pérdida" :
+          p.pct < 10 ? "Aumentar precio de venta o renegociar costo" :
+          "Evaluar si el margen es suficiente para cubrir gastos fijos",
+        ]);
+
+      // ── Hoja 6: Resumen ejecutivo ─────────────────────────────────────
+      const totalRev  = saleData.reduce((s: number, r: any) => s + (r.revenue ?? 0), 0);
+      const totalCost = saleData.reduce((s: number, r: any) => s + ((r.purchasePrice ?? 0) * (r.quantity ?? 1)), 0);
+      const totalMargin = totalRev - totalCost;
+      const avgMargin   = totalRev > 0 ? ((totalMargin / totalRev) * 100).toFixed(2) : "0.00";
+      const productsNoPrice = saleData.filter((r: any) => !r.purchasePrice || r.purchasePrice === 0).length;
+
+      const summaryData = [
+        [dateHeader(input.from, input.to)],
+        ["REPORTE DE RENTABILIDAD POR PRODUCTO"],
+        [],
+        ["Ingresos Totales (Bs)",     fmtCents(totalRev)],
+        ["Costo Total de Ventas (Bs)", fmtCents(totalCost)],
+        ["Margen Bruto (Bs)",          fmtCents(totalMargin)],
+        ["Margen Bruto (%)",           avgMargin + "%"],
+        [],
+        ["Total líneas de venta",  saleData.length],
+        ["Productos distintos",    productMap.size],
+        ["Categorías",             categoryMap.size],
+        ["Marcas",                 brandMap2.size],
+        ["Ventas sin costo",       productsNoPrice, productsNoPrice > 0 ? "⚠️ Rentabilidad inflada" : "✅ OK"],
+        ["Productos margen < 20%", alertRows.length, alertRows.length > 0 ? "⚠️ Revisar precios" : "✅ OK"],
+        [],
+        ["Generado el", new Date().toLocaleString("es-BO")],
+      ];
+
+      const base64 = buildXlsx([
+        { name: "Detalle Ventas",     data: [detailHeaders,  ...detailRows]  },
+        { name: "Por Producto",       data: [productHeaders, ...productRows] },
+        { name: "Por Categoría",      data: [catHeaders,     ...catRows]     },
+        { name: "Por Marca",          data: [brandHeaders,   ...brandRows]   },
+        { name: "Alertas Margen<20%", data: [alertHeaders,   ...alertRows]   },
+        { name: "Resumen",            data: summaryData                      },
+      ]);
+
+      return { base64, filename: `Rentabilidad_Productos_${input.from}_${input.to}.xlsx` };
+    }),
 });

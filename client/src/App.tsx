@@ -52,6 +52,7 @@ import AdminBackup from "@/pages/AdminBackup";
 import SellerBoxesManagement from "@/pages/admin/SellerBoxesManagement";
 import DataAudit from "@/pages/admin/DataAudit";
 import ProfitabilityDashboard from "@/pages/admin/ProfitabilityDashboard";
+import FinancialControl from "@/pages/admin/FinancialControl";
 
 function ProtectedRoute({
   component: Component,
@@ -281,6 +282,9 @@ function Router() {
           </Route>
           <Route path="/admin/rentabilidad">
             <ProtectedRoute component={ProfitabilityDashboard} adminOnly={true} />
+          </Route>
+          <Route path="/admin/control-financiero">
+            <ProtectedRoute component={FinancialControl} adminOnly={true} />
           </Route>
           <Route path="/delivery-load" component={DeliveryLoad} />
 
