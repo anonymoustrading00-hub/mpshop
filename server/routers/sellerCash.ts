@@ -1023,6 +1023,74 @@ export const sellerCashRouter = router({
     }),
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // DEBUG: Diagnóstico de ventas y caja
+  // ═══════════════════════════════════════════════════════════════════════════
+  admin_debugSellerSales: protectedProcedure
+    .input(z.object({ cashRegisterId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      // Obtener info de la caja
+      const [box] = await db
+        .select()
+        .from(sellerCashRegisters)
+        .where(eq(sellerCashRegisters.id, input.cashRegisterId))
+        .limit(1);
+
+      if (!box) {
+        return { error: "Caja no encontrada" };
+      }
+
+      // Buscar ventas del vendedor ese día
+      const [salesRaw] = await db.execute(sql`
+        SELECT 
+          id, saleNumber, soldBy, paymentMethod, total, status, DATE(createdAt) as saleDate, createdAt
+        FROM sales
+        WHERE soldBy = ${box.sellerId}
+          AND DATE(createdAt) = ${box.date}
+        ORDER BY createdAt DESC
+      `) as any;
+
+      const salesList = Array.isArray(salesRaw) ? salesRaw : [];
+
+      // Calcular totales
+      const [totalsRaw] = await db.execute(sql`
+        SELECT 
+          COALESCE(SUM(CASE WHEN paymentMethod = 'cash' THEN total ELSE 0 END), 0) as totalCash,
+          COALESCE(SUM(CASE WHEN paymentMethod = 'qr' THEN total ELSE 0 END), 0) as totalQr,
+          COALESCE(SUM(CASE WHEN paymentMethod = 'transfer' THEN total ELSE 0 END), 0) as totalTransfer,
+          COUNT(*) as count
+        FROM sales
+        WHERE soldBy = ${box.sellerId}
+          AND DATE(createdAt) = ${box.date}
+          AND status != 'cancelled'
+      `) as any;
+
+      const totals = Array.isArray(totalsRaw) ? totalsRaw[0] : {};
+
+      return {
+        box: {
+          id: box.id,
+          sellerId: box.sellerId,
+          date: box.date,
+          turnNumber: box.turnNumber,
+          salesCash: box.salesCash,
+          salesQr: box.salesQr,
+          salesTransfer: box.salesTransfer,
+        },
+        sales: salesList,
+        totals: {
+          totalCash: Number(totals.totalCash || 0),
+          totalQr: Number(totals.totalQr || 0),
+          totalTransfer: Number(totals.totalTransfer || 0),
+          count: Number(totals.count || 0),
+        },
+      };
+    }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // TEMPORAL: Sincronizar ventas antiguas con seller_cash_registers
   // ═══════════════════════════════════════════════════════════════════════════
   admin_syncSalesWithBoxes: protectedProcedure
