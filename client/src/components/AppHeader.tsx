@@ -61,8 +61,8 @@ export const ADMIN_NAV_ROW1: NavItem[] = [
   { href: "/repairs",          label: "Taller",       icon: Package,     moduleKey: "repairs" },
   { href: "/warranties",       label: "Garantías",    icon: Tag,         moduleKey: "warranties" },
   // { href: "/returns",          label: "Devoluciones", icon: Package,     moduleKey: "returns" }, // OCULTO
-  { href: "/orders",           label: "Pedidos",      icon: ShoppingCart, moduleKey: "orders" },
-  { href: "/delivery-load",    label: "Mi Carga",    icon: Package,      moduleKey: "delivery-load" },
+  // { href: "/orders",           label: "Pedidos",      icon: ShoppingCart, moduleKey: "orders" },      // OCULTO
+  // { href: "/delivery-load",    label: "Mi Carga",     icon: Package,     moduleKey: "delivery-load" }, // OCULTO
   { href: "/generate-codes",   label: "Códigos QR",   icon: Tag,         moduleKey: "generate-codes" },
   { href: "/customers",        label: "Clientes",     icon: Users,       moduleKey: "customers" },
   { href: "/suppliers",        label: "Proveedores",  icon: Users,       moduleKey: "suppliers" },
@@ -70,23 +70,23 @@ export const ADMIN_NAV_ROW1: NavItem[] = [
 ];
 
 export const ADMIN_NAV_ROW2: NavItem[] = [
-  { href: "/dashboard-kpis",              label: "📊 KPIs",             icon: BarChart3,  moduleKey: "dashboard-kpis" },
-  { href: "/reports",                      label: "📈 Reportes",         icon: BarChart3,  moduleKey: "reports" },
-  { href: "/analytics",                   label: "Analítica",            icon: TrendingUp, moduleKey: "analytics" },
-  { href: "/admin/rentabilidad",          label: "💰 Rentabilidad",     icon: TrendingUp, moduleKey: "finance", adminOnly: true },
+  { href: "/dashboard-kpis",              label: "📊 KPIs",               icon: BarChart3,  moduleKey: "dashboard-kpis" },
+  { href: "/reports",                      label: "📈 Reportes",           icon: BarChart3,  moduleKey: "reports" },
+  { href: "/analytics",                   label: "Analítica",              icon: TrendingUp, moduleKey: "analytics" },
+  { href: "/admin/rentabilidad",          label: "💰 Rentabilidad",       icon: TrendingUp, moduleKey: "finance", adminOnly: true },
   { href: "/admin/control-financiero",    label: "🔔 Control Financiero", icon: DollarSign, moduleKey: "finance", adminOnly: true },
-  { href: "/finance",                     label: "Finanzas",             icon: DollarSign, moduleKey: "finance" },
-  { href: "/admin/cajas-vendedores",      label: "🏪 Cajas Vendedores",  icon: Store,      moduleKey: "seller-boxes-admin", adminOnly: true },
-  { href: "/admin/auditoria-datos",       label: "🔍 Auditoría Datos",   icon: BarChart3,  moduleKey: "seller-boxes-admin", adminOnly: true },
-  { href: "/repartidor/finance",          label: "Caja Reparto",         icon: DollarSign, moduleKey: "repartidor-finance" },
-  { href: "/vendedor/caja",               label: "Mi Caja",              icon: Wallet,     moduleKey: "seller-cash",  sellerOnly: true },
-  { href: "/accounts-receivable",         label: "C. por Cobrar",        icon: CreditCard, moduleKey: "accounts-receivable" },
-  { href: "/accounts-payable",            label: "C. por Pagar",         icon: Landmark,   moduleKey: "accounts-payable" },
-  { href: "/expenses",                    label: "Gastos",               icon: Receipt,    moduleKey: "expenses" },
-  { href: "/branches",                    label: "Sucursales",           icon: Store,      moduleKey: "branches" },
-  { href: "/users",                       label: "👥 Usuarios",          icon: Users,      moduleKey: "users" },
-  { href: "/delivery-persons",            label: "Repartidores",         icon: Truck,      moduleKey: "delivery-persons" },
-  { href: "/settings",                    label: "⚙️ Config.",           icon: Settings,   moduleKey: "settings-admin" },
+  { href: "/finance",                     label: "Finanzas",               icon: DollarSign, moduleKey: "finance" },
+  { href: "/admin/cajas-vendedores",      label: "🏪 Cajas Vendedores",   icon: Store,      moduleKey: "seller-boxes-admin", adminOnly: true },
+  { href: "/admin/auditoria-datos",       label: "🔍 Auditoría Datos",    icon: BarChart3,  moduleKey: "seller-boxes-admin", adminOnly: true },
+  // { href: "/repartidor/finance",       label: "Caja Reparto",           icon: DollarSign, moduleKey: "repartidor-finance" },  // OCULTO
+  { href: "/vendedor/caja",               label: "Mi Caja",                icon: Wallet,     moduleKey: "seller-cash",  sellerOnly: true },
+  { href: "/accounts-receivable",         label: "C. por Cobrar",          icon: CreditCard, moduleKey: "accounts-receivable" },
+  { href: "/accounts-payable",            label: "C. por Pagar",           icon: Landmark,   moduleKey: "accounts-payable" },
+  { href: "/expenses",                    label: "Gastos",                 icon: Receipt,    moduleKey: "expenses" },
+  { href: "/branches",                    label: "Sucursales",             icon: Store,      moduleKey: "branches" },
+  { href: "/users",                       label: "👥 Usuarios",            icon: Users,      moduleKey: "users" },
+  // { href: "/delivery-persons",         label: "Repartidores",           icon: Truck,      moduleKey: "delivery-persons" }, // OCULTO
+  { href: "/settings",                    label: "⚙️ Config.",             icon: Settings,   moduleKey: "settings-admin" },
 ];
 
 // Flat list for mobile / command menu
