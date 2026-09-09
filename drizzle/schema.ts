@@ -659,7 +659,9 @@ export const sellerCashRegisters = mysqlTable("seller_cash_registers", {
   reportedCash: int("reportedCash").default(0),
   reportedQr: int("reportedQr").default(0),
   reportedTransfer: int("reportedTransfer").default(0),
-  differenceCash: int("differenceCash").default(0), // Diferencia = reportado - esperado
+  differenceCash: int("differenceCash").default(0), // Diferencia efectivo = reportado - esperado
+  differenceQr: int("differenceQr").default(0), // Diferencia QR = reportado - esperado
+  differenceTransfer: int("differenceTransfer").default(0), // Diferencia Transfer = reportado - esperado
   differenceJustification: text("differenceJustification"),
   closedAt: timestamp("closedAt"),
   closingApprovedBy: int("closingApprovedBy").references(() => users.id),

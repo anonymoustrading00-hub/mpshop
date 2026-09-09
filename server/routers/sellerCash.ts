@@ -310,19 +310,53 @@ export const sellerCashRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Tu caja aún no ha sido aprobada para poder cerrarla" });
       }
       
-      // Calcular esperado
-      const expectedCash = cashRegister.initialCash + cashRegister.salesCash - cashRegister.partialDeliveriesCash - cashRegister.totalExpenses;
-      const differenceCash = Math.round(input.reportedCash * 100) - expectedCash;
+      // ═══════════════════════════════════════════════════════════════
+      // CÁLCULO AUTOMÁTICO DE DIFERENCIAS (CRÍTICO #1 - AUDITORÍA)
+      // ═══════════════════════════════════════════════════════════════
       
-      // Actualizar con datos de cierre
+      // Efectivo esperado en sistema
+      const expectedCash = cashRegister.initialCash 
+        + cashRegister.salesCash 
+        - cashRegister.partialDeliveriesCash 
+        - cashRegister.totalExpenses;
+      
+      // QR esperado (solo ventas, sin deducciones)
+      const expectedQr = cashRegister.salesQr;
+      
+      // Transfer esperado (solo ventas, sin deducciones)
+      const expectedTransfer = cashRegister.salesTransfer;
+      
+      // Calcular diferencias (reportado - esperado)
+      const reportedCashCents = Math.round(input.reportedCash * 100);
+      const reportedQrCents = Math.round(input.reportedQr * 100);
+      const reportedTransferCents = Math.round(input.reportedTransfer * 100);
+      
+      const differenceCash = reportedCashCents - expectedCash;
+      const differenceQr = reportedQrCents - expectedQr;
+      const differenceTransfer = reportedTransferCents - expectedTransfer;
+      
+      // Validación: diferencias mayores a Bs. 10 requieren justificación
+      const totalDifference = Math.abs(differenceCash) + Math.abs(differenceQr) + Math.abs(differenceTransfer);
+      const significantDifference = totalDifference > 1000; // > Bs. 10.00
+      
+      if (significantDifference && !input.differenceJustification) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Diferencia significativa detectada (Bs. ${(totalDifference/100).toFixed(2)}). Debes proporcionar una justificación.`
+        });
+      }
+      
+      // Actualizar con datos de cierre y diferencias calculadas
       await db
         .update(sellerCashRegisters)
         .set({
           closingStatus: "pending",
-          reportedCash: Math.round(input.reportedCash * 100),
-          reportedQr: Math.round(input.reportedQr * 100),
-          reportedTransfer: Math.round(input.reportedTransfer * 100),
-          differenceCash,
+          reportedCash: reportedCashCents,
+          reportedQr: reportedQrCents,
+          reportedTransfer: reportedTransferCents,
+          differenceCash,              // ✅ Calculado automáticamente
+          differenceQr,                // ✅ NUEVO
+          differenceTransfer,          // ✅ NUEVO
           differenceJustification: input.differenceJustification || null,
           closedAt: new Date(),
         })
@@ -331,7 +365,17 @@ export const sellerCashRouter = router({
       return { 
         success: true, 
         message: "Solicitud de cierre enviada. Espera la aprobación del administrador.",
-        differenceCash: differenceCash / 100,
+        differences: {
+          cash: differenceCash / 100,
+          qr: differenceQr / 100,
+          transfer: differenceTransfer / 100,
+          total: totalDifference / 100,
+        },
+        expected: {
+          cash: expectedCash / 100,
+          qr: expectedQr / 100,
+          transfer: expectedTransfer / 100,
+        },
       };
     }),
   

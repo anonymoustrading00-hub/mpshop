@@ -386,7 +386,9 @@ export default function SellerBoxesManagement() {
                       <TableHead>QR Declarado</TableHead>
                       <TableHead>Transf. Declarada</TableHead>
                       <TableHead>Ef. Sistema</TableHead>
-                      <TableHead>Diferencia</TableHead>
+                      <TableHead>Dif. Efectivo</TableHead>
+                      <TableHead>Dif. QR</TableHead>
+                      <TableHead>Dif. Transfer</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -395,8 +397,16 @@ export default function SellerBoxesManagement() {
                       const sysCash   = (cr.initialCash ?? 0) + (cr.salesCash ?? 0) - (cr.partialDeliveriesCash ?? 0) - (cr.totalExpenses ?? 0);
                       const sysQr     = cr.salesQr ?? 0;
                       const sysTrans  = cr.salesTransfer ?? 0;
-                      const diffCash  = (cr.reportedCash ?? 0) - sysCash;
-                      const diffOk    = Math.abs(diffCash) < 100; // < Bs 1
+                      
+                      // Usar diferencias calculadas en backend (CRÍTICO #1)
+                      const diffCash  = cr.differenceCash ?? ((cr.reportedCash ?? 0) - sysCash);
+                      const diffQr    = cr.differenceQr ?? ((cr.reportedQr ?? 0) - sysQr);
+                      const diffTrans = cr.differenceTransfer ?? ((cr.reportedTransfer ?? 0) - sysTrans);
+                      
+                      const diffCashOk = Math.abs(diffCash) < 100; // < Bs 1
+                      const diffQrOk = Math.abs(diffQr) < 100;
+                      const diffTransOk = Math.abs(diffTrans) < 100;
+                      
                       return (
                         <TableRow key={cr.id}>
                           <TableCell className="font-bold">{seller?.name ?? "—"}</TableCell>
@@ -405,9 +415,19 @@ export default function SellerBoxesManagement() {
                           <TableCell className="font-mono">{formatCurrency(cr.reportedTransfer ?? 0)}</TableCell>
                           <TableCell className="font-mono text-slate-500">{formatCurrency(sysCash)}</TableCell>
                           <TableCell>
-                            <span className={`font-bold font-mono ${diffOk ? "text-emerald-600" : diffCash > 0 ? "text-blue-600" : "text-red-600"}`}>
+                            <span className={`font-bold font-mono ${diffCashOk ? "text-emerald-600" : diffCash > 0 ? "text-blue-600" : "text-red-600"}`}>
                               {diffCash >= 0 ? "+" : ""}{formatCurrency(Math.abs(diffCash))}
-                              {!diffOk && <span className="ml-1 text-[10px]">{diffCash > 0 ? "SOBRANTE" : "FALTANTE"}</span>}
+                              {!diffCashOk && <span className="ml-1 text-[10px]">{diffCash > 0 ? "💰" : "⚠️"}</span>}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`font-bold font-mono ${diffQrOk ? "text-emerald-600" : diffQr > 0 ? "text-blue-600" : "text-red-600"}`}>
+                              {diffQr >= 0 ? "+" : ""}{formatCurrency(Math.abs(diffQr))}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`font-bold font-mono ${diffTransOk ? "text-emerald-600" : diffTrans > 0 ? "text-blue-600" : "text-red-600"}`}>
+                              {diffTrans >= 0 ? "+" : ""}{formatCurrency(Math.abs(diffTrans))}
                             </span>
                           </TableCell>
                           <TableCell className="text-right">

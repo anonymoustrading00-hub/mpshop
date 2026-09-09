@@ -549,6 +549,37 @@ export async function getDb() {
           }
         });
         
+        // Migración: Agregar columnas differenceQr y differenceTransfer (CRÍTICO #1)
+        _pool.execute(`
+          ALTER TABLE seller_cash_registers 
+          ADD COLUMN differenceQr INT NOT NULL DEFAULT 0 AFTER differenceCash
+        `).catch((err) => {
+          if (!err.message.includes('Duplicate column name')) {
+            console.error('[Migration] Error adding differenceQr:', err.message);
+          }
+        });
+        
+        _pool.execute(`
+          ALTER TABLE seller_cash_registers 
+          ADD COLUMN differenceTransfer INT NOT NULL DEFAULT 0 AFTER differenceQr
+        `).catch((err) => {
+          if (!err.message.includes('Duplicate column name')) {
+            console.error('[Migration] Error adding differenceTransfer:', err.message);
+          }
+        });
+        
+        // Actualizar diferencias históricas
+        _pool.execute(`
+          UPDATE seller_cash_registers 
+          SET 
+            differenceQr = reportedQr - salesQr,
+            differenceTransfer = reportedTransfer - salesTransfer
+          WHERE closingStatus IN ('pending', 'approved', 'rejected')
+            AND (differenceQr = 0 OR differenceTransfer = 0)
+        `).catch((err) => {
+          console.log('[Migration] Historical differences updated (or skipped if already done)');
+        });
+        
         _pool.execute(`
           CREATE TABLE IF NOT EXISTS kefir_storage (
             storage_key VARCHAR(100) PRIMARY KEY,
