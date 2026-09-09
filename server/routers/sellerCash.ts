@@ -969,6 +969,233 @@ export const sellerCashRouter = router({
       return { success: true, message: "Montos reseteados a 0. Ahora ejecuta Sincronizar Ventas." };
     }),
 
+  // ═══════════════════════════════════════════════════════════════
+  // CRÍTICO #2: AUDITORÍA Y LIMPIEZA DE DATOS HISTÓRICOS
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * Auditar inconsistencias en cajas históricas
+   * Identifica cajas con ventas que no coinciden con las ventas reales en DB
+   */
+  admin_auditHistoricalData: protectedProcedure
+    .input(z.object({ 
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      sellerId: z.number().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      try {
+        // Obtener todas las cajas aprobadas en el rango
+        let query = db
+          .select()
+          .from(sellerCashRegisters)
+          .where(eq(sellerCashRegisters.openingStatus, "approved"));
+
+        if (input.sellerId) {
+          query = query.where(eq(sellerCashRegisters.sellerId, input.sellerId)) as any;
+        }
+
+        const boxes = await query;
+
+        const inconsistencies: any[] = [];
+        let totalBoxes = 0;
+        let inconsistentBoxes = 0;
+
+        for (const box of boxes) {
+          // Filtrar por fecha si se especificó
+          if (input.startDate && box.date < input.startDate) continue;
+          if (input.endDate && box.date > input.endDate) continue;
+
+          totalBoxes++;
+
+          // Calcular ventas reales desde openedAt
+          const openedAtStr = box.openedAt ? box.openedAt.toISOString().slice(0, 19).replace('T', ' ') : null;
+          
+          const [salesData] = await db.execute(sql`
+            SELECT 
+              COALESCE(SUM(CASE WHEN paymentMethod = 'cash' AND status != 'cancelled' THEN total ELSE 0 END), 0) as totalCash,
+              COALESCE(SUM(CASE WHEN paymentMethod = 'qr' AND status != 'cancelled' THEN total ELSE 0 END), 0) as totalQr,
+              COALESCE(SUM(CASE WHEN paymentMethod = 'transfer' AND status != 'cancelled' THEN total ELSE 0 END), 0) as totalTransfer,
+              COUNT(*) as ventasCount
+            FROM sales
+            WHERE soldBy = ${box.sellerId}
+              AND DATE(createdAt) = ${box.date}
+              ${openedAtStr ? sql`AND createdAt >= ${openedAtStr}` : sql``}
+          `) as any;
+
+          if (salesData && Array.isArray(salesData) && salesData[0]) {
+            const row = salesData[0];
+            const realCash = Number(row.totalCash || 0);
+            const realQr = Number(row.totalQr || 0);
+            const realTransfer = Number(row.totalTransfer || 0);
+
+            const diffCash = Math.abs(box.salesCash - realCash);
+            const diffQr = Math.abs(box.salesQr - realQr);
+            const diffTransfer = Math.abs(box.salesTransfer - realTransfer);
+
+            // Inconsistencia si hay diferencia mayor a Bs. 1
+            if (diffCash > 100 || diffQr > 100 || diffTransfer > 100) {
+              inconsistentBoxes++;
+              inconsistencies.push({
+                boxId: box.id,
+                sellerId: box.sellerId,
+                date: box.date,
+                turnNumber: box.turnNumber,
+                openedAt: box.openedAt,
+                registered: {
+                  cash: box.salesCash / 100,
+                  qr: box.salesQr / 100,
+                  transfer: box.salesTransfer / 100,
+                  total: (box.salesCash + box.salesQr + box.salesTransfer) / 100,
+                },
+                real: {
+                  cash: realCash / 100,
+                  qr: realQr / 100,
+                  transfer: realTransfer / 100,
+                  total: (realCash + realQr + realTransfer) / 100,
+                },
+                differences: {
+                  cash: diffCash / 100,
+                  qr: diffQr / 100,
+                  transfer: diffTransfer / 100,
+                  total: (diffCash + diffQr + diffTransfer) / 100,
+                },
+                salesCount: Number(row.ventasCount || 0),
+              });
+            }
+          }
+        }
+
+        return {
+          success: true,
+          summary: {
+            totalBoxes,
+            inconsistentBoxes,
+            consistentBoxes: totalBoxes - inconsistentBoxes,
+            percentageInconsistent: totalBoxes > 0 ? (inconsistentBoxes / totalBoxes * 100).toFixed(2) : 0,
+          },
+          inconsistencies: inconsistencies.sort((a, b) => b.differences.total - a.differences.total),
+        };
+      } catch (error: any) {
+        throw new TRPCError({ 
+          code: "INTERNAL_SERVER_ERROR", 
+          message: `Error auditando datos: ${error.message}` 
+        });
+      }
+    }),
+
+  /**
+   * Corregir automáticamente inconsistencias en datos históricos
+   * Recalcula y actualiza los montos de ventas basándose en las ventas reales
+   */
+  admin_fixHistoricalData: protectedProcedure
+    .input(z.object({
+      boxIds: z.array(z.number()).optional(), // Si no se especifica, corrige todas las inconsistencias
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      dryRun: z.boolean().optional().default(false), // Si true, solo muestra qué se haría sin ejecutar
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+
+      try {
+        let query = db
+          .select()
+          .from(sellerCashRegisters)
+          .where(eq(sellerCashRegisters.openingStatus, "approved"));
+
+        const boxes = await query;
+        const corrections: any[] = [];
+        let correctedCount = 0;
+
+        for (const box of boxes) {
+          // Filtrar por IDs específicos si se proporcionaron
+          if (input.boxIds && input.boxIds.length > 0 && !input.boxIds.includes(box.id)) {
+            continue;
+          }
+
+          // Filtrar por rango de fechas
+          if (input.startDate && box.date < input.startDate) continue;
+          if (input.endDate && box.date > input.endDate) continue;
+
+          // Calcular ventas reales
+          const openedAtStr = box.openedAt ? box.openedAt.toISOString().slice(0, 19).replace('T', ' ') : null;
+          
+          const [salesData] = await db.execute(sql`
+            SELECT 
+              COALESCE(SUM(CASE WHEN paymentMethod = 'cash' AND status != 'cancelled' THEN total ELSE 0 END), 0) as totalCash,
+              COALESCE(SUM(CASE WHEN paymentMethod = 'qr' AND status != 'cancelled' THEN total ELSE 0 END), 0) as totalQr,
+              COALESCE(SUM(CASE WHEN paymentMethod = 'transfer' AND status != 'cancelled' THEN total ELSE 0 END), 0) as totalTransfer
+            FROM sales
+            WHERE soldBy = ${box.sellerId}
+              AND DATE(createdAt) = ${box.date}
+              ${openedAtStr ? sql`AND createdAt >= ${openedAtStr}` : sql``}
+          `) as any;
+
+          if (salesData && Array.isArray(salesData) && salesData[0]) {
+            const row = salesData[0];
+            const realCash = Number(row.totalCash || 0);
+            const realQr = Number(row.totalQr || 0);
+            const realTransfer = Number(row.totalTransfer || 0);
+
+            // Solo corregir si hay diferencias
+            if (box.salesCash !== realCash || box.salesQr !== realQr || box.salesTransfer !== realTransfer) {
+              corrections.push({
+                boxId: box.id,
+                date: box.date,
+                before: {
+                  cash: box.salesCash / 100,
+                  qr: box.salesQr / 100,
+                  transfer: box.salesTransfer / 100,
+                },
+                after: {
+                  cash: realCash / 100,
+                  qr: realQr / 100,
+                  transfer: realTransfer / 100,
+                },
+              });
+
+              // Aplicar corrección si no es dry-run
+              if (!input.dryRun) {
+                await db
+                  .update(sellerCashRegisters)
+                  .set({
+                    salesCash: realCash,
+                    salesQr: realQr,
+                    salesTransfer: realTransfer,
+                  })
+                  .where(eq(sellerCashRegisters.id, box.id));
+
+                correctedCount++;
+              }
+            }
+          }
+        }
+
+        return {
+          success: true,
+          dryRun: input.dryRun,
+          correctedCount: input.dryRun ? 0 : correctedCount,
+          potentialCorrections: corrections.length,
+          corrections,
+          message: input.dryRun 
+            ? `Simulación: Se corregirían ${corrections.length} cajas`
+            : `${correctedCount} cajas corregidas exitosamente`,
+        };
+      } catch (error: any) {
+        throw new TRPCError({ 
+          code: "INTERNAL_SERVER_ERROR", 
+          message: `Error corrigiendo datos: ${error.message}` 
+        });
+      }
+    }),
+
   test_checkTables: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return { error: "Database not available" };
