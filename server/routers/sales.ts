@@ -293,19 +293,22 @@ export const salesRouter = router({
           try {
             const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
             
-            // Buscar caja abierta del vendedor
-            const [cashRegister] = await db
+            // Buscar la ÚLTIMA caja abierta del vendedor (puede tener múltiples turnos)
+            const cashRegisters = await db
               .select()
               .from(sellerCashRegisters)
               .where(
                 and(
                   eq(sellerCashRegisters.sellerId, ctx.user.id),
-                  eq(sellerCashRegisters.date, today),
-                  eq(sellerCashRegisters.openingStatus, "approved"),
-                  eq(sellerCashRegisters.closingStatus, "open")
+                  eq(sellerCashRegisters.date, today)
                 )
               )
-              .limit(1);
+              .orderBy(desc(sellerCashRegisters.turnNumber));
+            
+            // Buscar la primera caja que esté activa (aprobada y abierta)
+            const cashRegister = cashRegisters.find(
+              cr => cr.openingStatus === "approved" && cr.closingStatus === "open"
+            );
             
             if (cashRegister) {
               // Actualizar ventas según método de pago
