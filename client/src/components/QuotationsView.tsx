@@ -463,27 +463,30 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
       {/* CREATION DIALOG */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent
-          className={
-            isMobile
-              ? "max-h-[94vh] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-[1.6rem] border-white/70 bg-white/95 p-4 sm:max-w-[calc(100vw-1.5rem)] sm:p-6"
-              : "h-[88vh] w-[min(1200px,96vw)] sm:max-w-[min(1200px,96vw)] overflow-hidden rounded-[1.8rem] border-white/70 bg-white/95 p-0"
-          }
+          className="flex flex-col max-h-[94vh] md:h-[88vh] w-[min(98vw,98vw)] md:w-[min(1200px,96vw)] md:max-w-[min(1200px,96vw)] overflow-y-auto md:overflow-hidden rounded-[1.6rem] md:rounded-[1.8rem] border-white/70 bg-white/95 p-4 sm:p-6 md:p-0"
         >
-          <DialogHeader className={isMobile ? "" : "border-b border-border/70 px-6 pt-6 pb-4"}>
+          <DialogHeader className="border-b border-border/70 px-6 pt-6 pb-4 shrink-0 md:block hidden">
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-indigo-600" />
+              Nueva Cotización {nextQuotationData?.quotationNumber ? `- ${nextQuotationData.quotationNumber}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          {/* Header visible en móvil (sin borde) */}
+          <DialogHeader className="md:hidden px-4 pt-4 pb-2 shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-indigo-600" />
               Nueva Cotización {nextQuotationData?.quotationNumber ? `- ${nextQuotationData.quotationNumber}` : ""}
             </DialogTitle>
           </DialogHeader>
 
-          <div className={isMobile ? "mt-6 space-y-6" : "grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1.14fr)_380px]"}>
-            <div className={isMobile ? "space-y-6" : "min-h-0 space-y-6 overflow-y-auto px-6 py-6"}>
+          <div className="flex flex-col gap-6 p-0 mt-4 md:mt-0 md:grid md:min-h-0 md:flex-1 md:gap-0 md:grid-cols-[minmax(0,1.14fr)_380px]">
+            <div className="space-y-6 px-4 md:px-0 md:min-h-0 md:space-y-6 md:overflow-y-auto md:px-6 md:py-6">
               
               <Card className="border-indigo-100/50">
                 <CardHeader>
                   <CardTitle className="text-base text-indigo-900">Datos Principales</CardTitle>
                 </CardHeader>
-                <CardContent className={isMobile ? "grid gap-4" : "grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]"}>
+                <CardContent className="grid gap-4 lg:gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]">
                   <div className="space-y-2">
                     <Label>Cliente</Label>
                     <div className="relative">
@@ -670,7 +673,7 @@ export default function QuotationsView({ onSelectQuotation }: { onSelectQuotatio
 
             </div>
 
-            <div className={isMobile ? "space-y-6" : "min-h-0 space-y-6 overflow-y-auto border-t border-border/70 pt-6 lg:border-t-0 lg:border-l lg:bg-indigo-50/30 lg:px-6 lg:py-6"}>
+            <div className="space-y-6 border-t border-border/70 pt-6 lg:border-t-0 lg:border-l lg:bg-indigo-50/30 lg:px-6 lg:py-6 md:min-h-0 md:overflow-y-auto">
               <div className="sticky top-0 space-y-4">
                 
                 {/* Resumen Total (Estilo Ticket) */}

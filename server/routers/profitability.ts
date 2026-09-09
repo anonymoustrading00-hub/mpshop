@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { sales, saleItems, units, operationalExpenses, financialTransactions, branches } from "../../drizzle/schema";
+import { sales, saleItems, units, operationalExpenses } from "../../drizzle/schema";
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
 
 /**
@@ -42,6 +42,7 @@ export const profitabilityRouter = router({
 
       const targetBranchId = input.branchId || 1;
 
+      try {
       // 1. Ingresos totales (ventas completadas)
       const revenueResult = await db
         .select({
@@ -82,14 +83,11 @@ export const profitabilityRouter = router({
       const grossProfit = revenue - cogs;
       const grossMarginPercent = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
 
-      // 4. Gastos Operacionales (excluyendo COGS)
-      const operationalExpensesResult = await db
+      // 4. Gastos Operacionales por categoría (compatible MySQL 5.7+ — sin JSON_OBJECTAGG)
+      const opExpByCategory = await db
         .select({
+          category: operationalExpenses.category,
           total: sql<number>`COALESCE(SUM(${operationalExpenses.amount}), 0)`,
-          byCategory: sql<string>`JSON_OBJECTAGG(
-            ${operationalExpenses.category}, 
-            COALESCE(SUM(${operationalExpenses.amount}), 0)
-          )`,
         })
         .from(operationalExpenses)
         .where(
@@ -99,12 +97,17 @@ export const profitabilityRouter = router({
             sql`${operationalExpenses.category} != 'cogs'`,
             eq(operationalExpenses.branchId, targetBranchId)
           )
-        );
+        )
+        .groupBy(operationalExpenses.category);
 
-      const operationalExpensesTotal = operationalExpensesResult[0]?.total || 0;
-      const expensesByCategory = operationalExpensesResult[0]?.byCategory 
-        ? JSON.parse(operationalExpensesResult[0].byCategory) 
-        : {};
+      // Armar el objeto expensesByCategory en JS, sin JSON_OBJECTAGG (no disponible en MySQL <8.0)
+      const expensesByCategory: Record<string, number> = {};
+      let operationalExpensesTotal = 0;
+      for (const row of opExpByCategory) {
+        const amount = Number(row.total) || 0;
+        expensesByCategory[row.category] = amount;
+        operationalExpensesTotal += amount;
+      }
 
       // 5. Margen Operativo
       const operatingProfit = grossProfit - operationalExpensesTotal;
@@ -137,6 +140,19 @@ export const profitabilityRouter = router({
           expensesByCategory,
         },
       };
+      } catch (err: any) {
+        // Retorna datos vacíos si hay error SQL en lugar de crashear
+        console.error('[profitability.getCompleteProfitability] Error:', err?.message);
+        return {
+          period: { startDate: input.startDate, endDate: input.endDate },
+          branchId: targetBranchId,
+          summary: { revenue: 0, salesCount: 0, cogs: 0, grossProfit: 0, grossMarginPercent: 0,
+                     operationalExpenses: 0, operatingProfit: 0, operatingMarginPercent: 0,
+                     netProfit: 0, netMarginPercent: 0 },
+          breakdown: { expensesByCategory: {} },
+          error: err?.message,
+        };
+      }
     }),
 
   /**
@@ -188,7 +204,8 @@ export const profitabilityRouter = router({
         )
         .groupBy(units.brand, units.model, units.type)
         .orderBy(desc(sql`SUM(${saleItems.subtotal})`))
-        .limit(input.limit);
+        .limit(input.limit)
+        .catch(() => [] as any[]);
 
       const products = results.map((row) => {
         const revenue = row.revenue || 0;
@@ -263,7 +280,8 @@ export const profitabilityRouter = router({
           )
         )
         .groupBy(units.type)
-        .orderBy(desc(sql`SUM(${saleItems.subtotal})`));
+        .orderBy(desc(sql`SUM(${saleItems.subtotal})`))
+        .catch(() => [] as any[]);
 
       const categories = results.map((row) => {
         const revenue = row.revenue || 0;
@@ -337,7 +355,8 @@ export const profitabilityRouter = router({
         )
         .groupBy(units.brand)
         .orderBy(desc(sql`SUM(${saleItems.subtotal})`))
-        .limit(input.limit);
+        .limit(input.limit)
+        .catch(() => [] as any[]);
 
       const brands = results.map((row) => {
         const revenue = row.revenue || 0;
@@ -410,7 +429,8 @@ export const profitabilityRouter = router({
             eq(sales.branchId, targetBranchId)
           )
         )
-        .groupBy(units.brand, units.model, units.type);
+        .groupBy(units.brand, units.model, units.type)
+        .catch(() => [] as any[]);
 
       const lowMarginProducts = results
         .map((row) => {

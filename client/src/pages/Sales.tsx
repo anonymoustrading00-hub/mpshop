@@ -1912,11 +1912,7 @@ export default function Sales() {
 
       <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) resetForm(); }}>
         <DialogContent
-          className={
-            isMobile
-              ? "max-h-[96vh] w-[98vw] max-w-[calc(100vw-0.5rem)] overflow-y-auto rounded-3xl border-slate-200 bg-white p-3 sm:p-4"
-              : "flex flex-col h-[90vh] max-h-[880px] w-[min(1380px,96vw)] sm:max-w-[min(1380px,96vw)] overflow-hidden rounded-3xl border-slate-200/90 bg-slate-100/70 shadow-2xl p-0"
-          }
+          className="flex flex-col max-h-[96vh] md:h-[90vh] md:max-h-[880px] w-[min(98vw,98vw)] md:w-[min(1380px,96vw)] md:max-w-[min(1380px,96vw)] overflow-y-auto md:overflow-hidden rounded-3xl border-slate-200 md:border-slate-200/90 bg-white md:bg-slate-100/70 shadow-2xl p-3 sm:p-4 md:p-0"
         >
           {/* Success overlay */}
           {showSuccess && (
@@ -1969,10 +1965,10 @@ export default function Sales() {
           </div>
 
           {/* Cuerpo Principal del POS (2 Columnas sin scroll general) */}
-          <div className={isMobile ? "p-4 space-y-4" : "grid grid-cols-12 gap-3 p-3 flex-1 min-h-0 overflow-hidden"}>
+          <div className="flex flex-col gap-4 p-0 md:grid md:grid-cols-12 md:gap-3 md:p-3 md:flex-1 md:min-h-0 md:overflow-hidden">
             
             {/* ─── Columna Izquierda: Cliente, Buscador & Carrito (7 Cols) ─── */}
-            <div className={isMobile ? "space-y-4" : "col-span-7 flex flex-col gap-2.5 min-h-0 overflow-hidden"}>
+            <div className="space-y-4 md:space-y-0 md:col-span-7 md:flex md:flex-col md:gap-2.5 md:min-h-0 md:overflow-hidden">
               
               {/* 1. Barra de Cliente & Condiciones (Ultra-compacta) */}
               <div className="bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs shrink-0">
@@ -2425,7 +2421,7 @@ export default function Sales() {
             </div>
 
             {/* ─── Columna Derecha: Cobro, Liquidación & Resumen (5 Cols) ─── */}
-            <div className={isMobile ? "space-y-4" : "col-span-5 flex flex-col gap-2.5 min-h-0 overflow-hidden"}>
+            <div className="space-y-4 md:space-y-0 md:col-span-5 md:flex md:flex-col md:gap-2.5 md:min-h-0 md:overflow-hidden">
               
               {/* Card 1: Métodos de Pago & Configuración */}
               <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs space-y-2.5 shrink-0">

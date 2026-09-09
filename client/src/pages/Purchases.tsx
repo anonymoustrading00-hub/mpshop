@@ -788,13 +788,9 @@ export default function Purchases() {
       {/* Modal AMPLIADO de Formulario de Nueva Compra (Estilo Modal de Ventas Amplio) */}
       <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) resetCreateForm(); }}>
         <DialogContent
-          className={
-            isMobile
-              ? "max-h-[94vh] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-[1.6rem] border-white/70 bg-white p-4 sm:max-w-[calc(100vw-1.5rem)] sm:p-6"
-              : "flex flex-col h-[92vh] w-[min(1360px,96vw)] sm:max-w-[min(1360px,96vw)] overflow-hidden rounded-[1.8rem] border-slate-200/60 bg-white shadow-2xl shadow-slate-900/10 p-0"
-          }
+          className="flex flex-col max-h-[94vh] md:h-[92vh] w-[min(98vw,98vw)] md:w-[min(1360px,96vw)] md:max-w-[min(1360px,96vw)] overflow-y-auto md:overflow-hidden rounded-[1.6rem] md:rounded-[1.8rem] border-white/70 md:border-slate-200/60 bg-white shadow-2xl shadow-slate-900/10 p-4 sm:p-6 md:p-0"
         >
-          <DialogHeader className={isMobile ? "" : "border-b border-slate-100 px-8 pt-6 pb-4 bg-gradient-to-r from-slate-50/80 to-white shrink-0"}>
+          <DialogHeader className="border-b border-slate-100 px-8 pt-6 pb-4 bg-gradient-to-r from-slate-50/80 to-white shrink-0">
             <DialogTitle className="flex items-center gap-3 text-xl">
               <div className="h-10 w-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-600/20">
                 <ShoppingCart className="h-5 w-5" />
@@ -809,9 +805,9 @@ export default function Purchases() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className={isMobile ? "mt-6 space-y-6" : "grid min-h-0 flex-1 overflow-hidden gap-0 lg:grid-cols-[minmax(0,1.1fr)_420px]"}>
+          <div className="flex flex-col gap-6 p-4 sm:p-6 md:p-0 md:grid md:min-h-0 md:flex-1 md:overflow-hidden md:gap-0 md:grid-cols-[minmax(0,1.1fr)_420px]">
             {/* LADO IZQUIERDO: Formulario de Selección e Ítems */}
-            <div className={isMobile ? "space-y-6" : "min-h-0 space-y-5 overflow-y-auto px-8 py-6"}>
+            <div className="space-y-6 md:space-y-5 md:min-h-0 md:overflow-y-auto md:px-8 md:py-6">
               {/* Card de Datos Generales */}
               <Card className="border-slate-100 shadow-sm">
                 <CardHeader className="pb-3">
@@ -1072,7 +1068,7 @@ export default function Purchases() {
             </div>
 
             {/* LADO DERECHO: Resumen de la Transacción & Botón de Acción */}
-            <div className={isMobile ? "space-y-6" : "min-h-0 space-y-5 overflow-y-auto border-l border-slate-100 bg-gradient-to-b from-slate-50/80 to-white px-6 py-6"}>
+            <div className="space-y-6 md:space-y-5 md:min-h-0 md:overflow-y-auto md:border-l md:border-slate-100 md:bg-gradient-to-b md:from-slate-50/80 md:to-white md:px-6 md:py-6">
               <div className="space-y-4">
                 {/* Resumen Tipo Ticket */}
                 <div className="rounded-[2.2rem] border-2 border-slate-900 bg-white shadow-xl overflow-hidden relative">
@@ -1163,7 +1159,7 @@ export default function Purchases() {
             </div>
           </div>
 
-          <DialogFooter className={isMobile ? "gap-2" : "border-t border-slate-100 bg-gradient-to-r from-slate-50/60 to-white px-8 py-4 gap-3 shrink-0"}>
+          <DialogFooter className="gap-2 px-4 pb-4 md:gap-3 md:border-t md:border-slate-100 md:bg-gradient-to-r md:from-slate-50/60 md:to-white md:px-8 md:py-4 md:pb-4 md:shrink-0">
             <Button
               variant="outline"
               onClick={() => { setIsCreateOpen(false); resetCreateForm(); }}
