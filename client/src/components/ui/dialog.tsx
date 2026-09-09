@@ -118,17 +118,28 @@ function DialogContent({
     [isComposing, onEscapeKeyDown]
   );
 
-  const hasCustomMaxWidth =
-    typeof className === "string" && (className.includes("max-w-") || className.includes("w-["));
-
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        style={{ maxWidth: "min(100% - 2rem, var(--dialog-max-width, 32rem))" }}
         className={cn(
-          "bg-white/90 backdrop-blur-2xl dark:bg-slate-900/90 dark:backdrop-blur-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-[1.5rem] border border-white/60 p-6 shadow-2xl duration-200",
-          !hasCustomMaxWidth && "sm:max-w-lg",
+          // Base: centrado con scroll en móvil
+          "bg-white/90 backdrop-blur-2xl dark:bg-slate-900/90 dark:backdrop-blur-2xl",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+          "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          // Posición centrada
+          "fixed left-[50%] top-[50%] z-50",
+          "translate-x-[-50%] translate-y-[-50%]",
+          // Ancho: toma el ancho de max-w-* que venga en className, con margen lateral garantizado por style
+          "w-full",
+          // Altura máxima con scroll para pantallas pequeñas
+          "max-h-[calc(100dvh-2rem)] overflow-y-auto",
+          "grid gap-4 rounded-[1.5rem] border border-white/60 p-6 shadow-2xl duration-200",
+          // Default max-width si no se especifica
+          "sm:max-w-lg",
           className
         )}
         onEscapeKeyDown={handleEscapeKeyDown}

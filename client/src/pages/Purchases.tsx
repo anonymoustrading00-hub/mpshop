@@ -1222,7 +1222,7 @@ function PurchaseDetailDialog({ purchase, open, onOpenChange }: any) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl rounded-[2rem] p-6 bg-white border-0 shadow-2xl">
+      <DialogContent className="sm:max-w-2xl rounded-[2rem] p-6 bg-white border-0 shadow-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-black">
             <FileText className="h-5 w-5 text-blue-600" /> Detalle de Compra: {purchase?.purchaseNumber}
@@ -1413,7 +1413,7 @@ function EditPurchaseDialog({ purchase, open, onOpenChange }: any) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[2rem] p-6 bg-white border-0 shadow-2xl">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto rounded-[2rem] p-6 bg-white border-0 shadow-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-black">
             <Edit className="h-5 w-5 text-amber-600" /> Editar Compra: {purchase?.purchaseNumber}
@@ -1598,7 +1598,7 @@ function QuickCreateProductDialog({ open, onOpenChange, onSuccess }: any) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md bg-white border-0 shadow-2xl p-0 overflow-hidden rounded-[2rem]">
+      <DialogContent className="sm:max-w-md bg-white border-0 shadow-2xl p-0 overflow-hidden rounded-[2rem]">
         <div className="bg-slate-50 border-b px-6 py-4 flex items-center gap-3">
           <div className="h-10 w-10 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600">
             <Package className="h-5 w-5" />

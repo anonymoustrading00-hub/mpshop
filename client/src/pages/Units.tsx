@@ -1493,7 +1493,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
         {/* Modal: Marcar como YA REPARADA y Disponible */}
         <Dialog open={isCompleteRepairOpen} onOpenChange={setIsCompleteRepairOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-emerald-700 font-bold">
                 <CheckCircle className="h-6 w-6 text-emerald-600" />
@@ -1569,7 +1569,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
         {/* Modal: Formulario de Traspaso a Taller */}
         <Dialog open={isWorkshopModalOpen} onOpenChange={setIsWorkshopModalOpen}>
-          <DialogContent className="max-w-xl">
+          <DialogContent className="sm:max-w-xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-red-600 text-lg font-bold">
                 <Wrench className="h-5 w-5 text-red-600" />
@@ -1684,7 +1684,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
         {/* ══════════ MODAL: EDITAR UNIDAD ══════════ */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="max-w-4xl w-[95vw] md:w-full max-h-[92vh] overflow-y-auto p-0 rounded-3xl border border-slate-200/80 shadow-2xl bg-white">
+          <DialogContent className="sm:max-w-4xl w-[95vw] md:w-full max-h-[92vh] overflow-y-auto p-0 rounded-3xl border border-slate-200/80 shadow-2xl bg-white">
             {/* Header */}
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -2567,7 +2567,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
         {/* ── MODAL ELIMINAR UNIDADES / LOTES CON CHECKS Y CANTIDADES ───────── */}
         <Dialog open={isBatchDeleteOpen} onOpenChange={setIsBatchDeleteOpen}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-red-600">
                 <Trash2 className="h-5 w-5" />

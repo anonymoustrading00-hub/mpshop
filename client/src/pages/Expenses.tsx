@@ -546,7 +546,7 @@ function ExpenseDetailDialog({ expense, onClose }: { expense: any; onClose: () =
   const meta = getCategoryMeta(expense.category);
   return (
     <Dialog open={!!expense} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {expense.isAutomatic === 1 && <Bot className="h-4 w-4 text-slate-400" />}
@@ -646,7 +646,7 @@ function ExpenseDialog({ open, expense, onClose, onSave }: ExpenseDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{expense ? "Editar Gasto" : "Nuevo Gasto"}</DialogTitle>
           <DialogDescription>{expense ? "Modifica los datos del gasto" : "Registra un gasto operativo o administrativo del negocio"}</DialogDescription>

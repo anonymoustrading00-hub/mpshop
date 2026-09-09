@@ -1153,7 +1153,7 @@ function ClosureDetailDialog({ closure, onClose }: { closure: any, onClose: () =
 
   return (
     <Dialog open={!!closure} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl overflow-hidden p-0">
+      <DialogContent className="sm:max-w-2xl overflow-hidden p-0">
         <div className="p-6 print:p-0 no-print">
           <DialogHeader className="mb-4"><div className="flex items-center justify-between">
             <div><DialogTitle className="text-xl">Resumen de Cierre de Caja</DialogTitle>
@@ -1586,7 +1586,7 @@ function PurchaseTransactionDialog({ purchaseId, transaction, onClose, onPrint }
 
   return (
     <Dialog open={!!transaction} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />Detalle de Compra: {purchase?.purchaseNumber || `#${purchaseId}`}</DialogTitle></DialogHeader>
         {!purchase ? (
           <div className="py-10 text-center text-muted-foreground">Cargando...</div>
@@ -1691,7 +1691,7 @@ function SaleTransactionDialog({ saleId, transaction, onClose, onPrint }: { sale
 
   return (
     <Dialog open={!!transaction} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />Detalle de Venta: {detail?.sale?.saleNumber || `#${saleId}`}</DialogTitle></DialogHeader>
         {isLoading || !detail ? (
           <div className="py-10 text-center text-muted-foreground">Cargando...</div>
@@ -1827,7 +1827,7 @@ function BasicTransactionDialog({ transaction, onClose, onPrint }: { transaction
 
   return (
     <Dialog open={!!transaction} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-lg overflow-hidden p-0">
+      <DialogContent className="sm:max-w-lg overflow-hidden p-0">
         <div className="p-6 print:p-0 no-print">
           <DialogHeader className="mb-4">
             <div className="flex items-center justify-between">
