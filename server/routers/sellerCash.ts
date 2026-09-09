@@ -823,7 +823,6 @@ export const sellerCashRouter = router({
         branchId,
         date: today,
         turnNumber: nextTurnNumber,
-        date: today,
         openingStatus: "approved",          // ya aprobada — el admin la abre directamente
         openingApprovedBy: ctx.user.id,
         openingApprovedAt: new Date(),

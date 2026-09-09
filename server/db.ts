@@ -536,7 +536,18 @@ export async function getDb() {
         // Agregar columna createdAt por si la tabla se creó con la versión anterior del código
         _pool.execute(`
           ALTER TABLE inventory_transfer_items ADD COLUMN createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-        `).catch(() => {}); // ignorar error si la columna ya existe
+        `).catch(() => {});
+        
+        // Migración: Agregar columna turnNumber a seller_cash_registers
+        _pool.execute(`
+          ALTER TABLE seller_cash_registers 
+          ADD COLUMN turnNumber INT NOT NULL DEFAULT 1 AFTER date
+        `).catch((err) => {
+          // Ignorar si la columna ya existe
+          if (!err.message.includes('Duplicate column name')) {
+            console.error('[Migration] Error adding turnNumber:', err.message);
+          }
+        });
         
         _pool.execute(`
           CREATE TABLE IF NOT EXISTS kefir_storage (
