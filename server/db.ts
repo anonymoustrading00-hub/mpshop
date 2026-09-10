@@ -4525,7 +4525,18 @@ export async function getAllBranches() {
   if (!db) {
     return MOCK_BRANCHES;
   }
-  return await db.select().from(branches);
+  // Auto-ensure Sucursal Principal (id=1) always exists
+  try {
+    const pool = _pool!;
+    await pool.execute(
+      "INSERT INTO branches (id, name, address, phone, isMainWarehouse, status, createdAt, updatedAt) " +
+      "VALUES (1, 'Sucursal Principal', 'Casa Central', '', 1, 'active', NOW(), NOW()) " +
+      "ON DUPLICATE KEY UPDATE status = COALESCE(status, 'active')"
+    );
+  } catch { /* already exists or table issue — ignore */ }
+
+  const rows = await db.select().from(branches);
+  return toPlainObject(rows);
 }
 
 export async function createBranch(data: any) {
