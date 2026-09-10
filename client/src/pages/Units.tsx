@@ -1685,8 +1685,8 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
         {/* ══════════ MODAL: EDITAR UNIDAD ══════════ */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
           <DialogContent
-            className="w-[97vw] md:w-full max-h-[88vh] overflow-y-auto p-0 rounded-3xl border border-slate-200/80 shadow-2xl bg-white"
-            style={{ "--dialog-max-width": "min(1100px, 96vw)" } as React.CSSProperties}
+            className="w-[98vw] md:w-full max-h-[88vh] overflow-y-auto p-0 rounded-3xl border border-slate-200/80 shadow-2xl bg-white"
+            style={{ "--dialog-max-width": "min(1440px, 96vw)" } as React.CSSProperties}
           >
             {/* Header */}
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -1717,8 +1717,8 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
             </div>
 
             {editUnit && (
-              <div className="p-4 md:p-5 text-sm">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-5 md:p-6 text-sm">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                   {/* ══ COLUMNA IZQUIERDA ══ */}
                   <div className="space-y-4">
 
@@ -1784,7 +1784,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                               updated[idx].key = e.target.value;
                               setEditSpecs(updated);
                             }}
-                            className="w-2/5 h-8 text-xs font-bold uppercase tracking-wider bg-white rounded-lg border-slate-200"
+                            className="w-28 sm:w-32 shrink-0 h-8 text-xs font-bold uppercase tracking-wider bg-white rounded-lg border-slate-200"
                           />
                           <Input
                             placeholder="Valor (ej. Core i7 16GB)"
@@ -1921,7 +1921,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                     </label>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     {/* Precio Compra */}
                     <div className="p-3.5 rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 space-y-2 flex flex-col justify-between shadow-xs">
                       <div className="flex items-center justify-between gap-1.5">
@@ -2156,7 +2156,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         {/* Efectivo */}
                         <button
                           type="button"
