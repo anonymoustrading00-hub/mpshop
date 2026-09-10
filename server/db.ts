@@ -16,9 +16,9 @@ import {
 
 function getInsertId(result: any): number {
   if (Array.isArray(result) && result.length > 0) {
-    return result[0].insertId;
+    return Number(result[0].insertId) || 0;
   }
-  return result?.insertId || 0;
+  return Number(result?.insertId) || 0;
 }
 
 function toOptionalInteger(value: unknown): number | undefined {
@@ -868,7 +868,7 @@ export async function createUser(data: any) {
   }
 
   const result = await db.insert(users).values(data);
-  return { insertId: result[0]?.insertId || result.insertId };
+  return { insertId: Number(result[0]?.insertId ?? (result as any).insertId ?? 0) };
 }
 
 export async function getAllUsers() {
@@ -1011,7 +1011,7 @@ export async function createCustomer(data: InsertCustomer) {
   }
   
   const result = await db.insert(customers).values(data);
-  return { insertId: result[0]?.insertId || result.insertId };
+  return { insertId: Number(result[0]?.insertId ?? (result as any).insertId ?? 0) };
 }
 
 export async function updateCustomer(customerId: number, data: Partial<InsertCustomer>) {
@@ -1414,7 +1414,7 @@ export async function createOrder(data: InsertOrder) {
   }
   
   const result = await db.insert(orders).values(data);
-  return { insertId: result[0]?.insertId || result.insertId };
+  return { insertId: Number(result[0]?.insertId ?? (result as any).insertId ?? 0) };
 }
 
 export async function updateOrder(orderId: number, data: Partial<InsertOrder>) {
@@ -1465,7 +1465,7 @@ export async function createDeliveryPerson(data: InsertUser) {
   }
   
   const result = await db.insert(users).values(data);
-  return { insertId: result[0]?.insertId || result.insertId };
+  return { insertId: Number(result[0]?.insertId ?? (result as any).insertId ?? 0) };
 }
 
 export async function updateDeliveryPerson(userId: number, data: Partial<InsertUser>) {
@@ -1610,7 +1610,7 @@ export async function createOrderItem(data: InsertOrderItem) {
 
   try {
     const result = await db.insert(orderItems).values(payload);
-    return { insertId: result[0]?.insertId || result.insertId };
+    return { insertId: Number(result[0]?.insertId ?? (result as any).insertId ?? 0) };
   } catch (err: any) {
     // If unitId or productId column differences occur, try targeted insertion
     if (err?.message?.includes("Unknown column 'unitId'") || err?.sqlMessage?.includes("Unknown column 'unitId'")) {
@@ -1622,7 +1622,7 @@ export async function createOrderItem(data: InsertOrderItem) {
         price: payload.price,
       };
       const result = await db.insert(orderItems).values(fallback as any);
-      return { insertId: result[0]?.insertId || result.insertId };
+      return { insertId: Number(result[0]?.insertId ?? (result as any).insertId ?? 0) };
     }
     if (err?.message?.includes("productId") || err?.sqlMessage?.includes("productId")) {
       const fallback = {
@@ -1633,7 +1633,7 @@ export async function createOrderItem(data: InsertOrderItem) {
         price: payload.price,
       };
       const result = await db.insert(orderItems).values(fallback as any);
-      return { insertId: result[0]?.insertId || result.insertId };
+      return { insertId: Number(result[0]?.insertId ?? (result as any).insertId ?? 0) };
     }
     throw err;
   }
@@ -1669,7 +1669,7 @@ export async function createGPSTracking(data: InsertGPSTracking) {
   if (!db) return { insertId: Date.now() };
   
   const result = await db.insert(gpsTracking).values(data);
-  return { insertId: result[0]?.insertId || result.insertId };
+  return { insertId: Number(result[0]?.insertId ?? (result as any).insertId ?? 0) };
 }
 
 export async function getLatestGPSTracking(orderId: number) {
@@ -1770,7 +1770,7 @@ export async function createSupplier(data: any) {
   }
   
   const result = await db.insert(suppliers).values(data);
-  return { insertId: result[0]?.insertId || result.insertId };
+  return { insertId: Number(result[0]?.insertId ?? (result as any).insertId ?? 0) };
 }
 
 export async function getPurchaseById(id: number) {
@@ -2840,7 +2840,7 @@ export async function createCashOpening(data: InsertCashOpening) {
   }
 
   const result = await db.insert(cashOpenings).values(data);
-  return { insertId: result[0]?.insertId || result.insertId };
+  return { insertId: Number(result[0]?.insertId ?? (result as any).insertId ?? 0) };
 }
 
 export async function updateCashOpeningStatus(id: number, status: string) {
@@ -2960,7 +2960,7 @@ export async function createCashClosure(data: InsertCashClosure) {
   }
   
   const result = await db.insert(cashClosures).values(data);
-  return { insertId: result[0]?.insertId || result.insertId };
+  return { insertId: Number(result[0]?.insertId ?? (result as any).insertId ?? 0) };
 }
 
 export async function getAllCashClosures(branchId?: number) {
@@ -3398,7 +3398,7 @@ export async function createSale(data: InsertSale) {
   }
   
   const result = await db.insert(sales).values(data);
-  return { insertId: result[0]?.insertId || result.insertId };
+  return { insertId: Number(result[0]?.insertId ?? (result as any).insertId ?? 0) };
 }
 
 export async function createSaleItem(data: InsertSaleItem) {
@@ -3418,7 +3418,7 @@ export async function createSaleItem(data: InsertSaleItem) {
   }
   
   const result = await db.insert(saleItems).values(data);
-  return { insertId: result[0]?.insertId || result.insertId };
+  return { insertId: Number(result[0]?.insertId ?? (result as any).insertId ?? 0) };
 }
 
 export async function getProductsWithStock() {
@@ -4539,7 +4539,7 @@ export async function createBranch(data: any) {
   }
   
   const result = await db.insert(branches).values(data);
-  return { insertId: result[0]?.insertId || result.insertId };
+  return { insertId: Number(result[0]?.insertId ?? (result as any).insertId ?? 0) };
 }
 
 export async function updateBranch(id: number, data: any) {
