@@ -1684,7 +1684,7 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
         {/* ══════════ MODAL: EDITAR UNIDAD ══════════ */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="sm:max-w-4xl w-[95vw] md:w-full max-h-[92vh] overflow-y-auto p-0 rounded-3xl border border-slate-200/80 shadow-2xl bg-white">
+          <DialogContent className="sm:max-w-5xl w-[97vw] md:w-full max-h-[88vh] overflow-y-auto p-0 rounded-3xl border border-slate-200/80 shadow-2xl bg-white">
             {/* Header */}
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -1714,9 +1714,11 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
             </div>
 
             {editUnit && (
-              <div className="p-6 space-y-6 text-sm">
+              <div className="p-4 md:p-5 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* ══ COLUMNA IZQUIERDA ══ */}
+                  <div className="space-y-4">
 
-                {/* ─── 1. Tipo, Marca y Modelo ─── */}
                 <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200/80 space-y-4">
                   <div className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
                     <Laptop className="h-4 w-4 text-blue-600" />
@@ -1891,7 +1893,11 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                     rows={2}
                     className="rounded-xl border-slate-200 text-xs bg-slate-50/40 focus:bg-white"
                   />
+                  </div>
                 </div>
+
+                  {/* ══ COLUMNA DERECHA ══ */}
+                  <div className="space-y-4">
 
                 {/* ─── 5. Precios y Margen de Ganancia ─── */}
                 <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm space-y-4">
@@ -2539,8 +2545,10 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
                       </button>
                     )}
                   </div>
-                </div>
+                </div>{/* end TikTok */}
 
+                  </div>{/* end right column */}
+                </div>{/* end 2-col grid */}
               </div>
             )}
 
