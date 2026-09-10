@@ -1684,7 +1684,10 @@ function compressImage(base64: string, maxWidth = 1200, quality = 0.8): Promise<
 
         {/* ══════════ MODAL: EDITAR UNIDAD ══════════ */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="sm:max-w-5xl w-[97vw] md:w-full max-h-[88vh] overflow-y-auto p-0 rounded-3xl border border-slate-200/80 shadow-2xl bg-white">
+          <DialogContent
+            className="w-[97vw] md:w-full max-h-[88vh] overflow-y-auto p-0 rounded-3xl border border-slate-200/80 shadow-2xl bg-white"
+            style={{ "--dialog-max-width": "min(1100px, 96vw)" } as React.CSSProperties}
+          >
             {/* Header */}
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
