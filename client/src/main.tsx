@@ -32,9 +32,11 @@ setInterval(fetchCSRFToken, 30 * 60 * 1000);
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,           // 30s — evita re-fetch al montar componentes
-      refetchOnWindowFocus: false,  // no refrescar al cambiar de pestaña
-      retry: 1,                     // solo 1 reintento en caso de error
+      staleTime: 0,                  // datos siempre obsoletos → refetch al montar
+      refetchOnWindowFocus: true,    // refrescar al volver a la pestaña/ventana
+      refetchOnMount: true,          // refrescar cada vez que el componente se monta
+      refetchInterval: 15_000,       // auto-actualizar cada 15 segundos en segundo plano
+      retry: 1,
     },
   },
 });
