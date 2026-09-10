@@ -539,7 +539,28 @@ export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       if (!_pool) {
-        _pool = mysql.createPool(process.env.DATABASE_URL);
+        _pool = mysql.createPool({
+          uri: process.env.DATABASE_URL,
+          // Convert BigInt (LONGLONG) and Decimal to plain JS numbers
+          // This prevents "Unable to transform response from server" errors in tRPC/superjson
+          typeCast(field: any, next: () => any) {
+            if (
+              field.type === 'LONGLONG' ||
+              field.type === 'LONG' ||
+              field.type === 'INT24' ||
+              field.type === 'SHORT' ||
+              field.type === 'TINY'
+            ) {
+              const val = field.string();
+              return val === null ? null : Number(val);
+            }
+            if (field.type === 'NEWDECIMAL') {
+              const val = field.string();
+              return val === null ? null : parseFloat(val);
+            }
+            return next();
+          },
+        });
         console.log("[Database] Pool created successfully");
       }
       _db = drizzle(_pool, { schema, mode: "default" });
