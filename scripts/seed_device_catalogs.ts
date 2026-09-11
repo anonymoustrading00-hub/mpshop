@@ -79,6 +79,17 @@ async function ensureCatalogTables(connection: mysql.Connection) {
       CONSTRAINT screen_sizes_size_unique UNIQUE(size)
     )
   `);
+
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS device_spec_options (
+      id int AUTO_INCREMENT NOT NULL,
+      specKey varchar(100) NOT NULL,
+      specValue varchar(255) NOT NULL,
+      createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT device_spec_options_id PRIMARY KEY(id),
+      UNIQUE KEY device_spec_options_key_value_unique (specKey, specValue)
+    )
+  `);
 }
 
 async function ensureBrand(db: any, name: string) {

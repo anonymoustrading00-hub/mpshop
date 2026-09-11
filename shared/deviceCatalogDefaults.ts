@@ -1,5 +1,64 @@
 // Catálogos globales y base de datos de laptops para autocompletado inteligente
 
+export const SPEC_KEY_LABELS: Record<string, string> = {
+  cpu: "Procesador",
+  ram: "Memoria RAM",
+  storage: "Almacenamiento",
+  screenSize: "Tamaño de Pantalla",
+  gpu: "Tarjeta de Video",
+  resolution: "Resolución",
+  os: "Sistema Operativo",
+  androidVersion: "Versión Android",
+  iosVersion: "Versión iOS",
+  camera: "Cámara",
+  wattage: "Potencia (W)",
+  connector: "Conector",
+  voltage: "Voltaje",
+  amperage: "Amperaje",
+  color: "Color",
+  weight: "Peso",
+  connectivity: "Conectividad",
+  panelType: "Tipo de Panel",
+  refreshRate: "Tasa de Refresco",
+  description: "Descripción",
+};
+
+const SPEC_KEY_ALIASES: Record<string, string> = {
+  procesador: "cpu",
+  processor: "cpu",
+  cpu: "cpu",
+  ram: "ram",
+  memoria: "ram",
+  "memoria ram": "ram",
+  ddr: "ram",
+  almacenamiento: "storage",
+  storage: "storage",
+  disco: "storage",
+  ssd: "storage",
+  hdd: "storage",
+  nvme: "storage",
+  pantalla: "screenSize",
+  "tamaño de pantalla": "screenSize",
+  screensize: "screenSize",
+  gpu: "gpu",
+  video: "gpu",
+  "tarjeta de video": "gpu",
+  resolucion: "resolution",
+  resolución: "resolution",
+  resolution: "resolution",
+};
+
+export function canonicalizeSpecKey(raw: string) {
+  const normalized = String(raw || "").replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  if (SPEC_KEY_LABELS[normalized]) return normalized;
+
+  const lower = normalized.toLowerCase();
+  const fromLabel = Object.entries(SPEC_KEY_LABELS).find(([, label]) => label.toLowerCase() === lower);
+  if (fromLabel) return fromLabel[0];
+  return SPEC_KEY_ALIASES[lower] || normalized;
+}
+
 export const DEFAULT_DEVICE_BRANDS: string[] = [
   "Acer",
   "Apple",

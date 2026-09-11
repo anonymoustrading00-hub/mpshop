@@ -10,9 +10,11 @@ import {
   MOCK_RAM_OPTIONS, 
   MOCK_STORAGE_OPTIONS, 
   MOCK_SCREEN_SIZES,
+  MOCK_DEVICE_SPEC_OPTIONS,
   syncMocksToDisk,
 } from "../db";
 import {
+  canonicalizeSpecKey,
   DEFAULT_DEVICE_BRANDS,
   DEFAULT_DEVICE_MODELS,
   DEFAULT_PROCESSORS,
@@ -87,6 +89,303 @@ async function ensureBrandRecord(db: any, name: string) {
     .limit(1);
 
   return created || null;
+}
+
+function parseSpecsJson(raw: unknown): Record<string, string> {
+  if (!raw) return {};
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    return Object.fromEntries(
+      Object.entries(raw as Record<string, unknown>)
+        .map(([key, value]) => [canonicalizeSpecKey(key) || key, normalizeCatalogText(String(value ?? ""))])
+        .filter(([, value]) => Boolean(value))
+    );
+  }
+  if (typeof raw === "string") {
+    try {
+      return parseSpecsJson(JSON.parse(raw));
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function mergeSpecMaps(base: Record<string, string>, incoming: Record<string, string>) {
+  const next = { ...base };
+  for (const [key, value] of Object.entries(incoming)) {
+    if (value) next[key] = value;
+  }
+  return next;
+}
+
+async function ensureModelRecord(
+  db: any,
+  input: { brandId: number; name: string; defaultSpecs?: Record<string, string> }
+) {
+  const normalizedName = normalizeCatalogText(input.name);
+  if (!normalizedName || !input.brandId) return null;
+  const incomingSpecs = input.defaultSpecs || {};
+
+  if (!db) {
+    const existing = MOCK_DEVICE_MODELS.find(
+      (model) => Number(model.brandId) === Number(input.brandId) && sameCatalogText(model.name, normalizedName)
+    );
+    if (existing) {
+      const merged = mergeSpecMaps(parseSpecsJson(existing.defaultSpecs), incomingSpecs);
+      existing.defaultSpecs = Object.keys(merged).length ? JSON.stringify(merged) : existing.defaultSpecs;
+      syncMocksToDisk();
+      return existing;
+    }
+    const created = {
+      id: nextMockId(MOCK_DEVICE_MODELS),
+      brandId: input.brandId,
+      name: normalizedName,
+      defaultSpecs: Object.keys(incomingSpecs).length ? JSON.stringify(incomingSpecs) : null,
+      createdAt: new Date(),
+    };
+    MOCK_DEVICE_MODELS.push(created);
+    syncMocksToDisk();
+    return created;
+  }
+
+  const [existing] = await db
+    .select()
+    .from(schema.deviceModels)
+    .where(and(
+      eq(schema.deviceModels.brandId, input.brandId),
+      sql`lower(${schema.deviceModels.name}) = ${normalizedName.toLowerCase()}`
+    ))
+    .limit(1);
+
+  if (existing) {
+    const merged = mergeSpecMaps(parseSpecsJson(existing.defaultSpecs), incomingSpecs);
+    const mergedJson = Object.keys(merged).length ? JSON.stringify(merged) : existing.defaultSpecs;
+    if (mergedJson !== existing.defaultSpecs) {
+      await db.update(schema.deviceModels).set({ defaultSpecs: mergedJson }).where(eq(schema.deviceModels.id, existing.id));
+    }
+    return { ...existing, defaultSpecs: mergedJson };
+  }
+
+  const defaultSpecs = Object.keys(incomingSpecs).length ? JSON.stringify(incomingSpecs) : null;
+  await db.insert(schema.deviceModels).values({
+    brandId: input.brandId,
+    name: normalizedName,
+    defaultSpecs,
+  });
+
+  const [created] = await db
+    .select()
+    .from(schema.deviceModels)
+    .where(and(
+      eq(schema.deviceModels.brandId, input.brandId),
+      sql`lower(${schema.deviceModels.name}) = ${normalizedName.toLowerCase()}`
+    ))
+    .limit(1);
+
+  return created || null;
+}
+
+async function ensureProcessorRecord(db: any, name: string) {
+  const normalized = normalizeCatalogText(name);
+  if (!normalized) return null;
+
+  if (!db) {
+    const existing = MOCK_PROCESSORS.find((item) => sameCatalogText(item.name, normalized));
+    if (existing) return existing;
+    const created = { id: nextMockId(MOCK_PROCESSORS), name: normalized, generation: null, createdAt: new Date() };
+    MOCK_PROCESSORS.push(created);
+    syncMocksToDisk();
+    return created;
+  }
+
+  const [existing] = await db
+    .select()
+    .from(schema.processors)
+    .where(sql`lower(${schema.processors.name}) = ${normalized.toLowerCase()}`)
+    .limit(1);
+  if (existing) return existing;
+
+  await db.insert(schema.processors).values({ name: normalized }).onDuplicateKeyUpdate({ set: { name: schema.processors.name } });
+  const [created] = await db
+    .select()
+    .from(schema.processors)
+    .where(sql`lower(${schema.processors.name}) = ${normalized.toLowerCase()}`)
+    .limit(1);
+  return created || null;
+}
+
+async function ensureRamRecord(db: any, capacity: string) {
+  const normalized = normalizeCatalogText(capacity);
+  if (!normalized) return null;
+  const type = inferRamType(normalized);
+
+  if (!db) {
+    const existing = MOCK_RAM_OPTIONS.find((item) => sameCatalogText(item.capacity, normalized));
+    if (existing) return existing;
+    const created = { id: nextMockId(MOCK_RAM_OPTIONS), capacity: normalized, type, createdAt: new Date() };
+    MOCK_RAM_OPTIONS.push(created);
+    syncMocksToDisk();
+    return created;
+  }
+
+  const [existing] = await db
+    .select()
+    .from(schema.ramOptions)
+    .where(sql`lower(${schema.ramOptions.capacity}) = ${normalized.toLowerCase()}`)
+    .limit(1);
+  if (existing) return existing;
+
+  await db.insert(schema.ramOptions).values({ capacity: normalized, type }).onDuplicateKeyUpdate({ set: { capacity: schema.ramOptions.capacity } });
+  const [created] = await db
+    .select()
+    .from(schema.ramOptions)
+    .where(sql`lower(${schema.ramOptions.capacity}) = ${normalized.toLowerCase()}`)
+    .limit(1);
+  return created || null;
+}
+
+async function ensureStorageRecord(db: any, capacity: string) {
+  const normalized = normalizeCatalogText(capacity);
+  if (!normalized) return null;
+  const type = inferStorageType(normalized);
+
+  if (!db) {
+    const existing = MOCK_STORAGE_OPTIONS.find((item) => sameCatalogText(item.capacity, normalized));
+    if (existing) return existing;
+    const created = { id: nextMockId(MOCK_STORAGE_OPTIONS), capacity: normalized, type, createdAt: new Date() };
+    MOCK_STORAGE_OPTIONS.push(created);
+    syncMocksToDisk();
+    return created;
+  }
+
+  const [existing] = await db
+    .select()
+    .from(schema.storageOptions)
+    .where(sql`lower(${schema.storageOptions.capacity}) = ${normalized.toLowerCase()}`)
+    .limit(1);
+  if (existing) return existing;
+
+  await db.insert(schema.storageOptions).values({ capacity: normalized, type }).onDuplicateKeyUpdate({ set: { capacity: schema.storageOptions.capacity } });
+  const [created] = await db
+    .select()
+    .from(schema.storageOptions)
+    .where(sql`lower(${schema.storageOptions.capacity}) = ${normalized.toLowerCase()}`)
+    .limit(1);
+  return created || null;
+}
+
+async function ensureScreenRecord(db: any, size: string, resolution?: string | null) {
+  const normalized = normalizeCatalogText(size);
+  if (!normalized) return null;
+  const normalizedResolution = resolution ? normalizeCatalogText(resolution) : null;
+
+  if (!db) {
+    const existing = MOCK_SCREEN_SIZES.find((item) => sameCatalogText(item.size, normalized));
+    if (existing) return existing;
+    const created = { id: nextMockId(MOCK_SCREEN_SIZES), size: normalized, resolution: normalizedResolution, createdAt: new Date() };
+    MOCK_SCREEN_SIZES.push(created);
+    syncMocksToDisk();
+    return created;
+  }
+
+  const [existing] = await db
+    .select()
+    .from(schema.screenSizes)
+    .where(sql`lower(${schema.screenSizes.size}) = ${normalized.toLowerCase()}`)
+    .limit(1);
+  if (existing) return existing;
+
+  await db.insert(schema.screenSizes).values({ size: normalized, resolution: normalizedResolution }).onDuplicateKeyUpdate({ set: { size: schema.screenSizes.size } });
+  const [created] = await db
+    .select()
+    .from(schema.screenSizes)
+    .where(sql`lower(${schema.screenSizes.size}) = ${normalized.toLowerCase()}`)
+    .limit(1);
+  return created || null;
+}
+
+async function ensureSpecOptionRecord(db: any, specKey: string, specValue: string) {
+  const key = canonicalizeSpecKey(specKey) || normalizeCatalogText(specKey);
+  const value = normalizeCatalogText(specValue);
+  if (!key || !value) return null;
+
+  if (!db) {
+    const existing = MOCK_DEVICE_SPEC_OPTIONS.find(
+      (item) => sameCatalogText(item.specKey, key) && sameCatalogText(item.specValue, value)
+    );
+    if (existing) return existing;
+    const created = { id: nextMockId(MOCK_DEVICE_SPEC_OPTIONS), specKey: key, specValue: value, createdAt: new Date() };
+    MOCK_DEVICE_SPEC_OPTIONS.push(created);
+    syncMocksToDisk();
+    return created;
+  }
+
+  const [existing] = await db
+    .select()
+    .from(schema.deviceSpecOptions)
+    .where(and(
+      sql`lower(${schema.deviceSpecOptions.specKey}) = ${key.toLowerCase()}`,
+      sql`lower(${schema.deviceSpecOptions.specValue}) = ${value.toLowerCase()}`
+    ))
+    .limit(1);
+  if (existing) return existing;
+
+  await db
+    .insert(schema.deviceSpecOptions)
+    .values({ specKey: key, specValue: value })
+    .onDuplicateKeyUpdate({ set: { specValue: schema.deviceSpecOptions.specValue } });
+
+  const [created] = await db
+    .select()
+    .from(schema.deviceSpecOptions)
+    .where(and(
+      sql`lower(${schema.deviceSpecOptions.specKey}) = ${key.toLowerCase()}`,
+      sql`lower(${schema.deviceSpecOptions.specValue}) = ${value.toLowerCase()}`
+    ))
+    .limit(1);
+  return created || null;
+}
+
+async function persistSpecRecord(db: any, rawKey: string, rawValue: string) {
+  const key = canonicalizeSpecKey(rawKey) || normalizeCatalogText(rawKey);
+  const value = normalizeCatalogText(rawValue);
+  if (!key || !value) return;
+
+  if (key === "cpu") await ensureProcessorRecord(db, value);
+  else if (key === "ram") await ensureRamRecord(db, value);
+  else if (key === "storage") await ensureStorageRecord(db, value);
+  else if (key === "screenSize") await ensureScreenRecord(db, value);
+
+  await ensureSpecOptionRecord(db, key, value);
+}
+
+export async function persistDeviceCatalogFromUnit(input: {
+  brand?: string | null;
+  model?: string | null;
+  specs?: Record<string, any> | string | null;
+}) {
+  try {
+    const db = await getDb();
+    const specs = parseSpecsJson(input.specs);
+    const brandName = normalizeCatalogText(String(input.brand || ""));
+    let brandId: number | undefined;
+
+    if (brandName) {
+      const brand = await ensureBrandRecord(db, brandName);
+      brandId = brand?.id;
+    }
+
+    const modelName = normalizeCatalogText(String(input.model || ""));
+    if (brandId && modelName) {
+      await ensureModelRecord(db, { brandId, name: modelName, defaultSpecs: specs });
+    }
+
+    for (const [key, value] of Object.entries(specs)) {
+      await persistSpecRecord(db, key, value);
+    }
+  } catch (error) {
+    console.error("[DeviceCatalogs] Failed to persist unit catalog:", error);
+  }
 }
 
 export const deviceCatalogsRouter = router({

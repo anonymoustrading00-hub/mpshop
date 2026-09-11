@@ -287,6 +287,8 @@ export const MOCK_SCREEN_SIZES: any[] = DEFAULT_SCREEN_SIZES.map((option, index)
   createdAt: new Date(),
 }));
 
+export const MOCK_DEVICE_SPEC_OPTIONS: any[] = [];
+
 function nextMockId(items: any[]) {
   const ids = items.map((item) => Number(item.id)).filter(Number.isFinite);
   return (ids.length ? Math.max(...ids) : 0) + 1;
@@ -440,6 +442,7 @@ export function syncMocksToDisk() {
     MOCK_RAM_OPTIONS,
     MOCK_STORAGE_OPTIONS,
     MOCK_SCREEN_SIZES,
+    MOCK_DEVICE_SPEC_OPTIONS,
   };
   try {
     fs.writeFileSync(MOCK_DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
@@ -469,7 +472,8 @@ function loadMocks() {
       MOCK_UNITS, MOCK_UNIT_EVENTS, MOCK_REPAIRS,
       MOCK_WARRANTIES, MOCK_RETURNS, MOCK_GENERATED_CODES,
       MOCK_DEVICE_BRANDS, MOCK_DEVICE_MODELS, MOCK_PROCESSORS,
-      MOCK_RAM_OPTIONS, MOCK_STORAGE_OPTIONS, MOCK_SCREEN_SIZES
+      MOCK_RAM_OPTIONS, MOCK_STORAGE_OPTIONS, MOCK_SCREEN_SIZES,
+      MOCK_DEVICE_SPEC_OPTIONS
     };
     for (const [key, arr] of Object.entries(arrays)) {
       if (data[key] && Array.isArray(data[key])) {
@@ -3923,6 +3927,7 @@ export async function createSaleWithItems(payload: SaleCreatePayload) {
       });
     } else if (payload.paymentStatus === "completed") {
       await tx.insert(financialTransactions).values({
+        branchId: payload.branchId || 1,
         type: "income",
         category: payload.saleChannel === "delivery" ? "sale_delivery" : "sale_local",
         amount: payload.total,
@@ -4037,6 +4042,13 @@ export async function cancelSaleRecord(saleId: number, cancelledByUserId: number
       }
     }
 
+    // Revertir COGS en mock
+    for (let i = MOCK_OPERATIONAL_EXPENSES.length - 1; i >= 0; i--) {
+      if (MOCK_OPERATIONAL_EXPENSES[i].referenceType === "sale" && MOCK_OPERATIONAL_EXPENSES[i].referenceId === saleId) {
+        MOCK_OPERATIONAL_EXPENSES.splice(i, 1);
+      }
+    }
+
     return { success: true };
   }
 
@@ -4063,14 +4075,21 @@ export async function cancelSaleRecord(saleId: number, cancelledByUserId: number
     // Eliminar registros de garantía generados por esta venta anulada
     await tx.delete(schema.warranties).where(eq(schema.warranties.saleId, saleId));
 
-    // NOTA: Los items de la venta se conservan intencionalmente para registro histórico
-    // y para poder reimprimir la nota de venta con los artículos vendidos.
+    // Revertir COGS registrado en operationalExpenses para esta venta
+    await tx.delete(operationalExpenses).where(
+      and(
+        eq(operationalExpenses.referenceType, "sale"),
+        eq(operationalExpenses.referenceId, saleId),
+        eq(operationalExpenses.category, "cogs")
+      )
+    );
 
     // Cancelar cuenta por cobrar si existía
     await tx.update(schema.accountsReceivable).set({ status: "cancelled" }).where(eq(schema.accountsReceivable.saleId, saleId));
 
     if (sale.paymentStatus === "completed") {
       await tx.insert(financialTransactions).values({
+        branchId: sale.branchId || 1,
         type: "expense",
         category: "sale_cancellation",
         amount: sale.total,
@@ -4079,6 +4098,44 @@ export async function cancelSaleRecord(saleId: number, cancelledByUserId: number
         paymentMethod: sale.paymentMethod,
         userId: sale.soldBy,
       });
+
+      // ── Revertir venta en la caja del vendedor (si no fue a crédito) ──
+      if (sale.paymentMethod !== "credit") {
+        try {
+          const saleDateKey = sale.createdAt ? getLocalDateKey(new Date(sale.createdAt)) : getLocalDateKey(new Date());
+          const registers = await tx
+            .select()
+            .from(sellerCashRegisters)
+            .where(
+              and(
+                eq(sellerCashRegisters.sellerId, sale.soldBy),
+                eq(sellerCashRegisters.date, saleDateKey)
+              )
+            )
+            .orderBy(desc(sellerCashRegisters.turnNumber));
+
+          const targetBox = registers.find((cr: any) => cr.closingStatus === "open") || registers[0];
+          if (targetBox) {
+            const updateField: any = {};
+            if (sale.paymentMethod === "cash") {
+              updateField.salesCash = sql`GREATEST(0, ${sellerCashRegisters.salesCash} - ${sale.total})`;
+            } else if (sale.paymentMethod === "qr") {
+              updateField.salesQr = sql`GREATEST(0, ${sellerCashRegisters.salesQr} - ${sale.total})`;
+            } else if (sale.paymentMethod === "transfer") {
+              updateField.salesTransfer = sql`GREATEST(0, ${sellerCashRegisters.salesTransfer} - ${sale.total})`;
+            }
+
+            if (Object.keys(updateField).length > 0) {
+              await tx
+                .update(sellerCashRegisters)
+                .set(updateField)
+                .where(eq(sellerCashRegisters.id, targetBox.id));
+            }
+          }
+        } catch (boxErr) {
+          console.error("[cancelSaleRecord] Error revirtiendo venta en caja de vendedor:", boxErr);
+        }
+      }
     }
   });
 
@@ -4933,8 +4990,15 @@ export async function createCreditPayment(data: {
       });
       const paymentId = getInsertId(paymentInsertResult);
 
+      // Obtener branchId de la venta asociada
+      let saleBranchId = 1;
+      if (ar.saleId) {
+        const [saleRow] = await tx.select({ branchId: sales.branchId }).from(sales).where(eq(sales.id, ar.saleId)).limit(1);
+        if (saleRow) saleBranchId = saleRow.branchId || 1;
+      }
+
       await tx.insert(financialTransactions).values({
-        branchId: 1,
+        branchId: saleBranchId,
         type: "income",
         category: "ar_payment",
         amount: paymentAmount,
@@ -4993,8 +5057,15 @@ export async function createCreditPayment(data: {
       });
       const paymentId = getInsertId(paymentInsertResult);
 
+      // Obtener branchId de la compra asociada
+      let purchaseBranchId = 1;
+      if (ap.purchaseId) {
+        const [purchaseRow] = await tx.select({ branchId: purchases.branchId }).from(purchases).where(eq(purchases.id, ap.purchaseId)).limit(1);
+        if (purchaseRow) purchaseBranchId = purchaseRow.branchId || 1;
+      }
+
       await tx.insert(financialTransactions).values({
-        branchId: 1,
+        branchId: purchaseBranchId,
         type: "expense",
         category: "ap_payment",
         amount: paymentAmount,

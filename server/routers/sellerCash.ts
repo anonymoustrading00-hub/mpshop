@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
@@ -8,6 +7,8 @@ import {
   sellerCashRegisters, 
   sellerPartialDeliveries, 
   sellerCashExpenses,
+  financialTransactions,
+  operationalExpenses,
   sales,
   users,
   branches
@@ -724,19 +725,63 @@ export const sellerCashRouter = router({
 
       const [expense] = await db.select().from(sellerCashExpenses).where(eq(sellerCashExpenses.id, input.expenseId)).limit(1);
       if (!expense) throw new TRPCError({ code: "NOT_FOUND", message: "Gasto no encontrado" });
+      if (expense.status === "approved") {
+        return { success: true, message: "El gasto ya se encuentra aprobado" };
+      }
 
       const now = new Date();
-      await db.execute(sql`
-        UPDATE seller_cash_expenses
-        SET status='approved', approvedBy=${ctx.user.id}, approvedAt=${now}, adminNotes=${input.notes || null}
-        WHERE id=${input.expenseId}
-      `);
-      await db.execute(sql`
-        UPDATE seller_cash_registers
-        SET totalExpenses = totalExpenses + ${expense.amount}
-        WHERE id=${expense.cashRegisterId}
-      `);
-      return { success: true, message: "Gasto aprobado" };
+      // Obtener branchId de la caja del vendedor
+      const [cashReg] = await db
+        .select({ branchId: sellerCashRegisters.branchId })
+        .from(sellerCashRegisters)
+        .where(eq(sellerCashRegisters.id, expense.cashRegisterId))
+        .limit(1);
+      const branchId = cashReg?.branchId || 1;
+
+      await db.transaction(async (tx: any) => {
+        await tx.execute(sql`
+          UPDATE seller_cash_expenses
+          SET status='approved', approvedBy=${ctx.user.id}, approvedAt=${now}, adminNotes=${input.notes || null}
+          WHERE id=${input.expenseId}
+        `);
+        await tx.execute(sql`
+          UPDATE seller_cash_registers
+          SET totalExpenses = totalExpenses + ${expense.amount}
+          WHERE id=${expense.cashRegisterId}
+        `);
+
+        // Registrar en Gastos Operacionales (para P&L y reportes)
+        await tx.insert(operationalExpenses).values({
+          branchId,
+          description: `Gasto vendedor: ${expense.concept}`,
+          category: "other",
+          costType: "operational_expense",
+          referenceType: "seller_cash_expense",
+          referenceId: expense.id,
+          isAutomatic: 1,
+          amount: expense.amount,
+          paymentMethod: "cash",
+          status: "paid",
+          userId: expense.sellerId,
+          notes: input.notes || expense.notes || null,
+          expenseDate: now,
+        });
+
+        // Registrar egreso en Transacciones Financieras (Libro Diario)
+        await tx.insert(financialTransactions).values({
+          branchId,
+          type: "expense",
+          category: "seller_expense",
+          paymentMethod: "cash",
+          amount: expense.amount,
+          userId: expense.sellerId,
+          referenceId: expense.id,
+          notes: `Gasto aprobado caja vendedor #${expense.cashRegisterId}: ${expense.concept}`,
+          createdAt: now,
+        });
+      });
+
+      return { success: true, message: "Gasto aprobado y registrado en finanzas" };
     }),
 
   admin_rejectExpense: protectedProcedure
@@ -749,12 +794,42 @@ export const sellerCashRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
       if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
+      const [expense] = await db.select().from(sellerCashExpenses).where(eq(sellerCashExpenses.id, input.expenseId)).limit(1);
+      if (!expense) throw new TRPCError({ code: "NOT_FOUND", message: "Gasto no encontrado" });
+
       const now = new Date();
-      await db.execute(sql`
-        UPDATE seller_cash_expenses
-        SET status='rejected', approvedBy=${ctx.user.id}, approvedAt=${now}, adminNotes=${input.notes}
-        WHERE id=${input.expenseId}
-      `);
+
+      await db.transaction(async (tx: any) => {
+        // Si estaba aprobado, revertir de caja, operationalExpenses y financialTransactions
+        if (expense.status === "approved") {
+          await tx.execute(sql`
+            UPDATE seller_cash_registers
+            SET totalExpenses = GREATEST(0, totalExpenses - ${expense.amount})
+            WHERE id=${expense.cashRegisterId}
+          `);
+
+          await tx.delete(operationalExpenses).where(
+            and(
+              eq(operationalExpenses.referenceType, "seller_cash_expense"),
+              eq(operationalExpenses.referenceId, expense.id)
+            )
+          );
+
+          await tx.delete(financialTransactions).where(
+            and(
+              eq(financialTransactions.category, "seller_expense"),
+              eq(financialTransactions.referenceId, expense.id)
+            )
+          );
+        }
+
+        await tx.execute(sql`
+          UPDATE seller_cash_expenses
+          SET status='rejected', approvedBy=${ctx.user.id}, approvedAt=${now}, adminNotes=${input.notes}
+          WHERE id=${input.expenseId}
+        `);
+      });
+
       return { success: true, message: "Gasto rechazado" };
     }),
 

@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { int, mysqlEnum, mysqlTable, text, longtext, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, longtext, timestamp, unique, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -1052,6 +1052,19 @@ export const screenSizes = mysqlTable("screen_sizes", {
 
 export type ScreenSize = typeof screenSizes.$inferSelect;
 export type InsertScreenSize = typeof screenSizes.$inferInsert;
+
+// Valores libres de ficha técnica (cualquier característica nueva queda reutilizable)
+export const deviceSpecOptions = mysqlTable("device_spec_options", {
+  id: int("id").autoincrement().primaryKey(),
+  specKey: varchar("specKey", { length: 100 }).notNull(),
+  specValue: varchar("specValue", { length: 255 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  keyValueUnique: unique("device_spec_options_key_value_unique").on(table.specKey, table.specValue),
+}));
+
+export type DeviceSpecOption = typeof deviceSpecOptions.$inferSelect;
+export type InsertDeviceSpecOption = typeof deviceSpecOptions.$inferInsert;
 
 // 🔴 CRÍTICO #4: Tabla de KPIs agregados para dashboards rápidos
 // Almacena snapshots diarios de métricas para evitar cálculos costosos en tiempo real

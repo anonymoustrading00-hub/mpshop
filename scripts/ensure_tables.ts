@@ -1376,6 +1376,85 @@ export async function ensureTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
+    console.log("\n[EnsureTables] Device catalogs");
+    await runSQL("device_brands table", `
+      CREATE TABLE IF NOT EXISTS device_brands (
+        id int AUTO_INCREMENT NOT NULL,
+        name varchar(100) NOT NULL,
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT device_brands_id PRIMARY KEY(id),
+        CONSTRAINT device_brands_name_unique UNIQUE(name)
+      )
+    `);
+
+    await runSQL("device_models table", `
+      CREATE TABLE IF NOT EXISTS device_models (
+        id int AUTO_INCREMENT NOT NULL,
+        brandId int NOT NULL,
+        name varchar(255) NOT NULL,
+        defaultSpecs text,
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT device_models_id PRIMARY KEY(id),
+        INDEX device_models_brandId_idx (brandId),
+        UNIQUE KEY device_models_brand_name_unique (brandId, name)
+      )
+    `);
+
+    await runSQL("processors table", `
+      CREATE TABLE IF NOT EXISTS processors (
+        id int AUTO_INCREMENT NOT NULL,
+        name varchar(255) NOT NULL,
+        generation varchar(50),
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT processors_id PRIMARY KEY(id),
+        CONSTRAINT processors_name_unique UNIQUE(name)
+      )
+    `);
+
+    await runSQL("ram_options table", `
+      CREATE TABLE IF NOT EXISTS ram_options (
+        id int AUTO_INCREMENT NOT NULL,
+        capacity varchar(50) NOT NULL,
+        type varchar(50),
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT ram_options_id PRIMARY KEY(id),
+        CONSTRAINT ram_options_capacity_unique UNIQUE(capacity)
+      )
+    `);
+
+    await runSQL("storage_options table", `
+      CREATE TABLE IF NOT EXISTS storage_options (
+        id int AUTO_INCREMENT NOT NULL,
+        capacity varchar(50) NOT NULL,
+        type varchar(50),
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT storage_options_id PRIMARY KEY(id),
+        CONSTRAINT storage_options_capacity_unique UNIQUE(capacity)
+      )
+    `);
+
+    await runSQL("screen_sizes table", `
+      CREATE TABLE IF NOT EXISTS screen_sizes (
+        id int AUTO_INCREMENT NOT NULL,
+        size varchar(50) NOT NULL,
+        resolution varchar(100),
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT screen_sizes_id PRIMARY KEY(id),
+        CONSTRAINT screen_sizes_size_unique UNIQUE(size)
+      )
+    `);
+
+    await runSQL("device_spec_options table", `
+      CREATE TABLE IF NOT EXISTS device_spec_options (
+        id int AUTO_INCREMENT NOT NULL,
+        specKey varchar(100) NOT NULL,
+        specValue varchar(255) NOT NULL,
+        createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT device_spec_options_id PRIMARY KEY(id),
+        UNIQUE KEY device_spec_options_key_value_unique (specKey, specValue)
+      )
+    `);
+
     console.log("\n[EnsureTables] ✅ All tables verified and all columns ensured! v2");
   } finally {
     await connection.end();

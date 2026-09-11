@@ -21,7 +21,7 @@ import {
 } from "../db";
 import {
   units, saleItems, sales, returns,
-  financialTransactions, cashOpenings,
+  financialTransactions, cashOpenings, cashClosures,
   accountsReceivable, unitEvents, repairs,
   purchases, accountsPayable,
 } from "../../drizzle/schema";
@@ -32,7 +32,7 @@ function startOfMonth(d = new Date()): Date {
 }
 function now(): Date { return new Date(); }
 
-function calcBalances(transactions: any[], openings: any[]) {
+function calcBalances(transactions: any[], openings: any[], closures: any[] = []) {
   const calc = (method: "cash" | "qr" | "transfer") => {
     const inc = transactions
       .filter((t: any) => t.type === "income" &&
@@ -45,7 +45,12 @@ function calcBalances(transactions: any[], openings: any[]) {
     const opening = openings
       .filter((o: any) => o.paymentMethod === method || (method === "cash" && !o.paymentMethod))
       .reduce((s: number, o: any) => s + (o.openingAmount || 0), 0);
-    return inc - exp + opening;
+    // Restar cierres de caja (dinero retirado/arqueado)
+    const closure = closures.reduce((s: number, c: any) => {
+      const amt = method === "cash" ? (c.reportedCash || 0) : method === "qr" ? (c.reportedQr || 0) : (c.reportedTransfer || 0);
+      return s + amt;
+    }, 0);
+    return (inc + opening) - (exp + closure);
   };
   const cash = calc("cash");
   const qr = calc("qr");
@@ -576,7 +581,7 @@ export const dashboardRouter = router({
         if (!["available", "in_repair", "in_diagnosis"].includes(u.status)) return false;
         return new Date(u.createdAt) <= thirtyDaysAgo;
       }).length;
-      const balances = calcBalances(MOCK_FINANCIAL_TRANSACTIONS, MOCK_CASH_OPENINGS);
+      const balances = calcBalances(MOCK_FINANCIAL_TRANSACTIONS, MOCK_CASH_OPENINGS, []);
       const cxcPending = (MOCK_ACCOUNTS_RECEIVABLE as any[])
         .filter((ar: any) => ar.status !== "paid")
         .reduce((s: number, ar: any) => s + (ar.balance || 0), 0);
@@ -588,7 +593,7 @@ export const dashboardRouter = router({
       };
     }
 
-    const [soldThisMonthRows, returnsThisMonthRows, salesThisMonthRows, agingRows, txRows, openingRows, cxcRows] =
+    const [soldThisMonthRows, returnsThisMonthRows, salesThisMonthRows, agingRows, txRows, openingRows, closureRows, cxcRows] =
       await Promise.all([
         db.select({ unitId: saleItems.unitId, finalUnitPrice: saleItems.finalUnitPrice, purchasePrice: units.purchasePrice, unitCreatedAt: units.createdAt })
           .from(saleItems)
@@ -599,6 +604,7 @@ export const dashboardRouter = router({
         db.select({ count: sql<number>`count(*)` }).from(units).where(and(inArray(units.status, ["available", "in_repair", "in_diagnosis"]), lte(units.createdAt, thirtyDaysAgo))),
         db.select({ type: financialTransactions.type, paymentMethod: financialTransactions.paymentMethod, amount: financialTransactions.amount }).from(financialTransactions),
         db.select({ paymentMethod: cashOpenings.paymentMethod, openingAmount: cashOpenings.openingAmount }).from(cashOpenings),
+        db.select({ reportedCash: cashClosures.reportedCash, reportedQr: cashClosures.reportedQr, reportedTransfer: cashClosures.reportedTransfer }).from(cashClosures),
         db.select({ balance: accountsReceivable.balance }).from(accountsReceivable).where(ne(accountsReceivable.status, "paid")),
       ]);
 
@@ -641,7 +647,7 @@ export const dashboardRouter = router({
       avgInventoryDays: daysCount > 0 ? Math.round(daysSum / daysCount) : 0,
       returnRatePct: salesN > 0 ? Math.round((returnsN / salesN) * 1000) / 10 : 0,
       agingCount: Number((agingRows as any[])[0]?.count || 0),
-      balances: calcBalances(txRows, openingRows),
+      balances: calcBalances(txRows, openingRows, closureRows),
       cxcPendingCents: (cxcRows as any[]).reduce((s: number, r: any) => s + (r.balance || 0), 0),
       periodLabel: monthStart.toLocaleDateString("es-BO", { month: "long", year: "numeric" }),
       salesThisMonth: salesN,
